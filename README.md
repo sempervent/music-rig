@@ -2,6 +2,8 @@
 
 Living documentation for a one-human, many-machines home studio routing system: Alesis mixer, TASCAM US-16x08, Ableton Live, KAOSS Replay, BOSS RC-1, miniKORG, Privia, pedal loops, DI/reamp utilities, MIDI sync, and troubleshooting notes.
 
+Documentation site: https://sempervent.github.io/music-rig/
+
 This repo is intended to be the authoritative source for:
 
 - current signal flow
@@ -78,19 +80,21 @@ flowchart LR
 - [Troubleshooting log](docs/troubleshooting.md)
 - [Open questions](docs/open-questions.md)
 
-## Suggested first commands
+## Documentation CI/CD
+
+- Pull requests that change documentation-related files run `mkdocs build --strict`.
+- Pushes to `main` and manual workflow runs build the site and deploy it to GitHub Pages.
+- Local validation:
 
 ```bash
-git init
-git add .
-git commit -m "Initial music rig documentation"
-gh repo create sempervent/music-rig --private --source=. --remote=origin --push
+python -m pip install -r requirements-docs.txt
+mkdocs build --strict
 ```
 
-If you want it public instead:
+- Local preview:
 
 ```bash
-gh repo create sempervent/music-rig --public --source=. --remote=origin --push
+mkdocs serve
 ```
 
 ## Local docs preview
@@ -98,13 +102,6 @@ gh repo create sempervent/music-rig --public --source=. --remote=origin --push
 This repo is MkDocs-ready:
 
 ```bash
-uv tool run mkdocs serve
-```
-
-or, if you prefer a local venv:
-
-```bash
-uv venv
-uv pip install mkdocs mkdocs-material
-uv run mkdocs serve
+python -m pip install -r requirements-docs.txt
+mkdocs serve
 ```

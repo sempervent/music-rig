@@ -1,4 +1,5 @@
 site_name: Music Rig
+site_url: https://sempervent.github.io/music-rig/
 site_description: Living documentation for the home studio routing, pedals, MIDI, and recording setup.
 repo_name: sempervent/music-rig
 repo_url: https://github.com/sempervent/music-rig
@@ -7,7 +8,10 @@ theme:
   features:
     - navigation.sections
     - navigation.instant
+    - navigation.tracking
     - content.code.copy
+plugins:
+  - search
 nav:
   - Home: index.md
   - Current Routing: current-routing.md
