@@ -1,0 +1,31 @@
+# Ableton Track Map
+
+## Known track plan
+
+| Ableton Track | Source | TASCAM Input(s) | Notes |
+|---|---|---|---|
+| Drums | padKONTROL / Launchpad X | MIDI ch10 | Drum control |
+| miniKORG | miniKORG | 3/4 | Stereo synth |
+| MIXER | Alesis main out | 1/2 | Clean stereo mixer bus |
+| KAOSS | KAOSS Replay | 9/10 | Stereo KAOSS output |
+| GUITAR CLEAN | Guitar | 5 | Dry guitar |
+| BASS CLEAN | Bass | 7 | Dry bass |
+| KAOSS - Privia | KAOSS-derived | 9/10 | Label clips by source when sampling |
+| KAOSS - Kazoo | KAOSS-derived | 9/10 | Label clips by source when sampling |
+| KAOSS - Bass | KAOSS-derived | 9/10 | Label clips by source when sampling |
+| KAOSS - Guitar | KAOSS-derived | 9/10 | Label clips by source when sampling |
+
+## Clip naming convention
+
+Use this pattern:
+
+```text
+YYYY-MM-DD_source_device_bpm_key_take-description
+```
+
+Examples:
+
+```text
+2026-07-13_bass_kaoss_92bpm_Am_take01_swamp-pulse
+2026-07-13_privia_rc1_110bpm_Dm_take03_half-lit-loop
+```

@@ -1,0 +1,43 @@
+interfaces:
+  - TASCAM US-16x08
+  - Alesis mixer
+instruments:
+  - Bass
+  - Guitar
+  - Electric kazoo
+  - Casio Privia
+  - Korg miniKORG
+loopers_samplers:
+  - BOSS RC-1
+  - KAOSS Replay
+routers_di_reamp:
+  - JOYO A/B/Bypass router
+  - BOSS LS-2
+  - Radial ProRMP
+  - PYLE-PRO PDC22 dual DI
+  - MXR TRS split + tap
+controllers:
+  - Launchpad X
+  - Korg padKONTROL
+  - Behringer FCB1010
+  - Novation Remote Zero SL
+  - MOSKY Dual Switch
+  - BOSS EV-30
+pedals_chain_a:
+  - OD-1
+  - BD-2
+  - JB-2
+  - MT-2w
+  - TR-2
+  - DS-1
+pedals_chain_b:
+  - SY-1
+  - Flamma Mod
+  - PH-2
+  - SL-2
+  - DD-8
+  - PH-3
+  - TE-2
+  - RE-2
+post_router:
+  - BOSS CH-1

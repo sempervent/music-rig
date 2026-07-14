@@ -1,0 +1,26 @@
+routes:
+  clean_mixer_capture:
+    from: Alesis Main Out
+    to: TASCAM 1/2
+  kaoss_capture:
+    from: Alesis Monitor Out
+    through: KAOSS Replay
+    to: TASCAM 9/10
+  aux_send_loop:
+    from: Alesis AUX SEND
+    chain:
+      - Cry Baby
+      - BOSS RC-1
+      - JOYO A/B/Bypass
+      - Chain A or Chain B
+      - BOSS CH-1 stereo out
+    to: Alesis stereo return or line return
+  miniKORG_direct:
+    from: miniKORG stereo out
+    to: TASCAM 3/4
+  guitar_clean:
+    from: Guitar direct or clean split
+    to: TASCAM 5
+  bass_clean:
+    from: Bass direct or clean split
+    to: TASCAM 7

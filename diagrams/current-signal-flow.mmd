@@ -1,0 +1,23 @@
+flowchart LR
+  Bass --> Alesis1[Alesis Ch 1]
+  Guitar --> Alesis2[Alesis Ch 2]
+  Kazoo[Electric Kazoo] --> Alesis4[Alesis Ch 4]
+  Privia --> Alesis56[Alesis Ch 5/6]
+  MiniKORG --> Tascam34[TASCAM 3/4]
+
+  Alesis1 --> Aux[AUX SEND]
+  Alesis2 --> Aux
+  Alesis4 --> Aux
+  Alesis56 --> Aux
+
+  Aux --> CryBaby --> RC1[BOSS RC-1] --> JOYO
+  JOYO --> ChainA[Chain A: OD/BD/JB/MT/TR/DS]
+  JOYO --> ChainB[Chain B: SY/Mod/SL/DD/PH/TE/RE]
+  ChainA --> CH1[BOSS CH-1 Stereo]
+  ChainB --> CH1
+  CH1 --> AlesisReturn[Alesis Stereo Return]
+
+  AlesisMain[Alesis Main Out] --> Tascam12[TASCAM 1/2]
+  AlesisMonitor[Alesis Monitor Out] --> KAOSS[KAOSS Replay] --> Tascam910[TASCAM 9/10]
+  Guitar --> Tascam5[TASCAM 5 Clean Guitar]
+  Bass --> Tascam7[TASCAM 7 Clean Bass]

@@ -1,0 +1,14 @@
+flowchart LR
+  Aux[Alesis AUX SEND]
+  Wah[Cry Baby]
+  Loop[BOSS RC-1]
+  Router[JOYO A/B/Bypass]
+  A[Chain A: OD-1 -> BD-2 -> JB-2 -> MT-2w -> TR-2 -> DS-1]
+  B[Chain B: SY-1 -> Flamma Mod -> PH-2 -> SL-2 -> DD-8 -> PH-3 -> TE-2 -> RE-2]
+  Chorus[BOSS CH-1 Stereo]
+  Return[Alesis Return / Line Channel]
+
+  Aux --> Wah --> Loop --> Router
+  Router --> A --> Chorus
+  Router --> B --> Chorus
+  Chorus --> Return

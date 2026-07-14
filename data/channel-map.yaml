@@ -1,0 +1,18 @@
+tascam:
+  1: { name: MIXER_L, source: Alesis main out L, type: clean_stereo_bus }
+  2: { name: MIXER_R, source: Alesis main out R, type: clean_stereo_bus }
+  3: { name: miniKORG_L, source: miniKORG L, type: synth }
+  4: { name: miniKORG_R, source: miniKORG R, type: synth }
+  5: { name: GUITAR_CLEAN, source: Guitar, type: clean_mono }
+  6: { name: OPEN, source: null, type: reserved }
+  7: { name: BASS_CLEAN, source: Bass, type: clean_mono }
+  8: { name: OPEN, source: null, type: reserved }
+  9: { name: KAOSS_L, source: KAOSS Replay L, type: wet_stereo }
+  10: { name: KAOSS_R, source: KAOSS Replay R, type: wet_stereo }
+alesis:
+  1: { source: Bass, aux_send: true }
+  2: { source: Guitar, aux_send: true }
+  3: { source: null, aux_send: false }
+  4: { source: Electric kazoo, aux_send: true }
+  5_6: { source: Privia, aux_send: true }
+  7_8: { source: null, aux_send: false }

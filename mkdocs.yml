@@ -1,0 +1,28 @@
+site_name: Music Rig
+site_description: Living documentation for the home studio routing, pedals, MIDI, and recording setup.
+repo_name: sempervent/music-rig
+repo_url: https://github.com/sempervent/music-rig
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.instant
+    - content.code.copy
+nav:
+  - Home: index.md
+  - Current Routing: current-routing.md
+  - Inventory: inventory.md
+  - TASCAM Channel Map: tascam-channel-map.md
+  - Alesis Mixer Map: alesis-mixer-map.md
+  - Pedal Chains: pedal-chains.md
+  - Ableton Track Map: ableton-track-map.md
+  - MIDI Clock: midi-clock.md
+  - Reamp and DI: reamp-and-di.md
+  - Troubleshooting: troubleshooting.md
+  - Open Questions: open-questions.md
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - tables
+  - fenced_code
