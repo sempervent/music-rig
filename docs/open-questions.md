@@ -20,6 +20,7 @@
 
 ## Hardware candidates
 
+- See [Studio Wishlist and Upgrade Priorities](wishlist.md) for evaluated purchase priorities and proposed integration experiments.
 - MIDI thru/splitter
 - Patchbay, possibly ART P48 or equivalent
 - Better isolated pedal power

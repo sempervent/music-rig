@@ -29,6 +29,16 @@ Ableton Live
 | MOSKY Dual Switch | Momentary control | Useful on RC-1 STOP/UNDO |
 | BOSS EV-30 | Dual expression | Candidate for SL-2 / PH-3 expression workflows |
 
+## Wishlist control and clock implications
+
+Ableton remains the intended master clock.
+
+The MIDI Captain is a command controller, not a reliable continuous clock source.
+
+A dedicated MIDI splitter/router is still required for distributing clock to the miniKORG, KAOSS Replay, SL-2, Microcosm, RC-505mkII, and other future MIDI-capable devices.
+
+The FCB1010 direct-to-TASCAM test remains open and should be completed before replacing it on workflow grounds alone.
+
 ## FCB1010 problem statement
 
 The device appears in Ableton indirectly through the USB Uno interface, but presses are not being recognized as expected. Track exact observations here before changing multiple variables.

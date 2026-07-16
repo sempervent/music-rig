@@ -71,6 +71,7 @@ flowchart LR
 
 - [Current routing](docs/current-routing.md)
 - [Inventory](docs/inventory.md)
+- [Studio wishlist](docs/wishlist.md)
 - [TASCAM channel map](docs/tascam-channel-map.md)
 - [Alesis mixer map](docs/alesis-mixer-map.md)
 - [Pedal chains](docs/pedal-chains.md)
