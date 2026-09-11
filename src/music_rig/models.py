@@ -349,7 +349,7 @@ class QuestionStatus(str, Enum):
 class QuestionTarget(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    domain: str  # patchbay.mode | patchbay.model | channel.source | routing.verify | inventory.patchbay_mapping
+    domain: str  # patchbay.* | channel.* | routing.* | inventory.* | midi.*
     bay: str | None = None
     pair: str | None = None
     device: str | None = None
@@ -491,6 +491,186 @@ class PatchbayMode(str, Enum):
     HALF_NORMAL = "half-normal"
     THRU = "thru"
     UNKNOWN = "unknown"
+
+
+class MidiEvidenceStatus(str, Enum):
+    VERIFIED = "VERIFIED"
+    INTENDED = "INTENDED"
+    UNKNOWN = "UNKNOWN"
+
+
+class MidiTransport(str, Enum):
+    DIN = "DIN"
+    USB = "USB"
+    VIRTUAL = "VIRTUAL"
+
+
+class MidiTriState(str, Enum):
+    ON = "on"
+    OFF = "off"
+    UNKNOWN = "unknown"
+
+
+class MidiEndpoint(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1)
+    kind: str = Field(pattern=r"^(software|host)$")
+    name: str = Field(min_length=1)
+
+
+class MidiDevice(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    gear_ref: str = Field(min_length=1)
+    role: str = Field(min_length=1)
+    notes: str = ""
+
+
+class MidiConnection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(pattern=r"^midi-link-\d{3}$")
+    source: str = Field(min_length=1)
+    source_port: str = Field(min_length=1)
+    destination: str = Field(min_length=1)
+    destination_port: str = Field(min_length=1)
+    transport: MidiTransport
+    status: MidiEvidenceStatus
+    notes: str = ""
+
+
+class MidiChannelAssignment(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    gear_ref: str = Field(min_length=1)
+    channel: int | str
+    status: MidiEvidenceStatus
+    notes: str = ""
+
+    @field_validator("channel")
+    @classmethod
+    def _valid_channel(cls, value: int | str) -> int | str:
+        if isinstance(value, int):
+            if 1 <= value <= 16:
+                return value
+            raise ValueError("MIDI channel must be 1-16, OMNI, or UNKNOWN")
+        normalized = value.strip().upper()
+        if normalized not in {"OMNI", "UNKNOWN"}:
+            raise ValueError("MIDI channel must be 1-16, OMNI, or UNKNOWN")
+        return normalized
+
+
+class MidiClockMaster(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    endpoint_ref: str | None = None
+    gear_ref: str | None = None
+    status: MidiEvidenceStatus
+    notes: str = ""
+
+    @model_validator(mode="after")
+    def _one_reference(self) -> MidiClockMaster:
+        if bool(self.endpoint_ref) == bool(self.gear_ref):
+            raise ValueError("clock master requires exactly one endpoint_ref or gear_ref")
+        return self
+
+
+class MidiClockDestination(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    endpoint_ref: str | None = None
+    gear_ref: str | None = None
+    enabled: MidiTriState
+    status: MidiEvidenceStatus
+    notes: str = ""
+
+    @model_validator(mode="after")
+    def _one_reference(self) -> MidiClockDestination:
+        if bool(self.endpoint_ref) == bool(self.gear_ref):
+            raise ValueError(
+                "clock destination requires exactly one endpoint_ref or gear_ref"
+            )
+        return self
+
+
+class MidiClockTransportState(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: MidiEvidenceStatus
+    notes: str = ""
+
+
+class MidiClock(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    master: MidiClockMaster | None = None
+    destinations: list[MidiClockDestination] = Field(default_factory=list)
+    transport: MidiClockTransportState
+
+
+class MidiAbletonPort(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1)
+    direction: str = Field(pattern=r"^(input|output)$")
+    endpoint_ref: str | None = None
+    gear_ref: str | None = None
+    port_name: str | None = None
+    track: MidiTriState
+    sync: MidiTriState
+    remote: MidiTriState
+    status: MidiEvidenceStatus
+    notes: str = ""
+
+    @model_validator(mode="after")
+    def _one_reference(self) -> MidiAbletonPort:
+        refs = (self.endpoint_ref, self.gear_ref, self.port_name)
+        if sum(bool(ref) for ref in refs) != 1:
+            raise ValueError(
+                "Ableton port requires exactly one endpoint_ref, gear_ref, or port_name"
+            )
+        return self
+
+
+class MidiRoute(BaseModel):
+    """A programmable MIDI route; fields remain minimal until routes are verified."""
+
+    model_config = ConfigDict(extra="allow")
+
+    id: str | None = None
+    source: str | None = None
+    destination: str | None = None
+    status: MidiEvidenceStatus = MidiEvidenceStatus.UNKNOWN
+    notes: str = ""
+
+
+class MidiDocument(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    endpoints: list[MidiEndpoint] = Field(default_factory=list)
+    devices: list[MidiDevice] = Field(default_factory=list)
+    connections: list[MidiConnection] = Field(default_factory=list)
+    channels: list[MidiChannelAssignment] = Field(default_factory=list)
+    clock: MidiClock
+    ableton_ports: list[MidiAbletonPort] = Field(default_factory=list)
+    routes: list[MidiRoute] = Field(default_factory=list)
+    unknowns: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _unique_ids_and_refs(self) -> MidiDocument:
+        for label, values in (
+            ("MIDI endpoint IDs", [item.id for item in self.endpoints]),
+            ("MIDI connection IDs", [item.id for item in self.connections]),
+            ("MIDI device gear_refs", [item.gear_ref for item in self.devices]),
+            ("MIDI channel gear_refs", [item.gear_ref for item in self.channels]),
+            ("Ableton port IDs", [item.id for item in self.ableton_ports]),
+            ("MIDI route IDs", [item.id for item in self.routes if item.id]),
+        ):
+            folded = [value.casefold() for value in values]
+            if len(folded) != len(set(folded)):
+                raise ValueError(f"{label} must be unique")
+        return self
 
 
 class CurrentPreview(BaseModel):

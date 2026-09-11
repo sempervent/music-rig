@@ -10,6 +10,7 @@ from music_rig.models import (
     ChangesDocument,
     InboxDocument,
     InventoryDocument,
+    MidiDocument,
     OpenQuestionsDocument,
     RoutingDocument,
     SessionLog,
@@ -29,6 +30,7 @@ CHANNEL_MAP_PATH = DATA_DIR / "channel-map.yaml"
 PATCHBAYS_PATH = DATA_DIR / "patchbays.yaml"
 ROUTING_PATH = DATA_DIR / "routing.yaml"
 INVENTORY_PATH = DATA_DIR / "inventory.yaml"
+MIDI_PATH = DATA_DIR / "midi.yaml"
 DOCS_TODO_PATH = ROOT / "docs" / "todo.md"
 DOCS_WISHLIST_PATH = ROOT / "docs" / "wishlist.md"
 DOCS_QUESTIONS_PATH = ROOT / "docs" / "open-questions.md"
@@ -38,15 +40,19 @@ DOCS_ALESIS_PATH = ROOT / "docs" / "alesis-mixer-map.md"
 DOCS_ROUTING_PATH = ROOT / "docs" / "current-routing.md"
 DOCS_PEDAL_CHAINS_PATH = ROOT / "docs" / "pedal-chains.md"
 DOCS_INVENTORY_PATH = ROOT / "docs" / "inventory.md"
+DOCS_MIDI_TOPOLOGY_PATH = ROOT / "docs" / "midi-topology.md"
+DOCS_MIDI_CLOCK_PATH = ROOT / "docs" / "midi-clock.md"
 DIAGRAM_PATCHBAYS_PATH = ROOT / "diagrams" / "patchbays.mmd"
 DIAGRAM_TASCAM_PATH = ROOT / "diagrams" / "tascam-channel-map.mmd"
 DIAGRAM_AUX_LOOP_PATH = ROOT / "diagrams" / "aux-send-loop.mmd"
+DIAGRAM_MIDI_TOPOLOGY_PATH = ROOT / "diagrams" / "midi-topology.mmd"
 
 EXISTING_YAML = (
     CHANNEL_MAP_PATH,
     INVENTORY_PATH,
     PATCHBAYS_PATH,
     ROUTING_PATH,
+    MIDI_PATH,
 )
 
 
@@ -201,6 +207,21 @@ def load_inventory(path: Path | None = None) -> InventoryDocument:
 def save_inventory(doc: InventoryDocument, path: Path | None = None) -> None:
     target = path or INVENTORY_PATH
     InventoryDocument.model_validate(doc.model_dump())
+    _atomic_write(target, _dump_yaml(doc.model_dump(mode="json", exclude_none=True)))
+
+
+def load_midi(path: Path | None = None) -> MidiDocument:
+    target = path or MIDI_PATH
+    raw = _load_mapping(target, "MIDI")
+    try:
+        return MidiDocument.model_validate(raw)
+    except Exception as exc:
+        raise StoreError(f"MIDI schema validation failed: {exc}") from exc
+
+
+def save_midi(doc: MidiDocument, path: Path | None = None) -> None:
+    target = path or MIDI_PATH
+    MidiDocument.model_validate(doc.model_dump())
     _atomic_write(target, _dump_yaml(doc.model_dump(mode="json", exclude_none=True)))
 
 

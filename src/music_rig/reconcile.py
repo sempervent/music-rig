@@ -40,8 +40,10 @@ CATEGORY_LIKELY_FILES: dict[ChangeCategory, list[str]] = {
         "diagrams/patchbays.mmd",
     ],
     ChangeCategory.MIDI: [
+        "data/midi.yaml",
+        "docs/midi-topology.md",
         "docs/midi-clock.md",
-        "data/inventory.yaml",
+        "diagrams/midi-topology.mmd",
     ],
     ChangeCategory.ABLETON: [
         "docs/ableton-track-map.md",
@@ -68,7 +70,12 @@ AREA_LIKELY_FILES: dict[str, list[str]] = {
     "routing": ["data/routing.yaml", "docs/current-routing.md", "data/channel-map.yaml"],
     "patchbay": ["data/patchbays.yaml", "docs/patchbays.md"],
     "pedals": ["docs/pedal-chains.md", "data/routing.yaml"],
-    "midi": ["docs/midi-clock.md"],
+    "midi": [
+        "data/midi.yaml",
+        "docs/midi-topology.md",
+        "docs/midi-clock.md",
+        "diagrams/midi-topology.mmd",
+    ],
     "performance": ["docs/ableton-track-map.md"],
     "video": ["docs/ableton-track-map.md", "docs/todo.md"],
 }
@@ -273,6 +280,19 @@ def format_reconcile_question(
                 "  Record only observed unit identity; do not invent a PB letter mapping."
             )
             lines.append(f"  then: uv run rig question resolve {q.id}")
+        elif target is not None and target.domain == "midi.clock_master":
+            lines.append("  This question maps to CURRENT MIDI clock master evidence.")
+            lines.append("  Prefer verification (do not invent a master):")
+            lines.append("    uv run rig current midi verify")
+            lines.append(
+                f"    # or after physical check: "
+                f"uv run rig current midi set-clock-master <endpoint> "
+                f"--question {q.id}"
+            )
+        elif target is not None and target.domain == "midi.verify":
+            lines.append("  This question maps to CURRENT MIDI topology verification.")
+            lines.append("    uv run rig current midi verify")
+            lines.append(f"    # optionally pass --question {q.id} on the apply step")
         else:
             lines.append("  inspect the physical rig")
             lines.append(f"  then: uv run rig question resolve {q.id}")

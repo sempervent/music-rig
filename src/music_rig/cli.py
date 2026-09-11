@@ -15,6 +15,7 @@ from music_rig import (
     current_service,
     inbox_service,
     inventory_state,
+    midi_state,
     gear_usage,
     patchbay_state,
     question_service,
@@ -31,6 +32,9 @@ from music_rig.models import (
     GearCondition,
     InboxStatus,
     OwnershipStatus,
+    MidiEvidenceStatus,
+    MidiTransport,
+    MidiTriState,
     TodoPriority,
     TodoStatus,
     TodoTask,
@@ -51,6 +55,7 @@ from music_rig.store import (
     StoreError,
     load_inbox,
     load_inventory,
+    load_midi,
     load_todo,
     load_wishlist,
 )
@@ -82,6 +87,7 @@ reconcile_app = typer.Typer(
 )
 path_app = typer.Typer(help="Read-only CURRENT named paths.", no_args_is_help=True)
 gear_app = typer.Typer(help="Owned equipment inventory.", no_args_is_help=True)
+midi_app = typer.Typer(help="Read-only CURRENT MIDI state.", no_args_is_help=True)
 current_app = typer.Typer(
     help="Modify authoritative CURRENT state (typed, previewed).",
     no_args_is_help=True,
@@ -102,6 +108,10 @@ current_gear_app = typer.Typer(
     help="CURRENT owned-equipment mutations (data/inventory.yaml).",
     no_args_is_help=True,
 )
+current_midi_app = typer.Typer(
+    help="CURRENT MIDI mutations (data/midi.yaml).",
+    no_args_is_help=True,
+)
 app.add_typer(todo_app, name="todo")
 app.add_typer(wish_app, name="wish")
 todo_app.add_typer(next_app, name="next")
@@ -112,11 +122,13 @@ app.add_typer(question_app, name="question")
 app.add_typer(reconcile_app, name="reconcile")
 app.add_typer(path_app, name="path")
 app.add_typer(gear_app, name="gear")
+app.add_typer(midi_app, name="midi")
 app.add_typer(current_app, name="current")
 current_app.add_typer(current_pb_app, name="patchbay")
 current_app.add_typer(current_ch_app, name="channels")
 current_app.add_typer(current_path_app, name="path")
 current_app.add_typer(current_gear_app, name="gear")
+current_app.add_typer(current_midi_app, name="midi")
 
 
 def _fail(message: str, code: int = 1) -> None:
@@ -2294,6 +2306,398 @@ def current_ch_clear_source(
     except StoreError as exc:
         _fail(str(exc))
     console.print(f"[green]Applied:[/green] {result.message}")
+
+
+def _midi_ref(value) -> str:
+    return value.endpoint_ref or value.gear_ref or ""
+
+
+@midi_app.command("summary")
+def midi_summary() -> None:
+    """Summarize canonical MIDI evidence without implying unknown links."""
+    try:
+        doc = midi_state.load_document()
+    except StoreError as exc:
+        _fail(str(exc))
+    counts = {status.value: 0 for status in MidiEvidenceStatus}
+    evidence = [
+        *(item.status for item in doc.connections),
+        *(item.status for item in doc.channels),
+        *(item.status for item in doc.clock.destinations),
+        *(item.status for item in doc.ableton_ports),
+        doc.clock.transport.status,
+    ]
+    if doc.clock.master:
+        evidence.append(doc.clock.master.status)
+    for status in evidence:
+        counts[status.value] += 1
+    master = _midi_ref(doc.clock.master) if doc.clock.master else "UNKNOWN"
+    console.print("[bold]MIDI SUMMARY[/bold]")
+    console.print(f"Devices:       {len(doc.devices)}")
+    console.print(f"Endpoints:     {len(doc.endpoints)}")
+    console.print(f"Physical links:{len(doc.connections):>3}")
+    console.print(f"Clock master:  {master}")
+    console.print(
+        "Evidence:      "
+        + "  ".join(f"{key} {value}" for key, value in counts.items())
+    )
+
+
+@midi_app.command("devices")
+def midi_devices() -> None:
+    try:
+        doc = load_midi()
+    except StoreError as exc:
+        _fail(str(exc))
+    table = Table(title="MIDI DEVICES")
+    for label in ("Gear ref", "Role", "Notes"):
+        table.add_column(label)
+    for item in doc.devices:
+        table.add_row(item.gear_ref, item.role, item.notes or "—")
+    console.print(table)
+
+
+@midi_app.command("links")
+def midi_links() -> None:
+    try:
+        doc = load_midi()
+    except StoreError as exc:
+        _fail(str(exc))
+    table = Table(title="MIDI PHYSICAL LINKS")
+    for label in ("ID", "Source", "Destination", "Transport", "Evidence"):
+        table.add_column(label)
+    for item in doc.connections:
+        table.add_row(
+            item.id,
+            f"{item.source} / {item.source_port}",
+            f"{item.destination} / {item.destination_port}",
+            item.transport.value,
+            item.status.value,
+        )
+    if not doc.connections:
+        table.add_row("—", "UNKNOWN", "UNKNOWN", "—", "UNKNOWN")
+    console.print(table)
+
+
+@midi_app.command("channels")
+def midi_channels() -> None:
+    try:
+        doc = load_midi()
+    except StoreError as exc:
+        _fail(str(exc))
+    table = Table(title="MIDI CHANNELS")
+    for label in ("Gear ref", "Channel", "Evidence", "Notes"):
+        table.add_column(label)
+    for item in doc.channels:
+        table.add_row(
+            item.gear_ref, str(item.channel), item.status.value, item.notes or "—"
+        )
+    console.print(table)
+
+
+@midi_app.command("clock")
+def midi_clock() -> None:
+    try:
+        doc = load_midi()
+    except StoreError as exc:
+        _fail(str(exc))
+    if doc.clock.master:
+        console.print(
+            f"Master: {_midi_ref(doc.clock.master)} "
+            f"({doc.clock.master.status.value})"
+        )
+    else:
+        console.print("Master: UNKNOWN")
+    table = Table(title="CLOCK DESTINATIONS")
+    for label in ("Destination", "Enabled", "Evidence", "Notes"):
+        table.add_column(label)
+    for item in doc.clock.destinations:
+        table.add_row(
+            _midi_ref(item),
+            item.enabled.value.upper(),
+            item.status.value,
+            item.notes or "—",
+        )
+    console.print(table)
+    console.print(f"Transport start/stop: {doc.clock.transport.status.value}")
+
+
+@midi_app.command("ableton")
+def midi_ableton() -> None:
+    try:
+        doc = load_midi()
+    except StoreError as exc:
+        _fail(str(exc))
+    table = Table(title="ABLETON MIDI PORTS")
+    for label in ("ID", "Direction", "Reference", "Track", "Sync", "Remote", "Evidence"):
+        table.add_column(label)
+    for item in doc.ableton_ports:
+        ref = item.endpoint_ref or item.gear_ref or item.port_name or "—"
+        table.add_row(
+            item.id,
+            item.direction,
+            ref,
+            item.track.value.upper(),
+            item.sync.value.upper(),
+            item.remote.value.upper(),
+            item.status.value,
+        )
+    if not doc.ableton_ports:
+        table.add_row("—", "—", "UNKNOWN", "UNKNOWN", "UNKNOWN", "UNKNOWN", "UNKNOWN")
+    console.print(table)
+
+
+def _commit_midi_preview(
+    preview,
+    data: dict,
+    *,
+    yes: bool,
+    dry_run: bool,
+    question: Optional[str],
+    change: Optional[str],
+    answer_hint: str,
+    no_render: bool,
+) -> None:
+    if not _confirm_current(preview, yes=yes, dry_run=dry_run):
+        if dry_run:
+            try:
+                current_service.commit_midi(
+                    data,
+                    preview,
+                    dry_run=True,
+                    render=False,
+                    question_id=question,
+                    change_id=change,
+                )
+            except StoreError as exc:
+                _fail(str(exc))
+            raise typer.Exit(0)
+        if not preview.changed:
+            raise typer.Exit(0)
+        raise typer.Abort()
+    resolve_q, apply_chg, answer = _maybe_resolve_evidence(
+        question_id=question,
+        change_id=change,
+        answer_hint=answer_hint,
+        yes=yes,
+    )
+    try:
+        result = current_service.commit_midi(
+            data,
+            preview,
+            render=not no_render,
+            question_id=question,
+            change_id=change,
+            resolve_q=resolve_q,
+            apply_chg=apply_chg,
+            answer=answer,
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"[green]Applied:[/green] {result.message}")
+
+
+def _midi_mutation_options(
+    preview,
+    data,
+    *,
+    yes: bool,
+    dry_run: bool,
+    question: Optional[str],
+    change: Optional[str],
+    no_render: bool,
+) -> None:
+    _commit_midi_preview(
+        preview,
+        data,
+        yes=yes,
+        dry_run=dry_run,
+        question=question,
+        change=change,
+        answer_hint=preview.message,
+        no_render=no_render,
+    )
+
+
+@current_midi_app.command("set-channel")
+def current_midi_set_channel(
+    gear: str,
+    channel: str,
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    question: Optional[str] = typer.Option(None, "--question"),
+    change: Optional[str] = typer.Option(None, "--change"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        preview, data = midi_state.propose_set_channel(gear, channel)
+    except StoreError as exc:
+        _fail(str(exc))
+    _midi_mutation_options(preview, data, yes=yes, dry_run=dry_run, question=question, change=change, no_render=no_render)
+
+
+@current_midi_app.command("add-link")
+def current_midi_add_link(
+    source: str = typer.Option(..., "--source"),
+    source_port: str = typer.Option(..., "--source-port"),
+    destination: str = typer.Option(..., "--destination"),
+    destination_port: str = typer.Option(..., "--destination-port"),
+    transport: str = typer.Option(..., "--transport"),
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    question: Optional[str] = typer.Option(None, "--question"),
+    change: Optional[str] = typer.Option(None, "--change"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        preview, data = midi_state.propose_add_link(
+            source=source,
+            source_port=source_port,
+            destination=destination,
+            destination_port=destination_port,
+            transport=transport,
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+    _midi_mutation_options(preview, data, yes=yes, dry_run=dry_run, question=question, change=change, no_render=no_render)
+
+
+@current_midi_app.command("remove-link")
+def current_midi_remove_link(
+    link_id: str,
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    question: Optional[str] = typer.Option(None, "--question"),
+    change: Optional[str] = typer.Option(None, "--change"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        preview, data = midi_state.propose_remove_link(link_id)
+    except StoreError as exc:
+        _fail(str(exc))
+    _midi_mutation_options(preview, data, yes=yes, dry_run=dry_run, question=question, change=change, no_render=no_render)
+
+
+@current_midi_app.command("set-clock-master")
+def current_midi_set_clock_master(
+    endpoint: str,
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    question: Optional[str] = typer.Option(None, "--question"),
+    change: Optional[str] = typer.Option(None, "--change"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        preview, data = midi_state.propose_set_clock_master(endpoint)
+    except StoreError as exc:
+        _fail(str(exc))
+    _midi_mutation_options(preview, data, yes=yes, dry_run=dry_run, question=question, change=change, no_render=no_render)
+
+
+@current_midi_app.command("set-clock")
+def current_midi_set_clock(
+    gear_or_endpoint: str,
+    enabled: str,
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    question: Optional[str] = typer.Option(None, "--question"),
+    change: Optional[str] = typer.Option(None, "--change"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        preview, data = midi_state.propose_set_clock_destination(
+            gear_or_endpoint, enabled
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+    _midi_mutation_options(preview, data, yes=yes, dry_run=dry_run, question=question, change=change, no_render=no_render)
+
+
+@current_midi_app.command("ableton-set")
+def current_midi_ableton_set(
+    port_id: str,
+    track: Optional[str] = typer.Option(None, "--track"),
+    sync: Optional[str] = typer.Option(None, "--sync"),
+    remote: Optional[str] = typer.Option(None, "--remote"),
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    question: Optional[str] = typer.Option(None, "--question"),
+    change: Optional[str] = typer.Option(None, "--change"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        preview, data = midi_state.propose_ableton_set(
+            port_id, track=track, sync=sync, remote=remote
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+    _midi_mutation_options(preview, data, yes=yes, dry_run=dry_run, question=question, change=change, no_render=no_render)
+
+
+@current_midi_app.command("verify")
+def current_midi_verify(
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    question: Optional[str] = typer.Option(None, "--question"),
+    change: Optional[str] = typer.Option(None, "--change"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    """Walk known MIDI facts and apply selected verification as one transaction."""
+    try:
+        doc = midi_state.load_document()
+    except StoreError as exc:
+        _fail(str(exc))
+    mutations: list[dict] = []
+    for item in doc.channels:
+        value = typer.prompt(
+            f"Channel for {item.gear_ref}", default=str(item.channel)
+        ).strip()
+        if value:
+            mutations.append(
+                {"op": "set_channel", "gear_ref": item.gear_ref, "channel": value}
+            )
+    if doc.clock.master:
+        master = typer.prompt(
+            "Clock master", default=_midi_ref(doc.clock.master)
+        ).strip()
+        if master:
+            mutations.append({"op": "set_clock_master", "ref": master})
+    for item in doc.clock.destinations:
+        value = typer.prompt(
+            f"Clock to {_midi_ref(item)} (on/off/unknown)",
+            default=item.enabled.value,
+        ).strip()
+        if value.lower() != "unknown" or item.enabled != MidiTriState.UNKNOWN:
+            mutations.append(
+                {
+                    "op": "set_clock_destination",
+                    "ref": _midi_ref(item),
+                    "enabled": value,
+                }
+            )
+    for port in doc.ableton_ports:
+        values = {}
+        for field in ("track", "sync", "remote"):
+            current = getattr(port, field).value
+            values[field] = typer.prompt(
+                f"{port.id} {field} (on/off/unknown)", default=current
+            ).strip()
+        mutations.append({"op": "ableton_set", "port_id": port.id, **values})
+    for link in doc.connections:
+        label = (
+            f"{link.id}: {link.source}/{link.source_port} -> "
+            f"{link.destination}/{link.destination_port}"
+        )
+        if typer.confirm(
+            f"Verified physical link {label}?",
+            default=link.status == MidiEvidenceStatus.VERIFIED,
+        ):
+            mutations.append({"op": "verify_link", "link_id": link.id})
+    try:
+        preview, data = midi_state.propose_batch(mutations)
+    except StoreError as exc:
+        _fail(str(exc))
+    _midi_mutation_options(preview, data, yes=yes, dry_run=dry_run, question=question, change=change, no_render=no_render)
 
 
 @app.command("now")

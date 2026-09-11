@@ -90,6 +90,7 @@ Clean paths use preamp → A/B/Y before the confirmed TASCAM clean legs (5/6/7).
 - [Alesis mixer map](docs/alesis-mixer-map.md)
 - [Pedal chains](docs/pedal-chains.md)
 - [Ableton track map](docs/ableton-track-map.md)
+- [MIDI topology](docs/midi-topology.md)
 - [MIDI clock and controller notes](docs/midi-clock.md)
 - [Reamp and DI notes](docs/reamp-and-di.md)
 - [Troubleshooting log](docs/troubleshooting.md)
@@ -148,6 +149,12 @@ uv run rig patchbay list
 uv run rig patchbay PB-B
 uv run rig path list
 uv run rig path show space
+uv run rig midi summary
+uv run rig midi devices
+uv run rig midi links
+uv run rig midi channels
+uv run rig midi clock
+uv run rig midi ableton
 
 # Evidence vs CURRENT truth
 # I noticed something:        rig capture / rig change
@@ -185,6 +192,15 @@ uv run rig current gear acquire "BOSS RC-600"
 # `rig current gear acquire` does not purchase equipment.
 # It records that equipment has already been acquired and updates repository state.
 
+# Verify and maintain MIDI facts independently
+uv run rig current midi set-channel casio-privia 1 --dry-run
+uv run rig current midi add-link --source <ref> --source-port <port> \
+  --destination <ref> --destination-port <port> --transport DIN --dry-run
+uv run rig current midi set-clock-master ableton --question Q-014
+uv run rig current midi set-clock korg-minikorg unknown
+uv run rig current midi ableton-set <port-id> --track on --remote on
+uv run rig current midi verify
+
 # While working
 uv run rig session note "PH-3 confirmed before TR-2"
 uv run rig session discovery "RE-2 quiet on separate power"
@@ -219,6 +235,10 @@ which writes inventory and wishlist state transactionally.
 `rig now` is deterministic and explainable (no LLM).
 `rig doctor` is advisory; `rig check` remains the CI gate.
 No CLI command commits or pushes Git.
+
+MIDI physical links, channel assignments, clock state, and Ableton Track / Sync /
+Remote settings are separate evidence domains. `INTENDED` records design intent;
+it must never be read or promoted as `VERIFIED` without direct evidence.
 
 ## Documentation CI/CD
 

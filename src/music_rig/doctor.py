@@ -45,6 +45,10 @@ def build_doctor_text(
     diagram_aux_loop: Path | None = None,
     inventory_path: Path | None = None,
     docs_inventory: Path | None = None,
+    midi_path: Path | None = None,
+    docs_midi_topology: Path | None = None,
+    docs_midi_clock: Path | None = None,
+    diagram_midi_topology: Path | None = None,
 ) -> str:
     attention = 0
     lines = ["RIG DOCTOR", ""]
@@ -66,6 +70,10 @@ def build_doctor_text(
         diagram_aux_loop=diagram_aux_loop,
         inventory_path=inventory_path,
         docs_inventory=docs_inventory,
+        midi_path=midi_path,
+        docs_midi_topology=docs_midi_topology,
+        docs_midi_clock=docs_midi_clock,
+        diagram_midi_topology=diagram_midi_topology,
     )
     planning_errors = [
         e
@@ -257,6 +265,33 @@ def build_doctor_text(
             lines.append("✓ No OPEN PEDAL_CHAIN / AUDIO_ROUTING changes")
     except StoreError:
         pass
+
+    # MIDI detail stays out of compact `rig status`; doctor only checks validity/sync.
+    lines.append("")
+    lines.append("MIDI")
+    midi_errors = [
+        error
+        for error in checks.errors
+        if error.startswith("midi:") or "midi.yaml" in error
+    ]
+    midi_stale = [
+        error
+        for error in checks.errors
+        if any(
+            name in error
+            for name in ("midi-topology.md", "midi-clock.md", "midi-topology.mmd")
+        )
+    ]
+    if midi_errors:
+        lines.append("✗ MIDI state invalid")
+        attention += 1
+    else:
+        lines.append("✓ MIDI state valid")
+    if midi_stale:
+        lines.append("✗ MIDI projections out of sync")
+        attention += 1
+    else:
+        lines.append("✓ MIDI projections synchronized")
 
     # Inventory identity
     lines.append("")

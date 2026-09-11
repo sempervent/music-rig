@@ -1,24 +1,41 @@
 # MIDI Clock and Controllers
 
-## Goal
+Clock intent, channel assignment, physical cabling, and Ableton Track / Sync /
+Remote settings are separate facts. `INTENDED` is never equivalent to `VERIFIED`.
+See [MIDI Topology](midi-topology.md) for physical-link evidence.
 
-Ableton should be the master clock where practical, sending tempo/sync to:
+<!-- rig:midi-clock:start -->
+<!-- GENERATED FROM data/midi.yaml BY `uv run rig render`. DO NOT EDIT THIS SECTION DIRECTLY. -->
 
-- miniKORG
-- KAOSS Replay
-- BOSS SL-2
-- other MIDI-capable devices as added
+## Clock state
 
-## Current intent
+Master: **ableton** — INTENDED
 
-```text
-Ableton Live
-  -> CME U6MIDI Pro and/or TASCAM US-16x08 MIDI paths
-  -> CME MIDI Thru5 WC (distribution)
-  -> miniKORG / KAOSS Replay / SL-2 / future MIDI devices
-```
+Desired default. Not VERIFIED CURRENT — see Q-014 and TODO RIG-031. Do not treat this as confirmed practice yet.
 
-Exact physical topology is not fully verified. Treat the above as intent until TODO RIG-037 is complete.
+| Destination | Enabled | Evidence | Notes |
+|---|---|---|---|
+| korg-minikorg | UNKNOWN | INTENDED | Listed as intended clock consumer in docs/midi-clock.md |
+| kaoss-replay | UNKNOWN | INTENDED | Listed as intended clock consumer; may sometimes lead (Q-014) |
+| boss-sl-2 | UNKNOWN | INTENDED | Listed as intended clock consumer; may sometimes lead (Q-014) |
+
+Transport start/stop evidence: **UNKNOWN**
+
+## Channel assignments
+
+| Device | Channel | Evidence | Notes |
+|---|---:|---|---|
+| casio-privia | 1 | INTENDED | Planning isolation; confirm in RIG-037 / Q-015 |
+| korg-padkontrol | 10 | INTENDED | Drums; confirm in RIG-037 |
+| novation-remote-zero-sl | 15 | INTENDED | Confirm in RIG-037; encoder #6 broken (inventory) |
+| behringer-fcb1010 | 16 | INTENDED | Target channel; EXP A/B CC map is controller-mapping Stage 9+ (RIG-035) |
+
+## Ableton MIDI ports
+
+| Port | Direction | Reference | Track | Sync | Remote | Evidence |
+|---|---|---|---|---|---|---|
+| — | — | UNKNOWN | UNKNOWN | UNKNOWN | UNKNOWN | UNKNOWN |
+<!-- rig:midi-clock:end -->
 
 ## Owned MIDI hardware (not wishlist purchases)
 
@@ -28,15 +45,6 @@ Exact physical topology is not fully verified. Treat the above as intent until T
 | CME MIDI Thru5 WC | Hardware thru distribution | OWNED |
 
 A generic “buy MIDI thru/splitter” wishlist item is **REDUNDANT** while these are owned.
-
-## Channel isolation direction (planning — verify)
-
-| Device | MIDI channel | Notes |
-|---|---:|---|
-| Casio Privia | 1 | Confirm in RIG-037 |
-| padKONTROL | 10 | Drums |
-| Novation ReMOTE ZeRO SL | 15 | Encoder #6 broken |
-| Behringer FCB1010 | 16 | EXP A=CC111, EXP B=CC112 (RIG-035) |
 
 ## Controllers
 
