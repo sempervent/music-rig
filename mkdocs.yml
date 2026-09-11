@@ -16,9 +16,12 @@ nav:
   - Home: index.md
   - Current Routing: current-routing.md
   - Inventory: inventory.md
+  - Patchbays: patchbays.md
+  - Pedal Chains: pedal-chains.md
   - TASCAM Channel Map: tascam-channel-map.md
   - Alesis Mixer Map: alesis-mixer-map.md
-  - Pedal Chains: pedal-chains.md
+  - Todo: todo.md
+  - Wishlist: wishlist.md
   - Ableton Track Map: ableton-track-map.md
   - MIDI Clock: midi-clock.md
   - Reamp and DI: reamp-and-di.md

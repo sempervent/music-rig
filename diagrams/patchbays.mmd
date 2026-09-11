@@ -1,0 +1,45 @@
+flowchart TB
+  subgraph PBB[PB-B documented connectivity]
+    direction TB
+
+    subgraph Sources[Upper row sources]
+      U1[1 miniKORG L/MONO]
+      U2[2 miniKORG R]
+      U3[3 SR-18 MAIN L]
+      U4[4 SR-18 MAIN R]
+      U7[7 Privia L/MONO]
+      U8[8 Privia R]
+      U9[9 UNASSIGNED]
+      U10[10 UNASSIGNED]
+      U11[11 UNASSIGNED]
+      U12[12 UNASSIGNED]
+    end
+
+    subgraph Destinations[Lower row destinations]
+      L25[25 TASCAM 3]
+      L26[26 TASCAM 4]
+      L27[27 TASCAM 11]
+      L28[28 TASCAM 12]
+      L31[31 Alesis CH 5/L]
+      L32[32 Alesis CH 6/R]
+      L33[33 Alesis CH 7/L]
+      L34[34 Alesis CH 8/R]
+      L35[35 miniKORG AUDIO IN 1]
+      L36[36 miniKORG AUDIO IN 2]
+    end
+
+    U1 -.->|mode unknown| L25
+    U2 -.->|mode unknown| L26
+    U3 -.->|mode unknown| L27
+    U4 -.->|mode unknown| L28
+    U7 -.->|mode unknown| L31
+    U8 -.->|mode unknown| L32
+    U9 -.->|no source| L33
+    U10 -.->|no source| L34
+    U11 -.->|no source| L35
+    U12 -.->|no source| L36
+  end
+
+  PBA[PB-A: undocumented]
+  PBC[PB-C: undocumented]
+  PBD[PB-D: undocumented]

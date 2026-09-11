@@ -15,11 +15,23 @@ DATA = ROOT / "data" / "channel-map.yaml"
 with DATA.open("r", encoding="utf-8") as f:
     channel_map = yaml.safe_load(f)
 
+
+def fmt_source(source):
+    return "—" if source is None else source
+
+
 print("TASCAM")
 for channel, meta in channel_map["tascam"].items():
-    print(f"  {channel}: {meta['name']} <- {meta['source']} [{meta['type']}]")
+    status = meta.get("status", "")
+    status_suffix = f" ({status})" if status else ""
+    print(
+        f"  {channel}: {meta['name']} <- {fmt_source(meta['source'])} "
+        f"[{meta['type']}]{status_suffix}"
+    )
 
 print("\nAlesis")
 for channel, meta in channel_map["alesis"].items():
     aux = "aux" if meta["aux_send"] else "no aux"
-    print(f"  {channel}: {meta['source']} [{aux}]")
+    status = meta.get("status", "")
+    status_suffix = f" ({status})" if status else ""
+    print(f"  {channel}: {fmt_source(meta['source'])} [{aux}]{status_suffix}")
