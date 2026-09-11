@@ -15,6 +15,9 @@ from music_rig.models import (
     OpenQuestion,
     OpenQuestionsDocument,
     QuestionStatus,
+    InventoryDocument,
+    TodoDocument,
+    WishlistDocument,
 )
 from music_rig.render import render_docs
 from music_rig.store import (
@@ -23,13 +26,17 @@ from music_rig.store import (
     PATCHBAYS_PATH,
     QUESTIONS_PATH,
     ROUTING_PATH,
+    INVENTORY_PATH,
+    TODO_PATH,
+    WISHLIST_PATH,
     StoreError,
     _dump_yaml,
     load_changes,
     load_questions,
+    load_todo,
     write_text_files,
 )
-from music_rig import channel_state, patchbay_state, routing_state
+from music_rig import channel_state, inventory_state, patchbay_state, routing_state
 
 Clock = Callable[[], datetime]
 
@@ -368,3 +375,123 @@ def commit_routing(
         docs_wishlist=docs_wishlist,
         docs_questions=docs_questions,
     )
+
+
+def commit_inventory(
+    proposed_data: dict,
+    preview: CurrentPreview,
+    *,
+    dry_run: bool = False,
+    render: bool = True,
+    question_id: str | None = None,
+    change_id: str | None = None,
+    resolve_q: bool = False,
+    apply_chg: bool = False,
+    answer: str = "",
+    clock: Clock = default_clock,
+    inventory_path: Path | None = None,
+    questions_path: Path | None = None,
+    changes_path: Path | None = None,
+    docs_todo=None,
+    docs_wishlist=None,
+    docs_questions=None,
+) -> CurrentPreview:
+    target = inventory_path or INVENTORY_PATH
+    errors = inventory_state.validate_inventory_doc(proposed_data)
+    if errors:
+        raise StoreError("Inventory validation failed: " + "; ".join(errors))
+    existing = target.read_text(encoding="utf-8") if target.exists() else None
+    text = inventory_state.dump_with_header(proposed_data, existing_text=existing)
+    return _commit(
+        preview=preview,
+        primary_path=target,
+        primary_text=text,
+        dry_run=dry_run,
+        render=render,
+        question_id=question_id,
+        change_id=change_id,
+        resolve_q=resolve_q,
+        apply_chg=apply_chg,
+        answer=answer,
+        clock=clock,
+        questions_path=questions_path,
+        changes_path=changes_path,
+        docs_todo=docs_todo,
+        docs_wishlist=docs_wishlist,
+        docs_questions=docs_questions,
+    )
+
+
+def commit_acquisition(
+    proposed_inventory: dict,
+    proposed_wishlist: WishlistDocument,
+    proposed_todo: TodoDocument,
+    preview: CurrentPreview,
+    *,
+    dry_run: bool = False,
+    render: bool = True,
+    inventory_path: Path | None = None,
+    wishlist_path: Path | None = None,
+    todo_path: Path | None = None,
+    question_id: str | None = None,
+    change_id: str | None = None,
+    resolve_q: bool = False,
+    apply_chg: bool = False,
+    answer: str = "",
+    clock: Clock = default_clock,
+    questions_path: Path | None = None,
+    changes_path: Path | None = None,
+) -> CurrentPreview:
+    """Atomically cross the wishlist → owned-inventory boundary."""
+    errors = inventory_state.validate_inventory_doc(proposed_inventory)
+    if errors:
+        raise StoreError("Inventory validation failed: " + "; ".join(errors))
+    WishlistDocument.model_validate(proposed_wishlist.model_dump())
+    TodoDocument.model_validate(proposed_todo.model_dump())
+    qdoc, cdoc, q_key, c_key = _validate_evidence(
+        question_id=question_id,
+        change_id=change_id,
+        resolve_q=resolve_q,
+        apply_chg=apply_chg,
+        answer=answer,
+        questions_path=questions_path,
+        changes_path=changes_path,
+    )
+    if dry_run or not preview.changed:
+        return preview
+    inv_target = inventory_path or INVENTORY_PATH
+    existing = inv_target.read_text(encoding="utf-8") if inv_target.exists() else None
+    payloads = [
+        (
+            inv_target,
+            inventory_state.dump_with_header(
+                proposed_inventory, existing_text=existing
+            ),
+        ),
+        (
+            wishlist_path or WISHLIST_PATH,
+            _dump_yaml(proposed_wishlist.model_dump(mode="json", exclude_none=True)),
+        ),
+    ]
+    todo_target = todo_path or TODO_PATH
+    todo_text = _dump_yaml(proposed_todo.model_dump(mode="json", exclude_none=True))
+    current_todo = load_todo(todo_path)
+    if current_todo.model_dump(mode="json") != proposed_todo.model_dump(mode="json"):
+        payloads.append((todo_target, todo_text))
+    if resolve_q and qdoc is not None and q_key is not None:
+        qdoc = _with_resolved_question(
+            qdoc, q_key, answer, change_id=c_key, clock=clock
+        )
+        payloads.append((questions_path or QUESTIONS_PATH, _dump_questions_yaml(qdoc)))
+    if apply_chg and cdoc is not None and c_key is not None:
+        cdoc = _with_applied_change(cdoc, c_key, question_id=q_key)
+        payloads.append(
+            (
+                changes_path or CHANGES_PATH,
+                _dump_yaml(cdoc.model_dump(mode="json")),
+            )
+        )
+    write_text_files(payloads)
+    if render:
+        render_docs(write=True)
+    return preview

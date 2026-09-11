@@ -15,14 +15,13 @@ routes:
     status: CURRENT
     from: Alesis AUX SEND
     chain:
-      - BOSS RC-1
-      - Cry Baby
-      - JOYO A/B/Bypass
-      - DIRTY (Send A) or SPACE (Send B)
-      - BOSS CH-1 stereo out
+    - BOSS RC-1
+    - Cry Baby
+    - JOYO A/B/Bypass
+    - DIRTY (Send A) or SPACE (Send B)
+    - BOSS CH-1 stereo out
     to: Alesis stereo return or line return
-    notes: >-
-      RC-1 ahead of wah/JOYO so captured phrases can be manipulated by downstream pedals.
+    notes: RC-1 ahead of wah/JOYO so captured phrases can be manipulated by downstream pedals.
       JOYO path is mono until CH-1.
   miniKORG_direct:
     status: CURRENT
@@ -33,24 +32,24 @@ routes:
     status: CURRENT
     from: Acoustic instrument
     through:
-      - BOSS acoustic preamp
-      - A/B/Y clean leg
+    - BOSS acoustic preamp
+    - A/B/Y clean leg
     to: TASCAM 5
     other_aby_leg: UNKNOWN
   bass_clean:
     status: CURRENT
     from: Bass
     through:
-      - BBox preamp
-      - A/B/Y clean leg
+    - BBox preamp
+    - A/B/Y clean leg
     to: TASCAM 6
     other_aby_leg: UNKNOWN
   electric_guitar_clean:
     status: CURRENT
     from: Electric guitar
     through:
-      - Flamma preamp
-      - A/B/Y clean leg
+    - Flamma preamp
+    - A/B/Y clean leg
     to: TASCAM 7
     other_aby_leg: UNKNOWN
   sr18_direct:
@@ -58,40 +57,48 @@ routes:
     from: Alesis SR-18 MAIN L/R
     to: TASCAM 11/12
     via_patchbay: PB-B
-
 named_paths:
   aux:
     label: AUX SEND wet loop
     status: CURRENT
     route_ref: aux_send_loop
-    notes: >-
-      A = DIRTY (see: rig path show dirty); B = SPACE (see: rig path show space).
-      JOYO path is mono until CH-1.
+    notes: 'A = DIRTY (see: rig path show dirty); B = SPACE (see: rig path show space). JOYO
+      path is mono until CH-1.'
     branches:
       main:
         label: Main path
         nodes:
-          - id: alesis-aux-send
-            label: Alesis AUX SEND
-          - id: rc-1
-            label: BOSS RC-1
-          - id: cry-baby
-            label: Cry Baby
-          - id: joyo
-            label: JOYO A/B/Bypass
-            note: A = DIRTY (rig path show dirty); B = SPACE (rig path show space)
-          - id: ch-1
-            label: BOSS CH-1 stereo out
-            signal: stereo
-          - id: alesis-return
-            label: Alesis return / line return
+        - id: alesis-aux-send
+          label: Alesis AUX SEND
+          kind: endpoint
+        - id: rc-1
+          label: BOSS RC-1
+          gear_ref: boss-rc-1
+          kind: device
+        - id: cry-baby
+          label: Cry Baby
+          gear_ref: cry-baby
+          kind: device
+        - id: joyo
+          label: JOYO A/B/Bypass
+          note: A = DIRTY (rig path show dirty); B = SPACE (rig path show space)
+          gear_ref: joyo-ab-bypass
+          kind: device
+        - id: ch-1
+          label: BOSS CH-1 stereo out
+          signal: stereo
+          gear_ref: boss-ch-1
+          kind: device
+        - id: alesis-return
+          label: Alesis return / line return
+          kind: endpoint
       joyo-a:
-        label: "A = DIRTY (see: rig path show dirty)"
+        label: 'A = DIRTY (see: rig path show dirty)'
         attach: joyo
         position: before
         nodes: []
       joyo-b:
-        label: "B = SPACE (see: rig path show space)"
+        label: 'B = SPACE (see: rig path show space)'
         attach: joyo
         position: before
         nodes: []
@@ -102,20 +109,32 @@ named_paths:
       main:
         label: DIRTY chain
         nodes:
-          - id: joyo-send-a
-            label: JOYO SEND A
-          - id: od-1
-            label: BOSS OD-1
-          - id: bd-2
-            label: BOSS BD-2
-          - id: jb-2
-            label: BOSS JB-2
-          - id: mt-2w
-            label: BOSS MT-2w
-          - id: ds-1
-            label: BOSS DS-1
-          - id: joyo-return-a
-            label: JOYO RETURN A
+        - id: joyo-send-a
+          label: JOYO SEND A
+          kind: endpoint
+        - id: od-1
+          label: BOSS OD-1
+          gear_ref: boss-od-1
+          kind: device
+        - id: bd-2
+          label: BOSS BD-2
+          gear_ref: boss-bd-2
+          kind: device
+        - id: jb-2
+          label: BOSS JB-2
+          gear_ref: boss-jb-2
+          kind: device
+        - id: mt-2w
+          label: BOSS MT-2w
+          gear_ref: boss-mt-2w
+          kind: device
+        - id: ds-1
+          label: BOSS DS-1
+          gear_ref: boss-ds-1
+          kind: device
+        - id: joyo-return-a
+          label: JOYO RETURN A
+          kind: endpoint
   space:
     label: JOYO SPACE — Send B
     status: CURRENT
@@ -123,44 +142,63 @@ named_paths:
       main:
         label: Main path
         nodes:
-          - id: joyo-send-b
-            label: JOYO SEND B
-          - id: sy-1
-            label: SY-1
-          - id: ls-2
-            label: LS-2
-            mode: A+B MIX ↔ BYPASS
-          - id: joyo-return-b
-            label: JOYO RETURN B
+        - id: joyo-send-b
+          label: JOYO SEND B
+          kind: endpoint
+        - id: sy-1
+          label: SY-1
+          gear_ref: boss-sy-1
+          kind: device
+        - id: ls-2
+          label: LS-2
+          mode: A+B MIX ↔ BYPASS
+          gear_ref: boss-ls-2
+          kind: device
+        - id: joyo-return-b
+          label: JOYO RETURN B
+          kind: endpoint
       sy1-send:
         label: SY-1 SEND loop
         attach: sy-1
         position: before
         nodes:
-          - id: ph-3
-            label: PH-3
-          - id: tr-2
-            label: TR-2
-          - id: sy1-return
-            label: SY-1 RETURN
+        - id: ph-3
+          label: PH-3
+          gear_ref: boss-ph-3
+          kind: device
+        - id: tr-2
+          label: TR-2
+          gear_ref: boss-tr-2
+          kind: device
+        - id: sy1-return
+          label: SY-1 RETURN
+          kind: endpoint
       ls2-a:
         label: LS-2 Loop A
         attach: ls-2
         position: before
         nodes:
-          - id: sl-2
-            label: SL-2
-          - id: dd-8
-            label: DD-8
+        - id: sl-2
+          label: SL-2
+          gear_ref: boss-sl-2
+          kind: device
+        - id: dd-8
+          label: DD-8
+          gear_ref: boss-dd-8
+          kind: device
       ls2-b:
         label: LS-2 Loop B
         attach: ls-2
         position: before
         nodes:
-          - id: te-2
-            label: TE-2
-          - id: re-2
-            label: RE-2
+        - id: te-2
+          label: TE-2
+          gear_ref: boss-te-2
+          kind: device
+        - id: re-2
+          label: RE-2
+          gear_ref: boss-re-2
+          kind: device
   kaoss:
     label: KAOSS Replay monitor/sample path
     status: CURRENT
@@ -169,12 +207,17 @@ named_paths:
       main:
         label: Main path
         nodes:
-          - id: alesis-monitor
-            label: Alesis Monitor Out
-          - id: kaoss-replay
-            label: KAOSS Replay
-          - id: tascam-9-10
-            label: TASCAM 9/10
+        - id: alesis-monitor
+          label: Alesis Monitor Out
+          kind: endpoint
+        - id: kaoss-replay
+          label: KAOSS Replay
+          gear_ref: kaoss-replay
+          kind: device
+        - id: tascam-9-10
+          label: TASCAM 9/10
+          gear_ref: tascam-us-16x08
+          kind: device
   clean_mixer:
     label: Clean mixer capture
     status: CURRENT
@@ -183,10 +226,13 @@ named_paths:
       main:
         label: Main path
         nodes:
-          - id: alesis-main
-            label: Alesis Main Out
-          - id: tascam-1-2
-            label: TASCAM 1/2
+        - id: alesis-main
+          label: Alesis Main Out
+          kind: endpoint
+        - id: tascam-1-2
+          label: TASCAM 1/2
+          gear_ref: tascam-us-16x08
+          kind: device
   acoustic:
     label: Acoustic clean capture
     status: CURRENT
@@ -195,21 +241,29 @@ named_paths:
       main:
         label: Main path
         nodes:
-          - id: acoustic-in
-            label: Acoustic instrument
-          - id: boss-acoustic-preamp
-            label: BOSS acoustic preamp
-          - id: aby-clean
-            label: A/B/Y clean leg
-          - id: tascam-5
-            label: TASCAM 5
+        - id: acoustic-in
+          label: Acoustic instrument
+          gear_ref: acoustic-instrument
+          kind: device
+        - id: boss-acoustic-preamp
+          label: BOSS acoustic preamp
+          gear_ref: boss-acoustic-preamp
+          kind: device
+        - id: aby-clean
+          label: A/B/Y clean leg
+          kind: endpoint
+        - id: tascam-5
+          label: TASCAM 5
+          gear_ref: tascam-us-16x08
+          kind: device
       aby-other:
         label: other A/B/Y leg
         attach: boss-acoustic-preamp
         position: after
         nodes:
-          - id: aby-other-unknown
-            label: "other A/B/Y leg: UNKNOWN"
+        - id: aby-other-unknown
+          label: 'other A/B/Y leg: UNKNOWN'
+          kind: endpoint
   bass:
     label: Bass clean capture
     status: CURRENT
@@ -218,21 +272,29 @@ named_paths:
       main:
         label: Main path
         nodes:
-          - id: bass-in
-            label: Bass
-          - id: bbox-preamp
-            label: BBox preamp
-          - id: aby-clean
-            label: A/B/Y clean leg
-          - id: tascam-6
-            label: TASCAM 6
+        - id: bass-in
+          label: Bass
+          gear_ref: bass
+          kind: device
+        - id: bbox-preamp
+          label: BBox preamp
+          gear_ref: bbox-preamp
+          kind: device
+        - id: aby-clean
+          label: A/B/Y clean leg
+          kind: endpoint
+        - id: tascam-6
+          label: TASCAM 6
+          gear_ref: tascam-us-16x08
+          kind: device
       aby-other:
         label: other A/B/Y leg
         attach: bbox-preamp
         position: after
         nodes:
-          - id: aby-other-unknown
-            label: "other A/B/Y leg: UNKNOWN"
+        - id: aby-other-unknown
+          label: 'other A/B/Y leg: UNKNOWN'
+          kind: endpoint
   electric:
     label: Electric guitar clean capture
     status: CURRENT
@@ -241,21 +303,29 @@ named_paths:
       main:
         label: Main path
         nodes:
-          - id: electric-in
-            label: Electric guitar
-          - id: flamma-preamp
-            label: Flamma preamp
-          - id: aby-clean
-            label: A/B/Y clean leg
-          - id: tascam-7
-            label: TASCAM 7
+        - id: electric-in
+          label: Electric guitar
+          gear_ref: electric-guitar
+          kind: device
+        - id: flamma-preamp
+          label: Flamma preamp
+          gear_ref: flamma-preamp
+          kind: device
+        - id: aby-clean
+          label: A/B/Y clean leg
+          kind: endpoint
+        - id: tascam-7
+          label: TASCAM 7
+          gear_ref: tascam-us-16x08
+          kind: device
       aby-other:
         label: other A/B/Y leg
         attach: flamma-preamp
         position: after
         nodes:
-          - id: aby-other-unknown
-            label: "other A/B/Y leg: UNKNOWN"
+        - id: aby-other-unknown
+          label: 'other A/B/Y leg: UNKNOWN'
+          kind: endpoint
   minikorg:
     label: miniKORG direct capture
     status: CURRENT
@@ -264,13 +334,18 @@ named_paths:
       main:
         label: Main path
         nodes:
-          - id: minikorg-out
-            label: miniKORG stereo out
-            signal: stereo
-          - id: pb-b
-            label: PB-B
-          - id: tascam-3-4
-            label: TASCAM 3/4
+        - id: minikorg-out
+          label: miniKORG stereo out
+          signal: stereo
+          gear_ref: korg-minikorg
+          kind: device
+        - id: pb-b
+          label: PB-B
+          kind: endpoint
+        - id: tascam-3-4
+          label: TASCAM 3/4
+          gear_ref: tascam-us-16x08
+          kind: device
   sr18:
     label: SR-18 direct capture
     status: CURRENT
@@ -279,10 +354,15 @@ named_paths:
       main:
         label: Main path
         nodes:
-          - id: sr18-main
-            label: Alesis SR-18 MAIN L/R
-            signal: stereo
-          - id: pb-b
-            label: PB-B
-          - id: tascam-11-12
-            label: TASCAM 11/12
+        - id: sr18-main
+          label: Alesis SR-18 MAIN L/R
+          signal: stereo
+          gear_ref: alesis-sr-18
+          kind: device
+        - id: pb-b
+          label: PB-B
+          kind: endpoint
+        - id: tascam-11-12
+          label: TASCAM 11/12
+          gear_ref: tascam-us-16x08
+          kind: device

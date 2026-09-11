@@ -5,9 +5,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from music_rig.models import TERMINAL_FOR_NEXT, ChangeStatus, QuestionStatus
+from music_rig.models import (
+    INACTIVE_OWNERSHIP,
+    TERMINAL_FOR_NEXT,
+    ChangeStatus,
+    QuestionStatus,
+)
 from music_rig.render import check_render_sync
-from music_rig import channel_state, patchbay_state, routing_state
+from music_rig import channel_state, inventory_state, patchbay_state, routing_state
 from music_rig.store import (
     CHANGES_PATH,
     CHANNEL_MAP_PATH,
@@ -18,6 +23,7 @@ from music_rig.store import (
     StoreError,
     load_changes,
     load_inbox,
+    load_inventory,
     load_questions,
     load_routing,
     load_todo,
@@ -47,6 +53,8 @@ def run_checks(
     docs_routing: Path | None = None,
     docs_pedal_chains: Path | None = None,
     diagram_aux_loop: Path | None = None,
+    inventory_path: Path | None = None,
+    docs_inventory: Path | None = None,
 ) -> CheckResult:
     errors: list[str] = []
     warnings: list[str] = []
@@ -95,13 +103,42 @@ def run_checks(
     except StoreError as exc:
         errors.append(str(exc))
 
+    routing_doc = None
     try:
-        load_routing(routing_path)
+        routing_doc = load_routing(routing_path)
         routing = routing_state.load_raw(routing_path)
         for err in routing_state.validate_routing_doc(routing):
             errors.append(f"routing: {err}")
     except StoreError as exc:
         errors.append(str(exc))
+
+    inventory = None
+    try:
+        inventory = load_inventory(inventory_path)
+        raw_inventory = inventory_state.load_raw(inventory_path)
+        for err in inventory_state.validate_inventory_doc(raw_inventory):
+            errors.append(f"inventory: {err}")
+    except StoreError as exc:
+        errors.append(str(exc))
+
+    if inventory is not None and routing_doc is not None:
+        for path_id, path in routing_doc.named_paths.items():
+            for branch_id, branch in path.branches.items():
+                for node in branch.nodes:
+                    if not node.gear_ref:
+                        continue
+                    item = inventory.resolve(node.gear_ref)
+                    where = f"{path_id}/{branch_id}:{node.id}"
+                    if item is None:
+                        errors.append(
+                            f"routing gear_ref {node.gear_ref!r} at {where} "
+                            "does not resolve in inventory"
+                        )
+                    elif item.ownership_status in INACTIVE_OWNERSHIP:
+                        errors.append(
+                            f"routing gear_ref {node.gear_ref!r} at {where} resolves "
+                            f"to inactive inventory status {item.ownership_status.value}"
+                        )
 
     try:
         pb = patchbay_state.load_raw()
@@ -179,6 +216,8 @@ def run_checks(
             docs_routing=docs_routing,
             docs_pedal_chains=docs_pedal_chains,
             diagram_aux_loop=diagram_aux_loop,
+            inventory_path=inventory_path,
+            docs_inventory=docs_inventory,
         )
         for path in stale:
             errors.append(

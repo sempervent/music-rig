@@ -76,6 +76,9 @@ uv run rig session end
 
 # Read CURRENT wiring at the rack
 uv run rig channels
+uv run rig gear list
+uv run rig gear show boss-rc-1
+uv run rig gear usage boss-rc-1
 uv run rig patchbay PB-B
 uv run rig path list
 uv run rig path show space
@@ -89,6 +92,8 @@ uv run rig current path branches space
 uv run rig current path verify space
 uv run rig current path move space TR-2 --branch sy1-send --after PH-3 --dry-run
 uv run rig current path move space TR-2 --branch sy1-send --after PH-3
+uv run rig current gear set-condition big-muff ISSUE
+uv run rig current gear acquire "BOSS RC-600"
 
 uv run rig render --check
 uv run rig check
@@ -102,6 +107,14 @@ uv run rig check
 - Do **not** hand-edit generated routing sections (`docs/current-routing.md`, `docs/pedal-chains.md`) or `diagrams/aux-send-loop.mmd`.
 - `data/routing.yaml` is canonical for structured CURRENT audio/pedal topology (`named_paths`).
 - Use `rig current path …` for supported structured routing mutations.
+- `data/inventory.yaml` is canonical for owned equipment and stable gear IDs.
+- Gear and unit IDs are exact references; do not fuzzy-match or casually rename them.
+- Owned does not imply CURRENT routing membership. Inactive ownership states are
+  forbidden while CURRENT routing still references an item or one of its units.
+- Acquisition is an explicit transactional boundary: create inventory and mark the
+  wishlist entry ACQUIRED together. Do not treat wishlist entries as owned beforehand.
+- Do not invent inventory locations or infer patchbay unit-to-PB-letter mappings.
+- Keep `rig status` compact; inventory counts belong in `rig gear` / `rig doctor`.
 - Do not infer a CURRENT route update from inbox observations, session discoveries, freeform OPEN changes, or unresolved questions.
 - Use `rig change` when physical state may have changed but has not been reconciled.
 - `next_session` is the authoritative Next Session queue; TODO status is lifecycle only (`READY`, `IN PROGRESS`, etc.). There is no `NEXT` status.

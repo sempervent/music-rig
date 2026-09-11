@@ -14,6 +14,8 @@ from music_rig import (
     channel_state,
     current_service,
     inbox_service,
+    inventory_state,
+    gear_usage,
     patchbay_state,
     question_service,
     routing_state,
@@ -26,7 +28,9 @@ from music_rig.doctor import build_doctor_text
 from music_rig.inbox_service import default_clock
 from music_rig.models import (
     ChangeStatus,
+    GearCondition,
     InboxStatus,
+    OwnershipStatus,
     TodoPriority,
     TodoStatus,
     TodoTask,
@@ -43,7 +47,13 @@ from music_rig.reconcile import (
 from music_rig.render import check_render_sync, render_docs
 from music_rig import rig_views
 from music_rig.status import build_status_text
-from music_rig.store import StoreError, load_inbox, load_todo, load_wishlist
+from music_rig.store import (
+    StoreError,
+    load_inbox,
+    load_inventory,
+    load_todo,
+    load_wishlist,
+)
 
 console = Console(stderr=False)
 err_console = Console(stderr=True)
@@ -71,6 +81,7 @@ reconcile_app = typer.Typer(
     no_args_is_help=False,
 )
 path_app = typer.Typer(help="Read-only CURRENT named paths.", no_args_is_help=True)
+gear_app = typer.Typer(help="Owned equipment inventory.", no_args_is_help=True)
 current_app = typer.Typer(
     help="Modify authoritative CURRENT state (typed, previewed).",
     no_args_is_help=True,
@@ -87,6 +98,10 @@ current_path_app = typer.Typer(
     help="CURRENT named-path mutations (data/routing.yaml).",
     no_args_is_help=True,
 )
+current_gear_app = typer.Typer(
+    help="CURRENT owned-equipment mutations (data/inventory.yaml).",
+    no_args_is_help=True,
+)
 app.add_typer(todo_app, name="todo")
 app.add_typer(wish_app, name="wish")
 todo_app.add_typer(next_app, name="next")
@@ -96,10 +111,12 @@ app.add_typer(changes_app, name="changes")
 app.add_typer(question_app, name="question")
 app.add_typer(reconcile_app, name="reconcile")
 app.add_typer(path_app, name="path")
+app.add_typer(gear_app, name="gear")
 app.add_typer(current_app, name="current")
 current_app.add_typer(current_pb_app, name="patchbay")
 current_app.add_typer(current_ch_app, name="channels")
 current_app.add_typer(current_path_app, name="path")
+current_app.add_typer(current_gear_app, name="gear")
 
 
 def _fail(message: str, code: int = 1) -> None:
@@ -1238,6 +1255,389 @@ def _maybe_resolve_evidence(
                 f"Mark {change_id.strip().upper()} APPLIED?", default=False
             )
     return resolve_q, apply_chg, answer
+
+
+def _parse_ownership(raw: str) -> OwnershipStatus:
+    try:
+        return OwnershipStatus(raw.strip().upper().replace("-", "_"))
+    except ValueError:
+        _fail(
+            "Invalid ownership status. Use OWNED, RETIRED, SOLD, "
+            "LOANED_OUT, or UNKNOWN."
+        )
+        raise
+
+
+def _parse_condition(raw: str) -> GearCondition:
+    try:
+        return GearCondition(raw.strip().upper())
+    except ValueError:
+        _fail("Invalid condition. Use WORKING, ISSUE, BROKEN, or UNKNOWN.")
+        raise
+
+
+@gear_app.command("list")
+def gear_list_cmd(
+    category: Optional[str] = typer.Option(None, "--category"),
+    status: Optional[str] = typer.Option(None, "--status"),
+) -> None:
+    """List canonical owned-equipment records."""
+    try:
+        doc = load_inventory()
+        wanted_status = _parse_ownership(status) if status else None
+    except StoreError as exc:
+        _fail(str(exc))
+    items = [
+        item
+        for item in doc.items
+        if (category is None or item.category.casefold() == category.casefold())
+        and (wanted_status is None or item.ownership_status == wanted_status)
+    ]
+    table = Table(title="GEAR")
+    for column in ("ID", "Name", "Category", "Qty", "Status", "Condition"):
+        table.add_column(column)
+    for item in items:
+        table.add_row(
+            item.id,
+            item.name,
+            item.category,
+            str(item.quantity),
+            item.ownership_status.value,
+            item.condition.value,
+        )
+    console.print(table)
+
+
+@gear_app.command("show")
+def gear_show_cmd(gear_id: str) -> None:
+    try:
+        item = load_inventory().resolve(gear_id)
+        if item is None:
+            raise StoreError(f"Unknown gear ID {gear_id!r}.")
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"[bold]{item.id}[/bold] — {item.name}")
+    console.print(f"Manufacturer: {item.manufacturer or '—'}")
+    console.print(f"Model: {item.model or '—'}")
+    console.print(f"Category: {item.category}")
+    console.print(f"Quantity: {item.quantity}")
+    console.print(f"Status: {item.ownership_status.value}")
+    console.print(f"Condition: {item.condition.value}")
+    console.print(f"Location: {item.location or '—'}")
+    console.print(f"Notes: {item.notes or '—'}")
+    if item.units:
+        console.print("Units: " + ", ".join(unit.id for unit in item.units))
+
+
+@gear_app.command("usage")
+def gear_usage_cmd(gear_id: str) -> None:
+    try:
+        usage = gear_usage.usage_for(gear_id)
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"[bold]USAGE — {usage['gear_id']}[/bold]")
+    console.print("")
+    console.print("CURRENT routing:")
+    if usage["routing"]:
+        for ref in usage["routing"]:
+            console.print(
+                f"  {ref['path']}/{ref['branch']}  {ref['node']} — {ref['label']}"
+            )
+    else:
+        console.print("  (none)")
+    console.print("Wishlist:")
+    if usage["wishlist"]:
+        for name in usage["wishlist"]:
+            console.print(f"  {name}")
+    else:
+        console.print("  (none)")
+    console.print("Patchbay gear refs: (schema has no gear_ref field)")
+
+
+def _commit_inventory_preview(
+    preview,
+    data: dict,
+    *,
+    yes: bool,
+    dry_run: bool,
+    question: Optional[str],
+    change: Optional[str],
+    answer_hint: str,
+    no_render: bool,
+) -> None:
+    if not _confirm_current(preview, yes=yes, dry_run=dry_run):
+        if dry_run:
+            try:
+                current_service.commit_inventory(
+                    data,
+                    preview,
+                    dry_run=True,
+                    render=False,
+                    question_id=question,
+                    change_id=change,
+                )
+            except StoreError as exc:
+                _fail(str(exc))
+            raise typer.Exit(0)
+        if not preview.changed:
+            raise typer.Exit(0)
+        raise typer.Abort()
+    resolve_q, apply_chg, answer = _maybe_resolve_evidence(
+        question_id=question,
+        change_id=change,
+        answer_hint=answer_hint,
+        yes=yes,
+    )
+    try:
+        result = current_service.commit_inventory(
+            data,
+            preview,
+            render=not no_render,
+            question_id=question,
+            change_id=change,
+            resolve_q=resolve_q,
+            apply_chg=apply_chg,
+            answer=answer,
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"[green]Applied:[/green] {result.message}")
+
+
+@current_gear_app.command("add")
+def current_gear_add(
+    gear_id: Optional[str] = typer.Option(None, "--id"),
+    name: Optional[str] = typer.Option(None, "--name"),
+    manufacturer: Optional[str] = typer.Option(None, "--manufacturer"),
+    model: Optional[str] = typer.Option(None, "--model"),
+    category: Optional[str] = typer.Option(None, "--category"),
+    quantity: Optional[int] = typer.Option(None, "--quantity", min=1),
+    notes: Optional[str] = typer.Option(None, "--notes"),
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    question: Optional[str] = typer.Option(None, "--question"),
+    change: Optional[str] = typer.Option(None, "--change"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    if name is None:
+        name = typer.prompt("Name")
+    if manufacturer is None:
+        manufacturer = typer.prompt("Manufacturer (optional)", default="")
+    if model is None:
+        model = typer.prompt("Model (optional)", default="")
+    if category is None:
+        category = typer.prompt("Category")
+    if quantity is None:
+        quantity = typer.prompt("Quantity", default=1, type=int)
+    if notes is None:
+        notes = typer.prompt("Notes (optional)", default="")
+    if gear_id is None:
+        gear_id = typer.prompt("ID (blank to generate)", default="") or None
+    try:
+        preview, data = inventory_state.propose_add(
+            gear_id=gear_id,
+            name=name,
+            manufacturer=manufacturer,
+            model=model,
+            category=category,
+            quantity=quantity,
+            notes=notes,
+        )
+    except (StoreError, ValueError) as exc:
+        _fail(str(exc))
+    _commit_inventory_preview(
+        preview,
+        data,
+        yes=yes,
+        dry_run=dry_run,
+        question=question,
+        change=change,
+        answer_hint=preview.target,
+        no_render=no_render,
+    )
+
+
+def _gear_field_mutation(
+    preview,
+    data,
+    *,
+    yes: bool,
+    dry_run: bool,
+    question: Optional[str],
+    change: Optional[str],
+    no_render: bool,
+) -> None:
+    _commit_inventory_preview(
+        preview,
+        data,
+        yes=yes,
+        dry_run=dry_run,
+        question=question,
+        change=change,
+        answer_hint=str(next(iter(preview.after.values()), "")),
+        no_render=no_render,
+    )
+
+
+@current_gear_app.command("set-status")
+def current_gear_set_status(
+    gear_id: str,
+    status: str,
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    question: Optional[str] = typer.Option(None, "--question"),
+    change: Optional[str] = typer.Option(None, "--change"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        preview, data = inventory_state.propose_set_status(
+            gear_id, _parse_ownership(status)
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+    _gear_field_mutation(preview, data, yes=yes, dry_run=dry_run, question=question, change=change, no_render=no_render)
+
+
+@current_gear_app.command("set-condition")
+def current_gear_set_condition(
+    gear_id: str,
+    condition: str,
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    question: Optional[str] = typer.Option(None, "--question"),
+    change: Optional[str] = typer.Option(None, "--change"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        preview, data = inventory_state.propose_set_condition(
+            gear_id, _parse_condition(condition)
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+    _gear_field_mutation(preview, data, yes=yes, dry_run=dry_run, question=question, change=change, no_render=no_render)
+
+
+@current_gear_app.command("set-location")
+def current_gear_set_location(
+    gear_id: str,
+    location: str,
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    question: Optional[str] = typer.Option(None, "--question"),
+    change: Optional[str] = typer.Option(None, "--change"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        preview, data = inventory_state.propose_set_location(gear_id, location)
+    except StoreError as exc:
+        _fail(str(exc))
+    _gear_field_mutation(preview, data, yes=yes, dry_run=dry_run, question=question, change=change, no_render=no_render)
+
+
+@current_gear_app.command("retire")
+def current_gear_retire(
+    gear_id: str,
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    question: Optional[str] = typer.Option(None, "--question"),
+    change: Optional[str] = typer.Option(None, "--change"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        preview, data = inventory_state.propose_retire(gear_id)
+    except StoreError as exc:
+        _fail(str(exc))
+    _gear_field_mutation(preview, data, yes=yes, dry_run=dry_run, question=question, change=change, no_render=no_render)
+
+
+@current_gear_app.command("acquire")
+def current_gear_acquire(
+    wishlist_item_name: str,
+    gear_id: Optional[str] = typer.Option(None, "--id"),
+    name: Optional[str] = typer.Option(None, "--name"),
+    manufacturer: Optional[str] = typer.Option(None, "--manufacturer"),
+    model: Optional[str] = typer.Option(None, "--model"),
+    category: Optional[str] = typer.Option(None, "--category"),
+    quantity: Optional[int] = typer.Option(None, "--quantity", min=1),
+    notes: Optional[str] = typer.Option(None, "--notes"),
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    question: Optional[str] = typer.Option(None, "--question"),
+    change: Optional[str] = typer.Option(None, "--change"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        wish = wishlist_service.get_item(load_wishlist(), wishlist_item_name)
+    except StoreError as exc:
+        _fail(str(exc))
+    manufacturer = manufacturer if manufacturer is not None else typer.prompt("Manufacturer (optional)", default="")
+    model = model if model is not None else typer.prompt("Model (optional)", default="")
+    category = category if category is not None else typer.prompt("Category", default=wish.category)
+    quantity = quantity if quantity is not None else typer.prompt("Quantity", default=1, type=int)
+    notes = notes if notes is not None else typer.prompt("Notes (optional)", default="")
+    gear_id = gear_id if gear_id is not None else (typer.prompt("ID (blank to generate)", default="") or None)
+    todo = load_todo()
+    related = [todo.task_map()[ref] for ref in wish.todo_refs if ref in todo.task_map()]
+    console.print("Related TODOs:")
+    if related:
+        for task in related:
+            console.print(f"  {task.id} {task.status.value} — {task.task}")
+    else:
+        console.print("  (none)")
+    waiting = [task for task in related if task.status == TodoStatus.WAITING]
+    ready = False
+    if waiting and not yes:
+        ready = typer.confirm("Change related WAITING TODOs to READY?", default=False)
+    try:
+        preview, inventory, wishes, todos = inventory_state.propose_acquire(
+            wishlist_item_name,
+            name=name,
+            gear_id=gear_id,
+            manufacturer=manufacturer,
+            model=model,
+            category=category,
+            quantity=quantity,
+            notes=notes,
+            make_waiting_ready=ready,
+        )
+    except (StoreError, ValueError) as exc:
+        _fail(str(exc))
+    if not _confirm_current(preview, yes=yes, dry_run=dry_run):
+        if dry_run:
+            current_service.commit_acquisition(
+                inventory,
+                wishes,
+                todos,
+                preview,
+                dry_run=True,
+                render=False,
+                question_id=question,
+                change_id=change,
+            )
+            raise typer.Exit(0)
+        raise typer.Abort()
+    resolve_q, apply_chg, answer = _maybe_resolve_evidence(
+        question_id=question,
+        change_id=change,
+        answer_hint=preview.target,
+        yes=yes,
+    )
+    try:
+        result = current_service.commit_acquisition(
+            inventory,
+            wishes,
+            todos,
+            preview,
+            render=not no_render,
+            question_id=question,
+            change_id=change,
+            resolve_q=resolve_q,
+            apply_chg=apply_chg,
+            answer=answer,
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"[green]Applied:[/green] {result.message}")
 
 
 def _commit_routing_preview(

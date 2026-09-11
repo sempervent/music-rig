@@ -9,6 +9,7 @@ import yaml
 from music_rig.models import (
     ChangesDocument,
     InboxDocument,
+    InventoryDocument,
     OpenQuestionsDocument,
     RoutingDocument,
     SessionLog,
@@ -27,6 +28,7 @@ SESSIONS_DIR = DATA_DIR / "sessions"
 CHANNEL_MAP_PATH = DATA_DIR / "channel-map.yaml"
 PATCHBAYS_PATH = DATA_DIR / "patchbays.yaml"
 ROUTING_PATH = DATA_DIR / "routing.yaml"
+INVENTORY_PATH = DATA_DIR / "inventory.yaml"
 DOCS_TODO_PATH = ROOT / "docs" / "todo.md"
 DOCS_WISHLIST_PATH = ROOT / "docs" / "wishlist.md"
 DOCS_QUESTIONS_PATH = ROOT / "docs" / "open-questions.md"
@@ -35,13 +37,14 @@ DOCS_TASCAM_PATH = ROOT / "docs" / "tascam-channel-map.md"
 DOCS_ALESIS_PATH = ROOT / "docs" / "alesis-mixer-map.md"
 DOCS_ROUTING_PATH = ROOT / "docs" / "current-routing.md"
 DOCS_PEDAL_CHAINS_PATH = ROOT / "docs" / "pedal-chains.md"
+DOCS_INVENTORY_PATH = ROOT / "docs" / "inventory.md"
 DIAGRAM_PATCHBAYS_PATH = ROOT / "diagrams" / "patchbays.mmd"
 DIAGRAM_TASCAM_PATH = ROOT / "diagrams" / "tascam-channel-map.mmd"
 DIAGRAM_AUX_LOOP_PATH = ROOT / "diagrams" / "aux-send-loop.mmd"
 
 EXISTING_YAML = (
     CHANNEL_MAP_PATH,
-    DATA_DIR / "inventory.yaml",
+    INVENTORY_PATH,
     PATCHBAYS_PATH,
     ROUTING_PATH,
 )
@@ -184,6 +187,21 @@ def load_routing(path: Path | None = None) -> RoutingDocument:
         return RoutingDocument.model_validate(raw)
     except Exception as exc:
         raise StoreError(f"Routing schema validation failed: {exc}") from exc
+
+
+def load_inventory(path: Path | None = None) -> InventoryDocument:
+    target = path or INVENTORY_PATH
+    raw = _load_mapping(target, "inventory")
+    try:
+        return InventoryDocument.model_validate(raw)
+    except Exception as exc:
+        raise StoreError(f"Inventory schema validation failed: {exc}") from exc
+
+
+def save_inventory(doc: InventoryDocument, path: Path | None = None) -> None:
+    target = path or INVENTORY_PATH
+    InventoryDocument.model_validate(doc.model_dump())
+    _atomic_write(target, _dump_yaml(doc.model_dump(mode="json", exclude_none=True)))
 
 
 def session_path(session_id: str, sessions_dir: Path | None = None) -> Path:

@@ -267,6 +267,12 @@ def format_reconcile_question(
             lines.append(
                 f"    uv run rig current path verify {target.path}"
             )
+        elif target is not None and target.domain == "inventory.patchbay_mapping":
+            lines.append("  Inspect the physical patchbay units and their model labels.")
+            lines.append(
+                "  Record only observed unit identity; do not invent a PB letter mapping."
+            )
+            lines.append(f"  then: uv run rig question resolve {q.id}")
         else:
             lines.append("  inspect the physical rig")
             lines.append(f"  then: uv run rig question resolve {q.id}")

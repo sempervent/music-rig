@@ -1,99 +1,373 @@
-# Ownership and roles. Active signal membership is not implied by presence here.
-# CURRENT active topology: docs/pedal-chains.md and data/routing.yaml.
+# Canonical owned-equipment inventory.
+# Owned ≠ CURRENT signal-path membership (see data/routing.yaml).
+# Stable gear IDs are durable; do not rename casually.
+# Wishlist items are not owned until recorded via inventory / acquire.
+items:
+  # --- Interfaces / mixers ---
+  - id: tascam-us-16x08
+    name: TASCAM US-16x08
+    manufacturer: TASCAM
+    model: US-16x08
+    category: interfaces_mixers
+    quantity: 1
+    ownership_status: OWNED
+    notes: Main audio interface
+  - id: alesis-mixer
+    name: Alesis mixer
+    manufacturer: Alesis
+    model: UNKNOWN
+    category: interfaces_mixers
+    quantity: 1
+    ownership_status: OWNED
+    notes: Live routing and AUX SEND hub
 
-interfaces:
-  - TASCAM US-16x08
-  - Alesis mixer
+  # --- Instruments ---
+  - id: bass
+    name: Bass
+    category: instruments
+    quantity: 1
+    ownership_status: OWNED
+  - id: electric-guitar
+    name: Electric guitar
+    category: instruments
+    quantity: 1
+    ownership_status: OWNED
+  - id: acoustic-instrument
+    name: Acoustic instrument
+    category: instruments
+    quantity: 1
+    ownership_status: OWNED
+  - id: electric-kazoo
+    name: Electric kazoo
+    category: instruments
+    quantity: 1
+    ownership_status: OWNED
+  - id: casio-privia
+    name: Casio Privia
+    manufacturer: Casio
+    model: Privia
+    category: instruments
+    quantity: 1
+    ownership_status: OWNED
+  - id: korg-minikorg
+    name: Korg miniKORG
+    manufacturer: Korg
+    model: miniKORG
+    category: instruments
+    quantity: 1
+    ownership_status: OWNED
+  - id: alesis-sr-18
+    name: Alesis SR-18
+    manufacturer: Alesis
+    model: SR-18
+    category: instruments
+    quantity: 1
+    ownership_status: OWNED
 
-instruments:
-  - Bass
-  - Electric guitar
-  - Acoustic instrument
-  - Electric kazoo
-  - Casio Privia
-  - Korg miniKORG
-  - Alesis SR-18
+  # --- Preamps ---
+  - id: boss-acoustic-preamp
+    name: BOSS acoustic preamp
+    manufacturer: BOSS
+    category: preamps
+    quantity: 1
+    ownership_status: OWNED
+    notes: Acoustic front end before A/B/Y
+  - id: bbox-preamp
+    name: BBox preamp
+    manufacturer: BBox
+    category: preamps
+    quantity: 1
+    ownership_status: OWNED
+    notes: Bass front end before A/B/Y
+  - id: flamma-preamp
+    name: Flamma preamp
+    manufacturer: Flamma
+    category: preamps
+    quantity: 1
+    ownership_status: OWNED
+    notes: Electric guitar front end before A/B/Y
 
-preamps:
-  - name: BOSS acoustic preamp
-    instrument: Acoustic instrument
-  - name: BBox preamp
-    instrument: Bass
-  - name: Flamma preamp
-    instrument: Electric guitar
+  # --- Utility / splitters ---
+  - id: aby-splitters
+    name: A/B/Y splitters
+    category: utility
+    quantity: 1
+    ownership_status: OWNED
+    notes: Clean TASCAM legs confirmed; other legs UNKNOWN
+  - id: mxr-trs-split-tap
+    name: MXR TRS split + tap
+    manufacturer: MXR
+    category: utility
+    quantity: 1
+    ownership_status: OWNED
+  - id: radial-prormp
+    name: Radial ProRMP
+    manufacturer: Radial
+    model: ProRMP
+    category: utility
+    quantity: 1
+    ownership_status: OWNED
+    notes: AUX SEND placement was too quiet; not default wet-loop device
+  - id: pyle-pro-pdc22
+    name: PYLE-PRO PDC22 dual DI
+    manufacturer: PYLE-PRO
+    model: PDC22
+    category: utility
+    quantity: 1
+    ownership_status: OWNED
 
-splitters:
-  - A/B/Y splitters  # clean TASCAM legs confirmed; other legs UNKNOWN
+  # --- Loopers / samplers ---
+  - id: boss-rc-1
+    name: BOSS RC-1
+    manufacturer: BOSS
+    model: RC-1
+    category: loopers_samplers
+    quantity: 1
+    ownership_status: OWNED
+  - id: kaoss-replay
+    name: KAOSS Replay
+    manufacturer: Korg
+    model: KAOSS Replay
+    category: loopers_samplers
+    quantity: 1
+    ownership_status: OWNED
 
-loopers_samplers:
-  - BOSS RC-1
-  - KAOSS Replay
+  # --- Patchbays (model identity; PB letter mapping UNKNOWN) ---
+  - id: art-p48
+    name: ART Pro Audio P48
+    manufacturer: ART
+    model: P48
+    category: patchbays
+    quantity: 2
+    ownership_status: OWNED
+    units:
+      - id: art-p48-1
+      - id: art-p48-2
+    notes: Which physical units map to PB-A/B/C/D is UNKNOWN
+  - id: behringer-px3000
+    name: Behringer PX3000
+    manufacturer: Behringer
+    model: PX3000
+    category: patchbays
+    quantity: 2
+    ownership_status: OWNED
+    units:
+      - id: behringer-px3000-1
+      - id: behringer-px3000-2
+    notes: Which physical units map to PB-A/B/C/D is UNKNOWN
 
-patchbay_hardware:
-  owned:
-    - { model: ART Pro Audio P48, quantity: 2 }
-    - { model: Behringer PX3000, quantity: 2 }
-  named_bays:
-    - PB-A
-    - PB-B
-    - PB-C
-    - PB-D
-  model_to_bay_mapping: UNKNOWN
+  # --- Routers ---
+  - id: joyo-ab-bypass
+    name: JOYO A/B/Bypass router
+    manufacturer: JOYO
+    category: routers
+    quantity: 1
+    ownership_status: OWNED
+    notes: CURRENT A = DIRTY, B = SPACE
 
-routers_di_reamp:
-  - JOYO A/B/Bypass router
-  - BOSS LS-2
-  - Radial ProRMP
-  - PYLE-PRO PDC22 dual DI
-  - MXR TRS split + tap
+  # --- Pedals ---
+  - id: cry-baby
+    name: Cry Baby
+    category: pedals
+    quantity: 1
+    ownership_status: OWNED
+  - id: boss-od-1
+    name: BOSS OD-1
+    manufacturer: BOSS
+    model: OD-1
+    category: pedals
+    quantity: 1
+    ownership_status: OWNED
+  - id: boss-bd-2
+    name: BOSS BD-2
+    manufacturer: BOSS
+    model: BD-2
+    category: pedals
+    quantity: 1
+    ownership_status: OWNED
+  - id: boss-jb-2
+    name: BOSS JB-2
+    manufacturer: BOSS
+    model: JB-2
+    category: pedals
+    quantity: 1
+    ownership_status: OWNED
+  - id: boss-mt-2w
+    name: BOSS MT-2w
+    manufacturer: BOSS
+    model: MT-2w
+    category: pedals
+    quantity: 1
+    ownership_status: OWNED
+  - id: boss-ds-1
+    name: BOSS DS-1
+    manufacturer: BOSS
+    model: DS-1
+    category: pedals
+    quantity: 1
+    ownership_status: OWNED
+  - id: boss-sy-1
+    name: BOSS SY-1
+    manufacturer: BOSS
+    model: SY-1
+    category: pedals
+    quantity: 1
+    ownership_status: OWNED
+  - id: boss-ph-3
+    name: BOSS PH-3
+    manufacturer: BOSS
+    model: PH-3
+    category: pedals
+    quantity: 1
+    ownership_status: OWNED
+  - id: boss-tr-2
+    name: BOSS TR-2
+    manufacturer: BOSS
+    model: TR-2
+    category: pedals
+    quantity: 1
+    ownership_status: OWNED
+  - id: boss-ls-2
+    name: BOSS LS-2
+    manufacturer: BOSS
+    model: LS-2
+    category: pedals
+    quantity: 1
+    ownership_status: OWNED
+    notes: CURRENT SPACE after SY-1; mode A+B MIX ↔ BYPASS
+  - id: boss-sl-2
+    name: BOSS SL-2
+    manufacturer: BOSS
+    model: SL-2
+    category: pedals
+    quantity: 1
+    ownership_status: OWNED
+  - id: boss-dd-8
+    name: BOSS DD-8
+    manufacturer: BOSS
+    model: DD-8
+    category: pedals
+    quantity: 1
+    ownership_status: OWNED
+  - id: boss-te-2
+    name: BOSS TE-2
+    manufacturer: BOSS
+    model: TE-2
+    category: pedals
+    quantity: 1
+    ownership_status: OWNED
+  - id: boss-re-2
+    name: BOSS RE-2
+    manufacturer: BOSS
+    model: RE-2
+    category: pedals
+    quantity: 1
+    ownership_status: OWNED
+    notes: Noise noted historically; gain/noise isolation pending
+  - id: boss-ch-1
+    name: BOSS CH-1
+    manufacturer: BOSS
+    model: CH-1
+    category: pedals
+    quantity: 1
+    ownership_status: OWNED
+    notes: Post-JOYO stereo stage
+  - id: flamma-mod
+    name: Flamma Mod
+    manufacturer: Flamma
+    category: pedals
+    quantity: 1
+    ownership_status: OWNED
+    notes: OWNED but not in CURRENT SPACE topology
+  - id: boss-ph-2
+    name: BOSS PH-2
+    manufacturer: BOSS
+    model: PH-2
+    category: pedals
+    quantity: 1
+    ownership_status: OWNED
+    notes: OWNED but not in CURRENT SPACE topology
+  - id: big-muff
+    name: Big Muff
+    category: pedals
+    quantity: 1
+    ownership_status: OWNED
+    condition: ISSUE
+    notes: Failed/no audio; bench-test (RIG-020)
 
-controllers:
-  - Launchpad X
-  - Novation Launch Control 3
-  - Korg padKONTROL
-  - Behringer FCB1010
-  - Novation ReMOTE ZeRO SL
-  - Elgato Stream Deck+
-  - MOSKY Dual Switch
-  - BOSS EV-30
+  # --- Controllers ---
+  - id: launchpad-x
+    name: Launchpad X
+    manufacturer: Novation
+    model: Launchpad X
+    category: controllers
+    quantity: 1
+    ownership_status: OWNED
+  - id: novation-launch-control-3
+    name: Novation Launch Control 3
+    manufacturer: Novation
+    model: Launch Control 3
+    category: controllers
+    quantity: 1
+    ownership_status: OWNED
+  - id: korg-padkontrol
+    name: Korg padKONTROL
+    manufacturer: Korg
+    model: padKONTROL
+    category: controllers
+    quantity: 1
+    ownership_status: OWNED
+  - id: behringer-fcb1010
+    name: Behringer FCB1010
+    manufacturer: Behringer
+    model: FCB1010
+    category: controllers
+    quantity: 1
+    ownership_status: OWNED
+  - id: novation-remote-zero-sl
+    name: Novation ReMOTE ZeRO SL
+    manufacturer: Novation
+    model: ReMOTE ZeRO SL
+    category: controllers
+    quantity: 1
+    ownership_status: OWNED
+    notes: Encoder #6 broken
+    condition: ISSUE
+  - id: elgato-stream-deck-plus
+    name: Elgato Stream Deck+
+    manufacturer: Elgato
+    model: Stream Deck+
+    category: controllers
+    quantity: 1
+    ownership_status: OWNED
+  - id: mosky-dual-switch
+    name: MOSKY Dual Switch
+    manufacturer: MOSKY
+    category: controllers
+    quantity: 1
+    ownership_status: OWNED
+  - id: boss-ev-30
+    name: BOSS EV-30
+    manufacturer: BOSS
+    model: EV-30
+    category: controllers
+    quantity: 1
+    ownership_status: OWNED
 
-midi_interfaces:
-  - CME U6MIDI Pro  # 3 in / 3 out; route / merge / filter
-  - CME MIDI Thru5 WC  # hardware thru distribution
-
-# CURRENT active path membership
-active_aux_front:
-  - BOSS RC-1
-  - Cry Baby
-
-active_joyo_dirty:  # JOYO Send A
-  - OD-1
-  - BD-2
-  - JB-2
-  - MT-2w
-  - DS-1
-
-active_joyo_space:  # JOYO Send B
-  sy1:
-    pedal: SY-1
-    send_return_loop:
-      - PH-3
-      - TR-2
-  ls2:
-    pedal: LS-2
-    mode: A+B MIX <-> BYPASS
-    loop_a:
-      - SL-2
-      - DD-8
-    loop_b:
-      - TE-2
-      - RE-2
-
-post_router:
-  - BOSS CH-1
-
-# OWNED but not in CURRENT active signal path
-owned_not_in_active_chain:
-  - Flamma Mod
-  - PH-2
-  - Big Muff  # failed/no audio; bench-test
+  # --- MIDI utilities ---
+  - id: cme-u6midi-pro
+    name: CME U6MIDI Pro
+    manufacturer: CME
+    model: U6MIDI Pro
+    category: midi_utilities
+    quantity: 1
+    ownership_status: OWNED
+    notes: 3 in / 3 out; route / merge / filter
+  - id: cme-midi-thru5-wc
+    name: CME MIDI Thru5 WC
+    manufacturer: CME
+    model: MIDI Thru5 WC
+    category: midi_utilities
+    quantity: 1
+    ownership_status: OWNED
+    notes: Hardware thru distribution
