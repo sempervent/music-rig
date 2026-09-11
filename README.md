@@ -102,30 +102,41 @@ Canonical planning data:
 ```text
 data/todo.yaml       = canonical TODO data
 data/wishlist.yaml   = canonical wishlist data
+data/inbox.yaml      = uncategorized capture inbox (CLI-only)
 docs/todo.md         = human-facing rendered representation
 docs/wishlist.md     = human-facing rendered representation
 ```
 
 Do not manually edit the generated marker sections in the Markdown files.
+Inbox captures are not CURRENT routing truth until triaged into TODO/docs.
 
 ```bash
 uv sync --extra dev --extra docs
 uv run rig --help
+uv run rig status
 
 uv run rig todo list
 uv run rig todo show RIG-001
-uv run rig todo add
+uv run rig todo start RIG-001
+uv run rig todo done RIG-001
+uv run rig todo next list
+uv run rig todo next set RIG-002 RIG-038 RIG-046
 
 uv run rig wish list
 uv run rig wish show "BOSS RC-600"
-uv run rig wish add
+uv run rig wish promote "PFL Eurorack v1"
+
+uv run rig capture "Something weird happened"
+uv run rig inbox list
+uv run rig inbox triage CAP-001
 
 uv run rig render
 uv run rig render --check
 uv run rig check
 ```
 
-`rig todo add` and `rig wish add` write YAML and then re-render Markdown unless `--no-render` is passed.
+Mutation commands write YAML and re-render Markdown unless `--no-render` is passed.
+No CLI command commits or pushes Git.
 
 ## Documentation CI/CD
 

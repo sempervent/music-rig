@@ -8,6 +8,8 @@ from music_rig.models import TodoDocument, TodoStatus, WishlistDocument
 from music_rig.store import (
     DOCS_TODO_PATH,
     DOCS_WISHLIST_PATH,
+    TODO_PATH,
+    WISHLIST_PATH,
     StoreError,
     load_todo,
     load_wishlist,
@@ -160,15 +162,19 @@ def render_wishlist_section(doc: WishlistDocument) -> str:
         )
     lines.append("")
 
-    detailed = [i for i in doc.items if i.details.strip()]
+    detailed = [i for i in doc.items if i.details.strip() or i.todo_refs]
     if detailed:
         lines.append("## Detail notes")
         lines.append("")
         for item in detailed:
             lines.append(f"### {item.item}")
             lines.append("")
-            lines.append(item.details.rstrip())
-            lines.append("")
+            if item.todo_refs:
+                lines.append("Related TODOs: " + ", ".join(item.todo_refs))
+                lines.append("")
+            if item.details.strip():
+                lines.append(item.details.rstrip())
+                lines.append("")
     return "\n".join(lines)
 
 
@@ -202,7 +208,22 @@ def render_docs(
     docs_wishlist: Path | None = None,
     write: bool = True,
 ) -> tuple[bool, list[str]]:
-    """Render generated sections. Returns (changed, messages)."""
+    """Render generated sections. Returns (changed, messages).
+
+    When custom data paths are supplied without matching docs paths, rendering
+    is skipped for safety so fixture data cannot overwrite production docs.
+    """
+    using_custom_todo = todo_path is not None and todo_path != TODO_PATH
+    using_custom_wish = wishlist_path is not None and wishlist_path != WISHLIST_PATH
+    if using_custom_todo and docs_todo is None:
+        raise StoreError(
+            "docs_todo path is required when rendering with a custom todo_path"
+        )
+    if using_custom_wish and docs_wishlist is None:
+        raise StoreError(
+            "docs_wishlist path is required when rendering with a custom wishlist_path"
+        )
+
     todo = load_todo(todo_path)
     wishlist = load_wishlist(wishlist_path)
     todo_md_path = docs_todo or DOCS_TODO_PATH

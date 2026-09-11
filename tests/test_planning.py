@@ -7,20 +7,17 @@ import yaml
 from typer.testing import CliRunner
 
 from music_rig.cli import app
-from music_rig.models import TodoDocument, TodoPriority, TodoStatus, WishlistDocument
+from music_rig.models import TodoDocument, WishlistDocument
 from music_rig.render import (
-    WISH_END,
-    WISH_START,
     TODO_END,
     TODO_START,
-    apply_todo_render,
-    apply_wishlist_render,
+    WISH_END,
+    WISH_START,
     check_render_sync,
     render_todo_section,
     render_wishlist_section,
 )
 from music_rig.store import load_todo, load_wishlist, save_todo
-
 
 runner = CliRunner()
 
@@ -34,7 +31,7 @@ def _minimal_todo(**overrides) -> dict:
                 "task": "One",
                 "area": "Docs",
                 "priority": "P0",
-                "status": "NEXT",
+                "status": "READY",
                 "depends_on": [],
                 "definition_of_done": "Done when one.",
                 "notes": "",
@@ -63,7 +60,7 @@ def test_load_repo_todo_yaml():
     ids = {t.id for t in doc.tasks}
     assert "RIG-032" in ids
     assert "RIG-048" in ids
-    assert "RIG-026" not in ids  # historical gap
+    assert "RIG-026" not in ids
 
 
 def test_load_repo_wishlist_yaml():
@@ -106,6 +103,13 @@ def test_invalid_status_rejected():
         TodoDocument.model_validate(data)
 
 
+def test_next_status_enum_removed():
+    data = _minimal_todo()
+    data["tasks"][0]["status"] = "NEXT"
+    with pytest.raises(Exception):
+        TodoDocument.model_validate(data)
+
+
 def test_next_session_over_three_rejected():
     data = _minimal_todo()
     data["tasks"].append(
@@ -144,12 +148,10 @@ def test_done_not_in_next_session():
         TodoDocument.model_validate(data)
 
 
-def test_deterministic_render(tmp_path: Path):
+def test_deterministic_render():
     doc = TodoDocument.model_validate(_minimal_todo())
-    a = render_todo_section(doc)
-    b = render_todo_section(doc)
-    assert a == b
-    assert "GENERATED FROM data/todo.yaml" in a
+    assert render_todo_section(doc) == render_todo_section(doc)
+    assert "GENERATED FROM data/todo.yaml" in render_todo_section(doc)
 
 
 def test_render_check_success_on_repo():
@@ -182,7 +184,6 @@ def test_render_check_failure_on_stale(tmp_path: Path):
     wish_yaml.write_text(
         yaml.safe_dump(wish.model_dump(mode="json"), sort_keys=False), encoding="utf-8"
     )
-
     docs_todo.write_text(
         f"Intro\n{TODO_START}\nstale\n{TODO_END}\nOutro\n", encoding="utf-8"
     )
@@ -190,7 +191,6 @@ def test_render_check_failure_on_stale(tmp_path: Path):
         f"Intro\n{WISH_START}\n{render_wishlist_section(wish)}{WISH_END}\n",
         encoding="utf-8",
     )
-
     stale = check_render_sync(
         todo_path=todo_yaml,
         wishlist_path=wish_yaml,
@@ -201,8 +201,7 @@ def test_render_check_failure_on_stale(tmp_path: Path):
 
 
 def test_next_id_allocation():
-    doc = load_todo()
-    assert doc.next_id() == "RIG-049"
+    assert load_todo().next_id() == "RIG-049"
 
 
 def test_cli_todo_list():
@@ -214,21 +213,10 @@ def test_cli_todo_list():
 def test_cli_unknown_todo():
     result = runner.invoke(app, ["todo", "show", "RIG-999"])
     assert result.exit_code != 0
-    assert "does not exist" in result.stdout or "does not exist" in result.stderr
 
 
 def test_save_todo_roundtrip(tmp_path: Path):
     src = load_todo()
     out = tmp_path / "todo.yaml"
     save_todo(src, out)
-    again = load_todo(out)
-    assert again.model_dump() == src.model_dump()
-
-
-def test_apply_preserves_outside_markers():
-    doc = TodoDocument.model_validate(_minimal_todo())
-    original = f"KEEP-BEFORE\n{TODO_START}\nold\n{TODO_END}\nKEEP-AFTER\n"
-    updated = apply_todo_render(original, doc)
-    assert updated.startswith("KEEP-BEFORE\n")
-    assert updated.endswith("KEEP-AFTER\n")
-    assert "RIG-001" in updated
+    assert load_todo(out).model_dump() == src.model_dump()

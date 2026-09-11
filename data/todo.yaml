@@ -8,7 +8,7 @@ tasks:
     loops; A+B MIX↔BYPASS)
   area: Pedals
   priority: P0
-  status: NEXT
+  status: READY
   depends_on: []
   depends_hint: null
   definition_of_done: '`docs/pedal-chains.md` matches the physical board; any mismatch updated
@@ -20,7 +20,7 @@ tasks:
   task: Inspect and record normal / half-normal / thru for every populated PB-B pair
   area: Patchbay
   priority: P0
-  status: NEXT
+  status: READY
   depends_on: []
   depends_hint: null
   definition_of_done: Every populated pair in `data/patchbays.yaml` and `docs/patchbays.md`
@@ -32,7 +32,7 @@ tasks:
   task: Trace and document non-clean A/B/Y destinations for acoustic, bass, electric
   area: Routing
   priority: P0
-  status: NEXT
+  status: READY
   depends_on: []
   depends_hint: null
   definition_of_done: Each instrument’s other splitter leg is recorded in `docs/current-routing.md`
