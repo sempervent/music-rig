@@ -14,12 +14,14 @@ from music_rig import (
     channel_state,
     current_service,
     control_state,
+    control_surface_state,
     ableton_state,
     inbox_service,
     inventory_state,
     midi_state,
     gear_usage,
     patchbay_state,
+    performance_state,
     question_service,
     routing_state,
     session_service,
@@ -44,6 +46,7 @@ from music_rig.models import (
     PhysicalControlType,
     TargetKind,
     TargetState,
+    PerformanceCriticality,
     ValueBehavior,
     TodoPriority,
     TodoStatus,
@@ -102,6 +105,9 @@ gear_app = typer.Typer(help="Owned equipment inventory.", no_args_is_help=True)
 midi_app = typer.Typer(help="Read-only CURRENT MIDI state.", no_args_is_help=True)
 controls_app = typer.Typer(help="Controller mapping evidence and gaps.", no_args_is_help=True)
 ableton_app = typer.Typer(help="Durable Ableton mapping targets.", no_args_is_help=True)
+performance_app = typer.Typer(
+    help="PFL performance orchestration and readiness.", no_args_is_help=True
+)
 current_app = typer.Typer(
     help="Modify authoritative CURRENT state (typed, previewed).",
     no_args_is_help=True,
@@ -130,6 +136,9 @@ current_controls_app = typer.Typer(
     help="CURRENT controller mapping mutations (data/controllers.yaml).",
     no_args_is_help=True,
 )
+current_performance_app = typer.Typer(
+    help="PFL performance binding/evidence mutations.", no_args_is_help=True
+)
 app.add_typer(todo_app, name="todo")
 app.add_typer(wish_app, name="wish")
 todo_app.add_typer(next_app, name="next")
@@ -143,6 +152,7 @@ app.add_typer(gear_app, name="gear")
 app.add_typer(midi_app, name="midi")
 app.add_typer(controls_app, name="controls")
 app.add_typer(ableton_app, name="ableton")
+app.add_typer(performance_app, name="performance")
 app.add_typer(current_app, name="current")
 current_app.add_typer(current_pb_app, name="patchbay")
 current_app.add_typer(current_ch_app, name="channels")
@@ -150,6 +160,7 @@ current_app.add_typer(current_path_app, name="path")
 current_app.add_typer(current_gear_app, name="gear")
 current_app.add_typer(current_midi_app, name="midi")
 current_app.add_typer(current_controls_app, name="controls")
+current_app.add_typer(current_performance_app, name="performance")
 
 
 def _fail(message: str, code: int = 1) -> None:
@@ -2917,6 +2928,390 @@ def ableton_targets() -> None:
     _ableton_table("ABLETON TRACKS", doc.tracks, "name")
     _ableton_table("ABLETON SENDS", doc.sends, "label")
     _ableton_table("ABLETON ACTIONS", doc.actions, "label")
+
+
+@ableton_app.command("templates")
+def ableton_templates() -> None:
+    try:
+        doc = ableton_state.load_document()
+    except StoreError as exc:
+        _fail(str(exc))
+    table = Table(title="ABLETON TEMPLATES")
+    for label in ("ID", "Label", "Tracks", "Sends", "Requirements", "Evidence"):
+        table.add_column(label)
+    for template in doc.templates:
+        table.add_row(
+            template.id,
+            template.label,
+            str(len(template.tracks)),
+            str(len(template.sends)),
+            ", ".join(template.requirements) or "—",
+            template.evidence.value,
+        )
+    console.print(table)
+
+
+@ableton_app.command("template")
+def ableton_template(template_id: str) -> None:
+    try:
+        doc = ableton_state.load_document()
+    except StoreError as exc:
+        _fail(str(exc))
+    template = next((item for item in doc.templates if item.id == template_id), None)
+    if template is None:
+        _fail(f"Unknown Ableton template {template_id!r}.")
+    console.print(f"[bold]{template.label}[/bold]  {template.evidence.value}")
+    console.print(template.notes or "—")
+    tracks = Table(title="Tracks")
+    for label in ("Track", "Role", "Active", "Record ready"):
+        tracks.add_column(label)
+    for track in template.tracks:
+        tracks.add_row(
+            track.track_ref,
+            track.role,
+            str(track.active).lower(),
+            str(track.record_ready).lower(),
+        )
+    console.print(tracks)
+    sends = Table(title="Sends")
+    for label in ("Send", "Role", "Notes"):
+        sends.add_column(label)
+    for send in template.sends:
+        sends.add_row(send.send_ref, send.role, send.notes or "—")
+    console.print(sends)
+
+
+def _performance_doc():
+    try:
+        return performance_state.load_document()
+    except StoreError as exc:
+        _fail(str(exc))
+
+
+@performance_app.command("summary")
+def performance_summary() -> None:
+    doc = _performance_doc()
+    readiness = performance_state.evaluate_readiness(doc)
+    console.print("[bold]PERFORMANCE[/bold]")
+    console.print(f"Modes:      {len(doc.modes)}")
+    console.print(f"Actions:    {len(doc.actions)}")
+    console.print(f"Bindings:   {len(doc.bindings)}")
+    console.print(f"Recovery:   {len(doc.recovery)}")
+    console.print(f"Readiness:  {readiness.result.value}")
+
+
+@performance_app.command("modes")
+def performance_modes() -> None:
+    doc = _performance_doc()
+    table = Table(title="PERFORMANCE MODES")
+    for label in ("ID", "Label", "Required", "Optional", "Evidence"):
+        table.add_column(label)
+    for mode in doc.modes:
+        table.add_row(
+            mode.id,
+            mode.label,
+            str(len(mode.required_actions)),
+            str(len(mode.optional_actions)),
+            mode.evidence.value,
+        )
+    console.print(table)
+
+
+@performance_app.command("mode")
+def performance_mode(mode_id: str) -> None:
+    doc = _performance_doc()
+    mode = next((item for item in doc.modes if item.id == mode_id), None)
+    if mode is None:
+        _fail(f"Unknown performance mode {mode_id!r}.")
+    console.print(f"[bold]{mode.label}[/bold]  {mode.evidence.value}")
+    console.print(mode.purpose)
+    console.print("")
+    console.print("Required actions:")
+    for action in mode.required_actions:
+        console.print(f"  {action}")
+    console.print("Optional actions:")
+    for action in mode.optional_actions:
+        console.print(f"  {action}")
+    if mode.notes:
+        console.print("")
+        console.print(f"Notes: {mode.notes}")
+
+
+@performance_app.command("actions")
+def performance_actions() -> None:
+    doc = _performance_doc()
+    table = Table(title="PERFORMANCE ACTIONS")
+    for label in ("ID", "Label", "Category", "Criticality", "Evidence", "Bindings"):
+        table.add_column(label)
+    for action in doc.actions:
+        count = sum(binding.action_ref == action.id for binding in doc.bindings)
+        table.add_row(
+            action.id,
+            action.label,
+            action.category.value,
+            action.criticality.value,
+            action.evidence.value,
+            str(count),
+        )
+    console.print(table)
+
+
+@performance_app.command("action")
+def performance_action(action_id: str) -> None:
+    doc = _performance_doc()
+    action = next((item for item in doc.actions if item.id == action_id), None)
+    if action is None:
+        _fail(f"Unknown performance action {action_id!r}.")
+    console.print(
+        f"[bold]{action.label}[/bold]  {action.category.value} / "
+        f"{action.criticality.value} / {action.evidence.value}"
+    )
+    for effect in action.effects:
+        console.print(
+            f"  {effect.kind.value}: {effect.action_ref or effect.effect_id} "
+            f"[{effect.evidence.value}]"
+        )
+    bindings = [item for item in doc.bindings if item.action_ref == action.id]
+    console.print("Bindings:")
+    for binding in bindings:
+        console.print(
+            f"  {binding.id}: {binding.controller_ref or binding.surface_ref}/"
+            f"{binding.context_ref}/{binding.control_ref} [{binding.evidence.value}]"
+        )
+    if not bindings:
+        console.print("  (none)")
+
+
+@performance_app.command("bindings")
+def performance_bindings() -> None:
+    doc = _performance_doc()
+    table = Table(title="PERFORMANCE BINDINGS")
+    for label in ("ID", "Action", "Source", "Context", "Control", "Evidence", "Notes"):
+        table.add_column(label)
+    for binding in doc.bindings:
+        table.add_row(
+            binding.id,
+            binding.action_ref,
+            binding.controller_ref or binding.surface_ref or "—",
+            binding.context_ref,
+            binding.control_ref,
+            binding.evidence.value,
+            binding.notes or "—",
+        )
+    console.print(table)
+
+
+@performance_app.command("recovery")
+def performance_recovery(recovery_id: Optional[str] = None) -> None:
+    doc = _performance_doc()
+    values = doc.recovery
+    if recovery_id is not None:
+        values = [item for item in values if item.id == recovery_id]
+        if not values:
+            _fail(f"Unknown recovery scenario {recovery_id!r}.")
+    table = Table(title="LIVE RECOVERY")
+    for label in ("ID", "Label", "Severity", "Actions", "Keyboard/mouse", "Evidence"):
+        table.add_column(label)
+    for scenario in values:
+        table.add_row(
+            scenario.id,
+            scenario.label,
+            scenario.severity.value,
+            ", ".join(scenario.action_refs) or "—",
+            str(scenario.keyboard_mouse_required).lower(),
+            scenario.evidence.value,
+        )
+    console.print(table)
+
+
+@performance_app.command("readiness")
+def performance_readiness() -> None:
+    doc = _performance_doc()
+    readiness = performance_state.evaluate_readiness(doc)
+    console.print(f"[bold]{readiness.result.value}[/bold]")
+    for reason in readiness.reasons:
+        console.print(f"- {reason}")
+
+
+@performance_app.command("gaps")
+def performance_gaps() -> None:
+    doc = _performance_doc()
+    gaps = performance_state.find_gaps(doc)
+    conflicts = performance_state.find_conflicts(doc)
+    table = Table(title="PERFORMANCE GAPS")
+    table.add_column("Scope")
+    table.add_column("Gap")
+    for gap in gaps:
+        table.add_row(gap["scope"], gap["gap"])
+    for conflict in conflicts:
+        table.add_row(conflict["binding"], conflict["conflict"])
+    if not gaps and not conflicts:
+        table.add_row("—", "none")
+    console.print(table)
+
+
+def _commit_performance_preview(
+    preview, data: dict, *, yes: bool, dry_run: bool, no_render: bool
+) -> None:
+    if not _confirm_current(preview, yes=yes, dry_run=dry_run):
+        if dry_run:
+            current_service.commit_performance(
+                data, preview, dry_run=True, render=False
+            )
+            raise typer.Exit(0)
+        if not preview.changed:
+            raise typer.Exit(0)
+        raise typer.Abort()
+    try:
+        result = current_service.commit_performance(
+            data, preview, render=not no_render
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"[green]Applied:[/green] {result.message}")
+
+
+@current_performance_app.command("bind")
+def current_performance_bind(
+    action: str,
+    controller: Optional[str] = typer.Option(None, "--controller"),
+    surface: Optional[str] = typer.Option(None, "--surface"),
+    context: str = typer.Option(..., "--context"),
+    control: str = typer.Option(..., "--control"),
+    evidence: str = typer.Option("INTENDED", "--evidence"),
+    notes: str = typer.Option("", "--notes"),
+    binding_id: Optional[str] = typer.Option(None, "--id"),
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        preview, data = performance_state.propose_bind(
+            action,
+            context,
+            control,
+            controller_ref=controller,
+            surface_ref=surface,
+            evidence=evidence,
+            notes=notes,
+            binding_id=binding_id,
+        )
+    except (StoreError, ValueError) as exc:
+        _fail(str(exc))
+    _commit_performance_preview(
+        preview, data, yes=yes, dry_run=dry_run, no_render=no_render
+    )
+
+
+@current_performance_app.command("unbind")
+def current_performance_unbind(
+    binding_id: str,
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    doc = _performance_doc()
+    binding = next((item for item in doc.bindings if item.id == binding_id), None)
+    if binding is None:
+        _fail(f"Unknown performance binding {binding_id!r}.")
+    action = next(item for item in doc.actions if item.id == binding.action_ref)
+    action_bindings = [item for item in doc.bindings if item.action_ref == action.id]
+    if (
+        action.criticality == PerformanceCriticality.EMERGENCY
+        and len(action_bindings) == 1
+    ):
+        console.print(
+            f"[yellow]Warning:[/yellow] {binding_id} is the last binding for "
+            f"EMERGENCY action {action.id}."
+        )
+        if not dry_run and not yes and not typer.confirm("Remove it?", default=False):
+            raise typer.Abort()
+        if not dry_run:
+            yes = True
+    try:
+        preview, data = performance_state.propose_unbind(binding_id)
+    except StoreError as exc:
+        _fail(str(exc))
+    _commit_performance_preview(
+        preview, data, yes=yes, dry_run=dry_run, no_render=no_render
+    )
+
+
+@current_performance_app.command("set-evidence")
+def current_performance_set_evidence(
+    binding_id: str,
+    evidence: str,
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        preview, data = performance_state.propose_set_evidence(binding_id, evidence)
+    except (StoreError, ValueError) as exc:
+        _fail(str(exc))
+    _commit_performance_preview(
+        preview, data, yes=yes, dry_run=dry_run, no_render=no_render
+    )
+
+
+@current_performance_app.command("set-recovery-evidence")
+def current_performance_set_recovery_evidence(
+    recovery_id: str,
+    evidence: str,
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        preview, data = performance_state.propose_set_recovery_evidence(
+            recovery_id, evidence
+        )
+    except (StoreError, ValueError) as exc:
+        _fail(str(exc))
+    _commit_performance_preview(
+        preview, data, yes=yes, dry_run=dry_run, no_render=no_render
+    )
+
+
+@current_performance_app.command("verify")
+def current_performance_verify(
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    doc = _performance_doc()
+    mutations = []
+    for binding in doc.bindings:
+        verified = typer.confirm(
+            f"Verified binding {binding.id} as modeled?",
+            default=binding.evidence == MidiEvidenceStatus.VERIFIED,
+        )
+        mutations.append(
+            {
+                "op": "set_evidence",
+                "binding_id": binding.id,
+                "evidence": "VERIFIED" if verified else binding.evidence.value,
+            }
+        )
+    for scenario in doc.recovery:
+        verified = typer.confirm(
+            f"Verified recovery {scenario.id} as executable?",
+            default=scenario.evidence == MidiEvidenceStatus.VERIFIED,
+        )
+        mutations.append(
+            {
+                "op": "set_recovery_evidence",
+                "recovery_id": scenario.id,
+                "evidence": "VERIFIED" if verified else scenario.evidence.value,
+            }
+        )
+    try:
+        preview, data = performance_state.propose_batch(mutations)
+    except StoreError as exc:
+        _fail(str(exc))
+    _commit_performance_preview(
+        preview, data, yes=yes, dry_run=dry_run, no_render=no_render
+    )
 
 
 def _commit_controls_preview(

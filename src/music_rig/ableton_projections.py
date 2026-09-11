@@ -37,5 +37,47 @@ def render_ableton_section(doc: AbletonDocument) -> str:
             )
         if not items:
             lines.append("| — | — | UNKNOWN | — |")
+    lines.extend(
+        [
+            "",
+            "## Templates",
+            "",
+            "| ID | Label | Tracks | Sends | Requirements | Evidence | Notes |",
+            "|---|---|---:|---:|---|---|---|",
+        ]
+    )
+    for template in doc.templates:
+        lines.append(
+            f"| {template.id} | {_cell(template.label)} | {len(template.tracks)} | "
+            f"{len(template.sends)} | {_cell(', '.join(template.requirements))} | "
+            f"{template.evidence.value} | {_cell(template.notes)} |"
+        )
+        lines.extend(
+            [
+                "",
+                f"### {template.label} tracks",
+                "",
+                "| Track | Role | Active | Record ready |",
+                "|---|---|---|---|",
+            ]
+        )
+        for track in template.tracks:
+            lines.append(
+                f"| {track.track_ref} | {_cell(track.role)} | "
+                f"{str(track.active).lower()} | {_cell(track.record_ready)} |"
+            )
+        lines.extend(
+            [
+                "",
+                "| Send | Role | Notes |",
+                "|---|---|---|",
+            ]
+        )
+        for send in template.sends:
+            lines.append(
+                f"| {send.send_ref} | {_cell(send.role)} | {_cell(send.notes)} |"
+            )
+    if not doc.templates:
+        lines.append("| — | — | 0 | 0 | — | UNKNOWN | — |")
     lines.append("")
     return "\n".join(lines)

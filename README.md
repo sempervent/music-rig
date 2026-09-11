@@ -110,6 +110,8 @@ data/changes.yaml         = physical/logical change captures (not auto-CURRENT)
 data/open-questions.yaml  = unresolved factual questions (canonical)
 data/controllers.yaml     = canonical controller mapping evidence
 data/ableton.yaml         = durable Ableton mapping targets
+data/performance.yaml     = PFL performance modes, actions, bindings, and recovery
+data/control-surfaces.yaml = non-MIDI performance control surfaces
 data/sessions/            = studio session logs (one YAML file per session)
 docs/todo.md              = human-facing rendered representation
 docs/wishlist.md          = human-facing rendered representation
@@ -245,6 +247,12 @@ which writes inventory and wishlist state transactionally.
 `rig now` is deterministic and explainable (no LLM).
 `rig doctor` is advisory; `rig check` remains the CI gate.
 No CLI command commits or pushes Git.
+
+Performance readiness is also advisory and never blocks `rig now --play`:
+`NOT_READY` means a required action is missing/unbound or solely bound to a BROKEN
+control; `PARTIAL` means evidence or hands-off recovery remains incomplete; `READY`
+requires AVAILABLE bindings and VERIFIED critical/emergency paths. INTENDED evidence
+must not be promoted to VERIFIED without direct verification.
 
 MIDI physical links, channel assignments, clock state, and Ableton Track / Sync /
 Remote settings are separate evidence domains. `INTENDED` records design intent;

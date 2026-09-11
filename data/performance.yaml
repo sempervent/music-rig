@@ -1,0 +1,341 @@
+# Canonical PFL performance orchestration (semantic contracts).
+# Evidence: VERIFIED | INTENDED | UNKNOWN
+# Structural readiness ≠ live Ableton/OBS/hardware telemetry.
+# Do not upgrade INTENDED → VERIFIED without explicit physical/software verification.
+# Controllers: data/controllers.yaml. Surfaces: data/control-surfaces.yaml. Ableton targets: data/ableton.yaml.
+
+modes:
+  - id: pfl-jam
+    label: PFL JAM
+    purpose: >-
+      Turn the rig on, play music with minimal computer interaction, record if desired,
+      with controllers, clean+wet routing, KAOSS, looping, and recovery available.
+    evidence: INTENDED
+    required_actions:
+      - panic
+      - record-start
+      - record-stop
+      - clip-record-toggle
+      - clear-bad-loop
+      - all-notes-off
+    optional_actions:
+      - next-scene
+      - return-known-scene
+      - kaoss-recover
+    related_todos: [RIG-038, RIG-046, RIG-015]
+    notes: >-
+      Template and hands-off path remain unfinished (RIG-038, RIG-045). Prefer Just Play
+      even when readiness is PARTIAL.
+
+actions:
+  - id: panic
+    label: Panic / emergency safe
+    category: RECOVERY
+    criticality: EMERGENCY
+    evidence: INTENDED
+    effects:
+      - kind: OBS_ACTION
+        effect_id: obs-stop-recording
+        evidence: INTENDED
+      - kind: OBS_ACTION
+        effect_id: obs-mute-audio
+        evidence: INTENDED
+      - kind: OBS_ACTION
+        effect_id: obs-safe-scene
+        evidence: INTENDED
+      - kind: MIDI_ACTION
+        effect_id: all-notes-off
+        evidence: INTENDED
+      - kind: MANUAL_STEP
+        effect_id: stop-audio-runaway
+        evidence: INTENDED
+        notes: Mute runaway feedback / stop looping if needed by hand until mapped
+    related_todos: [RIG-019, RIG-044, RIG-045]
+    notes: Design direction from recovery + OBS SAFE concepts — not VERIFIED executable path
+
+  - id: record-start
+    label: Start performance recording
+    category: RECORDING
+    criticality: IMPORTANT
+    evidence: INTENDED
+    effects:
+      - kind: OBS_ACTION
+        effect_id: obs-start-recording
+        evidence: INTENDED
+      - kind: MANUAL_STEP
+        effect_id: arm-ableton-if-needed
+        evidence: UNKNOWN
+    related_todos: [RIG-045, RIG-038]
+
+  - id: record-stop
+    label: Stop performance recording
+    category: RECORDING
+    criticality: IMPORTANT
+    evidence: INTENDED
+    effects:
+      - kind: OBS_ACTION
+        effect_id: obs-stop-recording
+        evidence: INTENDED
+    related_todos: [RIG-045]
+
+  - id: clip-record-toggle
+    label: Clip record toggle
+    category: RECORDING
+    criticality: IMPORTANT
+    evidence: INTENDED
+    effects:
+      - kind: ABLETON_ACTION
+        action_ref: clip-record
+        evidence: INTENDED
+    related_todos: [RIG-039]
+    notes: padKONTROL footswitch / M4L — two-press stop issue unresolved
+
+  - id: clear-bad-loop
+    label: Clear bad RC-1 loop
+    category: LOOPING
+    criticality: IMPORTANT
+    evidence: INTENDED
+    effects:
+      - kind: HARDWARE_PROCEDURE
+        effect_id: rc1-clear-or-stop
+        evidence: INTENDED
+        notes: Prefer foot-accessible STOP/UNDO; exact binding TBD
+    related_todos: [RIG-019, RIG-044]
+
+  - id: all-notes-off
+    label: All Notes Off
+    category: MIDI
+    criticality: IMPORTANT
+    evidence: INTENDED
+    effects:
+      - kind: MIDI_ACTION
+        effect_id: all-notes-off
+        evidence: INTENDED
+        notes: Path not VERIFIED (RIG-037)
+    related_todos: [RIG-037, RIG-019]
+
+  - id: next-scene
+    label: Next scene
+    category: SCENE
+    criticality: NORMAL
+    evidence: INTENDED
+    effects:
+      - kind: ABLETON_ACTION
+        action_ref: scene-launch
+        evidence: INTENDED
+    related_todos: [RIG-035, RIG-038]
+
+  - id: return-known-scene
+    label: Return to known-safe scene
+    category: SCENE
+    criticality: IMPORTANT
+    evidence: INTENDED
+    effects:
+      - kind: OBS_ACTION
+        effect_id: obs-safe-scene
+        evidence: INTENDED
+      - kind: ABLETON_ACTION
+        action_ref: scene-launch
+        evidence: UNKNOWN
+    related_todos: [RIG-045, RIG-044]
+
+  - id: kaoss-recover
+    label: Recover from KAOSS mistake
+    category: RECOVERY
+    criticality: IMPORTANT
+    evidence: INTENDED
+    effects:
+      - kind: MANUAL_STEP
+        effect_id: kaoss-mute-or-clear
+        evidence: INTENDED
+    related_todos: [RIG-019, RIG-044]
+
+  - id: runaway-feedback-stop
+    label: Stop runaway delay/feedback
+    category: AUDIO
+    criticality: EMERGENCY
+    evidence: INTENDED
+    effects:
+      - kind: MANUAL_STEP
+        effect_id: kill-wet-send-or-mute
+        evidence: INTENDED
+    related_todos: [RIG-019, RIG-044]
+
+  - id: mute-solo-recover
+    label: Fix mute/solo accident
+    category: AUDIO
+    criticality: NORMAL
+    evidence: INTENDED
+    effects:
+      - kind: MANUAL_STEP
+        effect_id: reset-mute-solo
+        evidence: INTENDED
+    related_todos: [RIG-044]
+
+  - id: pedal-noise-isolate
+    label: Isolate pedal noise
+    category: AUDIO
+    criticality: NORMAL
+    evidence: INTENDED
+    effects:
+      - kind: MANUAL_STEP
+        effect_id: bypass-noisy-pedal
+        evidence: INTENDED
+    related_todos: [RIG-044, RIG-021]
+
+# Bindings only to controls that exist in controllers.yaml or control-surfaces.yaml
+bindings:
+  - id: padkontrol-clip-record
+    action_ref: clip-record-toggle
+    controller_ref: korg-padkontrol
+    context_ref: global
+    control_ref: footswitch
+    evidence: INTENDED
+    notes: Known imperfect stop behavior (RIG-039)
+
+  - id: streamdeck-obs-safe-panic
+    action_ref: panic
+    surface_ref: elgato-stream-deck-plus
+    context_ref: obs-safe
+    control_ref: panic
+    evidence: INTENDED
+    notes: OBS SAFE profile intent (RIG-045) — not VERIFIED on device
+
+  - id: streamdeck-obs-safe-stop-rec
+    action_ref: record-stop
+    surface_ref: elgato-stream-deck-plus
+    context_ref: obs-safe
+    control_ref: stop-recording
+    evidence: INTENDED
+
+  - id: streamdeck-obs-rec-start
+    action_ref: record-start
+    surface_ref: elgato-stream-deck-plus
+    context_ref: obs-rec
+    control_ref: start-recording
+    evidence: INTENDED
+
+  - id: streamdeck-obs-safe-scene
+    action_ref: return-known-scene
+    surface_ref: elgato-stream-deck-plus
+    context_ref: obs-safe
+    control_ref: known-scene
+    evidence: INTENDED
+
+recovery:
+  - id: bad-rc1-loop
+    label: Bad RC-1 loop
+    severity: IMPORTANT
+    symptom: Captured phrase is wrong / looping garbage
+    action_refs: [clear-bad-loop]
+    manual_steps:
+      - Prefer RC-1 STOP/UNDO via footswitch (MOSKY Dual Switch candidate)
+      - Do not rebuild the loop with keyboard if a foot path exists
+    keyboard_mouse_required: unknown
+    evidence: INTENDED
+    related_todos: [RIG-019, RIG-044]
+
+  - id: wrong-ableton-clip
+    label: Wrong Ableton clip
+    severity: IMPORTANT
+    symptom: Wrong clip launched or recording into wrong slot
+    action_refs: []
+    manual_steps:
+      - Stop clip / undo if available
+      - Return to known Session layout when defined (RIG-038)
+    keyboard_mouse_required: unknown
+    evidence: INTENDED
+    related_todos: [RIG-019, RIG-044, RIG-038]
+
+  - id: runaway-feedback
+    label: Runaway delay/feedback
+    severity: EMERGENCY
+    symptom: Delay/feedback escalating out of control
+    action_refs: [runaway-feedback-stop, panic]
+    manual_steps:
+      - Kill wet send / mute feedback path
+      - Prefer panic if mapped and working
+    keyboard_mouse_required: unknown
+    evidence: INTENDED
+    related_todos: [RIG-019, RIG-044]
+
+  - id: stuck-midi-note
+    label: Stuck MIDI note
+    severity: IMPORTANT
+    symptom: Hanging note / stuck MIDI
+    action_refs: [all-notes-off]
+    manual_steps:
+      - Send All Notes Off via intended path when verified (RIG-037)
+    keyboard_mouse_required: unknown
+    evidence: INTENDED
+    related_todos: [RIG-019, RIG-037]
+
+  - id: kaoss-mistake
+    label: KAOSS mistake
+    severity: IMPORTANT
+    symptom: Unwanted KAOSS capture/effect
+    action_refs: [kaoss-recover]
+    manual_steps:
+      - Mute/clear KAOSS path; recover sample if needed
+    keyboard_mouse_required: unknown
+    evidence: INTENDED
+    related_todos: [RIG-019, RIG-044]
+
+  - id: wrong-scene
+    label: Wrong scene
+    severity: IMPORTANT
+    symptom: Wrong Ableton/OBS scene active
+    action_refs: [return-known-scene]
+    manual_steps:
+      - Return to known-safe scene when Stream Deck OBS SAFE is configured
+    keyboard_mouse_required: unknown
+    evidence: INTENDED
+    related_todos: [RIG-044, RIG-045]
+
+  - id: mute-solo-accident
+    label: Mute/solo accident
+    severity: NORMAL
+    symptom: Unexpected mute or solo
+    action_refs: [mute-solo-recover]
+    manual_steps:
+      - Reset mute/solo on mixer/Ableton as appropriate
+    keyboard_mouse_required: unknown
+    evidence: INTENDED
+    related_todos: [RIG-044]
+
+  - id: pedal-noise
+    label: Pedal noise
+    severity: NORMAL
+    symptom: Noise from pedals / RE-2 area
+    action_refs: [pedal-noise-isolate]
+    manual_steps:
+      - Bypass noisy pedal; change one variable at a time
+    keyboard_mouse_required: unknown
+    evidence: INTENDED
+    related_todos: [RIG-044, RIG-021]
+
+  - id: full-emergency-stop
+    label: Full emergency stop
+    severity: EMERGENCY
+    symptom: Need to stop everything safely
+    action_refs: [panic, record-stop]
+    manual_steps:
+      - Trigger panic / OBS SAFE when mapped
+      - Stop recording; mute runaway audio; All Notes Off
+    keyboard_mouse_required: unknown
+    evidence: INTENDED
+    related_todos: [RIG-019, RIG-044, RIG-045]
+
+requirements:
+  - id: hands-off-core
+    description: Core performance operation requires no keyboard/mouse
+    evidence: INTENDED
+    related_todos: [RIG-045]
+  - id: pfl-jam-record-ready
+    description: Able to begin a rough recording quickly in PFL JAM
+    evidence: INTENDED
+    related_todos: [RIG-038, RIG-046]
+  - id: recovery-one-performer
+    description: Recovery procedures executable by one performer
+    evidence: INTENDED
+    related_todos: [RIG-044]

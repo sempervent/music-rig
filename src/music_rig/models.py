@@ -554,6 +554,7 @@ class TargetKind(str, Enum):
     ABLETON_TRACK = "ABLETON_TRACK"
     ABLETON_SEND = "ABLETON_SEND"
     ABLETON_ACTION = "ABLETON_ACTION"
+    PERFORMANCE_ACTION = "PERFORMANCE_ACTION"
     EXTERNAL_MIDI = "EXTERNAL_MIDI"
     OTHER = "OTHER"
 
@@ -602,6 +603,7 @@ class ControlTarget(BaseModel):
             TargetKind.ABLETON_TRACK: self.track,
             TargetKind.ABLETON_SEND: self.send,
             TargetKind.ABLETON_ACTION: self.action,
+            TargetKind.PERFORMANCE_ACTION: self.action,
         }
         if self.kind in required and not required[self.kind]:
             raise ValueError(f"{self.kind.value} target requires its reference field")
@@ -705,12 +707,52 @@ class AbletonAction(BaseModel):
     notes: str = ""
 
 
+class AbletonTemplateTrack(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    track_ref: str = Field(min_length=1)
+    role: str = Field(min_length=1)
+    active: bool
+    record_ready: bool | str
+
+    @field_validator("record_ready")
+    @classmethod
+    def _record_ready_state(cls, value: bool | str) -> bool | str:
+        if isinstance(value, bool):
+            return value
+        if value.strip().lower() != "unknown":
+            raise ValueError("record_ready must be true, false, or unknown")
+        return "unknown"
+
+
+class AbletonTemplateSend(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    send_ref: str = Field(min_length=1)
+    role: str = Field(min_length=1)
+    notes: str = ""
+
+
+class AbletonTemplate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1)
+    label: str = Field(min_length=1)
+    evidence: MidiEvidenceStatus
+    related_todos: list[RigId] = Field(default_factory=list)
+    notes: str = ""
+    tracks: list[AbletonTemplateTrack] = Field(default_factory=list)
+    sends: list[AbletonTemplateSend] = Field(default_factory=list)
+    requirements: list[str] = Field(default_factory=list)
+
+
 class AbletonDocument(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     tracks: list[AbletonTrack] = Field(default_factory=list)
     sends: list[AbletonSend] = Field(default_factory=list)
     actions: list[AbletonAction] = Field(default_factory=list)
+    templates: list[AbletonTemplate] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _unique_target_ids(self) -> AbletonDocument:
@@ -718,10 +760,248 @@ class AbletonDocument(BaseModel):
             ("Ableton track", [item.id.casefold() for item in self.tracks]),
             ("Ableton send", [item.id.casefold() for item in self.sends]),
             ("Ableton action", [item.id.casefold() for item in self.actions]),
+            ("Ableton template", [item.id.casefold() for item in self.templates]),
         ):
             if len(values) != len(set(values)):
                 raise ValueError(f"{label} IDs must be unique")
+        tracks = {item.id for item in self.tracks}
+        sends = {item.id for item in self.sends}
+        for template in self.templates:
+            track_refs = [item.track_ref for item in template.tracks]
+            send_refs = [item.send_ref for item in template.sends]
+            if len(track_refs) != len(set(track_refs)):
+                raise ValueError(f"{template.id}: template track_refs must be unique")
+            if len(send_refs) != len(set(send_refs)):
+                raise ValueError(f"{template.id}: template send_refs must be unique")
+            for ref in track_refs:
+                if ref not in tracks:
+                    raise ValueError(f"{template.id}: unknown Ableton track {ref!r}")
+            for ref in send_refs:
+                if ref not in sends:
+                    raise ValueError(f"{template.id}: unknown Ableton send {ref!r}")
         return self
+
+
+class PerformanceCriticality(str, Enum):
+    NORMAL = "NORMAL"
+    IMPORTANT = "IMPORTANT"
+    EMERGENCY = "EMERGENCY"
+
+
+class PerformanceActionCategory(str, Enum):
+    RECOVERY = "RECOVERY"
+    RECORDING = "RECORDING"
+    LOOPING = "LOOPING"
+    MIDI = "MIDI"
+    SCENE = "SCENE"
+    AUDIO = "AUDIO"
+
+
+class PerformanceEffectKind(str, Enum):
+    ABLETON_ACTION = "ABLETON_ACTION"
+    OBS_ACTION = "OBS_ACTION"
+    MIDI_ACTION = "MIDI_ACTION"
+    HARDWARE_PROCEDURE = "HARDWARE_PROCEDURE"
+    MANUAL_STEP = "MANUAL_STEP"
+
+
+class PerformanceEffect(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: PerformanceEffectKind
+    effect_id: str | None = None
+    action_ref: str | None = None
+    evidence: MidiEvidenceStatus
+    notes: str = ""
+
+    @model_validator(mode="after")
+    def _effect_reference(self) -> PerformanceEffect:
+        if self.kind == PerformanceEffectKind.ABLETON_ACTION:
+            if not self.action_ref or self.effect_id:
+                raise ValueError("ABLETON_ACTION requires action_ref only")
+        elif not self.effect_id or self.action_ref:
+            raise ValueError(f"{self.kind.value} requires effect_id only")
+        return self
+
+
+class PerformanceAction(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1)
+    label: str = Field(min_length=1)
+    category: PerformanceActionCategory
+    criticality: PerformanceCriticality
+    evidence: MidiEvidenceStatus
+    effects: list[PerformanceEffect] = Field(default_factory=list)
+    related_todos: list[RigId] = Field(default_factory=list)
+    notes: str = ""
+
+
+class PerformanceMode(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1)
+    label: str = Field(min_length=1)
+    purpose: str = Field(min_length=1)
+    evidence: MidiEvidenceStatus
+    required_actions: list[str] = Field(default_factory=list)
+    optional_actions: list[str] = Field(default_factory=list)
+    related_todos: list[RigId] = Field(default_factory=list)
+    notes: str = ""
+
+
+class PerformanceBinding(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1)
+    action_ref: str = Field(min_length=1)
+    controller_ref: str | None = None
+    surface_ref: str | None = None
+    context_ref: str = Field(min_length=1)
+    control_ref: str = Field(min_length=1)
+    evidence: MidiEvidenceStatus
+    notes: str = ""
+
+    @model_validator(mode="after")
+    def _one_source(self) -> PerformanceBinding:
+        if bool(self.controller_ref) == bool(self.surface_ref):
+            raise ValueError("binding requires exactly one controller_ref or surface_ref")
+        return self
+
+
+class RecoveryScenario(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1)
+    label: str = Field(min_length=1)
+    severity: PerformanceCriticality
+    symptom: str = Field(min_length=1)
+    action_refs: list[str] = Field(default_factory=list)
+    manual_steps: list[str] = Field(default_factory=list)
+    keyboard_mouse_required: bool | str
+    evidence: MidiEvidenceStatus
+    related_todos: list[RigId] = Field(default_factory=list)
+
+    @field_validator("keyboard_mouse_required")
+    @classmethod
+    def _keyboard_state(cls, value: bool | str) -> bool | str:
+        if isinstance(value, bool):
+            return value
+        if value.strip().lower() != "unknown":
+            raise ValueError("keyboard_mouse_required must be true, false, or unknown")
+        return "unknown"
+
+
+class PerformanceRequirement(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1)
+    description: str = Field(min_length=1)
+    evidence: MidiEvidenceStatus
+    related_todos: list[RigId] = Field(default_factory=list)
+
+
+class PerformanceDocument(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    modes: list[PerformanceMode] = Field(default_factory=list)
+    actions: list[PerformanceAction] = Field(default_factory=list)
+    bindings: list[PerformanceBinding] = Field(default_factory=list)
+    recovery: list[RecoveryScenario] = Field(default_factory=list)
+    requirements: list[PerformanceRequirement] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _references_and_unique_ids(self) -> PerformanceDocument:
+        groups = {
+            "mode": [item.id for item in self.modes],
+            "action": [item.id for item in self.actions],
+            "binding": [item.id for item in self.bindings],
+            "recovery": [item.id for item in self.recovery],
+            "requirement": [item.id for item in self.requirements],
+        }
+        for label, values in groups.items():
+            if len(values) != len(set(values)):
+                raise ValueError(f"Performance {label} IDs must be unique")
+        actions = set(groups["action"])
+        for mode in self.modes:
+            refs = [*mode.required_actions, *mode.optional_actions]
+            if len(refs) != len(set(refs)):
+                raise ValueError(f"{mode.id}: action references must be unique")
+            for ref in refs:
+                if ref not in actions:
+                    raise ValueError(f"{mode.id}: unknown performance action {ref!r}")
+        for binding in self.bindings:
+            if binding.action_ref not in actions:
+                raise ValueError(f"{binding.id}: unknown performance action {binding.action_ref!r}")
+        for scenario in self.recovery:
+            for ref in scenario.action_refs:
+                if ref not in actions:
+                    raise ValueError(f"{scenario.id}: unknown performance action {ref!r}")
+        return self
+
+
+class SurfaceControl(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1)
+    label: str = Field(min_length=1)
+    availability: ControlAvailability
+    evidence: MidiEvidenceStatus
+    notes: str = ""
+
+
+class SurfaceContext(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1)
+    label: str = Field(min_length=1)
+    kind: str = Field(min_length=1)
+    evidence: MidiEvidenceStatus
+    notes: str = ""
+    controls: list[SurfaceControl] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _unique_controls(self) -> SurfaceContext:
+        ids = [item.id.casefold() for item in self.controls]
+        if len(ids) != len(set(ids)):
+            raise ValueError(f"{self.id}: surface control IDs must be unique")
+        return self
+
+
+class ControlSurface(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    gear_ref: str = Field(min_length=1)
+    coverage: ControlCoverage
+    related_todos: list[RigId] = Field(default_factory=list)
+    notes: str = ""
+    contexts: list[SurfaceContext] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _unique_contexts(self) -> ControlSurface:
+        ids = [item.id.casefold() for item in self.contexts]
+        if len(ids) != len(set(ids)):
+            raise ValueError(f"{self.gear_ref}: surface context IDs must be unique")
+        return self
+
+
+class ControlSurfacesDocument(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    surfaces: list[ControlSurface] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _unique_surfaces(self) -> ControlSurfacesDocument:
+        refs = [item.gear_ref.casefold() for item in self.surfaces]
+        if len(refs) != len(set(refs)):
+            raise ValueError("surface gear_refs must be unique")
+        return self
+
+
+class ReadinessResult(str, Enum):
+    READY = "READY"
+    PARTIAL = "PARTIAL"
+    NOT_READY = "NOT_READY"
 
 
 class MidiTransport(str, Enum):

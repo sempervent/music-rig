@@ -77,7 +77,14 @@ AREA_LIKELY_FILES: dict[str, list[str]] = {
         "docs/midi-clock.md",
         "diagrams/midi-topology.mmd",
     ],
-    "performance": ["data/ableton.yaml", "docs/ableton-track-map.md"],
+    "performance": [
+        "data/performance.yaml",
+        "data/control-surfaces.yaml",
+        "data/ableton.yaml",
+        "docs/performance.md",
+        "docs/live-recovery.md",
+        "docs/ableton-track-map.md",
+    ],
     "controls": ["data/controllers.yaml", "docs/controller-mappings.md"],
     "video": ["docs/ableton-track-map.md", "docs/todo.md"],
 }
@@ -305,6 +312,18 @@ def format_reconcile_question(
             )
             lines.append(f"    uv run rig current controls verify {target.gear}")
             lines.append(f"    # optionally pass --question {q.id} on the apply step")
+        elif (
+            target is not None
+            and target.domain == "ableton.template"
+            and target.path
+        ):
+            lines.append(
+                f"  This question maps to Ableton template specification: {target.path}."
+            )
+            lines.append(f"    uv run rig ableton template {target.path}")
+            lines.append(
+                "  Verify the live set directly before updating INTENDED evidence."
+            )
         else:
             lines.append("  inspect the physical rig")
             lines.append(f"  then: uv run rig question resolve {q.id}")

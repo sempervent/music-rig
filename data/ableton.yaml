@@ -82,3 +82,56 @@ actions:
     label: Template HOME
     evidence: INTENDED
     notes: ZeRO PAD 8 → HOME (RIG-036)
+
+# Performance template specs (not a full .als dump).
+templates:
+  - id: pfl-jam
+    label: PFL JAM
+    evidence: INTENDED
+    related_todos: [RIG-038, RIG-046]
+    notes: >-
+      Structural expectations for a turn-on-and-play jam set.
+      Exact live-set contents remain open (Q-018 / RIG-038).
+    tracks:
+      - track_ref: drums
+        role: midi-source
+        active: true
+        record_ready: unknown
+      - track_ref: minikorg
+        role: audio-source
+        active: true
+        record_ready: unknown
+      - track_ref: mixer
+        role: clean-bus
+        active: true
+        record_ready: unknown
+      - track_ref: kaoss
+        role: wet-source
+        active: true
+        record_ready: unknown
+      - track_ref: acoustic-clean
+        role: clean-source
+        active: true
+        record_ready: unknown
+      - track_ref: bass-clean
+        role: clean-source
+        active: true
+        record_ready: unknown
+      - track_ref: guitar-clean
+        role: clean-source
+        active: true
+        record_ready: unknown
+      - track_ref: sr18
+        role: audio-source
+        active: true
+        record_ready: unknown
+    sends:
+      - send_ref: send-c
+        role: performance-send
+        notes: ZeRO PFL SEND C direction
+      - send_ref: send-d
+        role: performance-send
+        notes: Launch Control 3 direction
+    requirements:
+      - hands-off-core
+      - pfl-jam-record-ready

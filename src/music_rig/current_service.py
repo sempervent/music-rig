@@ -29,6 +29,7 @@ from music_rig.store import (
     INVENTORY_PATH,
     MIDI_PATH,
     CONTROLLERS_PATH,
+    PERFORMANCE_PATH,
     TODO_PATH,
     WISHLIST_PATH,
     StoreError,
@@ -38,7 +39,15 @@ from music_rig.store import (
     load_todo,
     write_text_files,
 )
-from music_rig import channel_state, control_state, inventory_state, midi_state, patchbay_state, routing_state
+from music_rig import (
+    channel_state,
+    control_state,
+    inventory_state,
+    midi_state,
+    patchbay_state,
+    performance_state,
+    routing_state,
+)
 
 Clock = Callable[[], datetime]
 
@@ -522,6 +531,49 @@ def commit_controllers(
         docs_todo=docs_todo,
         docs_wishlist=docs_wishlist,
         docs_questions=docs_questions,
+    )
+
+
+def commit_performance(
+    proposed_data: dict,
+    preview: CurrentPreview,
+    *,
+    dry_run: bool = False,
+    render: bool = True,
+    performance_path: Path | None = None,
+    controllers_path: Path | None = None,
+    surfaces_path: Path | None = None,
+    ableton_path: Path | None = None,
+    inventory_path: Path | None = None,
+    midi_path: Path | None = None,
+) -> CurrentPreview:
+    target = performance_path or PERFORMANCE_PATH
+    errors = performance_state.validate_performance_doc(
+        proposed_data,
+        controllers_path=controllers_path,
+        surfaces_path=surfaces_path,
+        ableton_path=ableton_path,
+        inventory_path=inventory_path,
+        midi_path=midi_path,
+    )
+    if errors:
+        raise StoreError("Performance validation failed: " + "; ".join(errors))
+    existing = target.read_text(encoding="utf-8") if target.exists() else None
+    text = performance_state.dump_with_header(proposed_data, existing_text=existing)
+    return _commit(
+        preview=preview,
+        primary_path=target,
+        primary_text=text,
+        dry_run=dry_run,
+        render=render,
+        question_id=None,
+        change_id=None,
+        resolve_q=False,
+        apply_chg=False,
+        answer="",
+        clock=default_clock,
+        questions_path=None,
+        changes_path=None,
     )
 
 

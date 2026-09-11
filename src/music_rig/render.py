@@ -31,17 +31,34 @@ from music_rig.midi_projections import (
 )
 from music_rig.control_projections import render_controller_mappings_section
 from music_rig.ableton_projections import render_ableton_section
-from music_rig import ableton_state, channel_state, control_state, inventory_state, midi_state, patchbay_state, routing_state
+from music_rig.performance_projections import (
+    render_live_recovery_doc,
+    render_performance_doc,
+)
+from music_rig import (
+    ableton_state,
+    channel_state,
+    control_state,
+    control_surface_state,
+    inventory_state,
+    midi_state,
+    patchbay_state,
+    performance_state,
+    routing_state,
+)
 from music_rig.store import (
     ABLETON_PATH,
     CHANNEL_MAP_PATH,
     CONTROLLERS_PATH,
+    CONTROL_SURFACES_PATH,
     DIAGRAM_AUX_LOOP_PATH,
     DIAGRAM_PATCHBAYS_PATH,
     DIAGRAM_TASCAM_PATH,
     DIAGRAM_MIDI_TOPOLOGY_PATH,
     DOCS_ALESIS_PATH,
     DOCS_ABLETON_PATH,
+    DOCS_LIVE_RECOVERY_PATH,
+    DOCS_PERFORMANCE_PATH,
     DOCS_CONTROLLERS_PATH,
     DOCS_PATCHBAYS_PATH,
     DOCS_PEDAL_CHAINS_PATH,
@@ -58,6 +75,7 @@ from music_rig.store import (
     ROUTING_PATH,
     INVENTORY_PATH,
     MIDI_PATH,
+    PERFORMANCE_PATH,
     TODO_PATH,
     WISHLIST_PATH,
     StoreError,
@@ -453,6 +471,10 @@ def render_docs(
     ableton_path: Path | None = None,
     docs_controllers: Path | None = None,
     docs_ableton: Path | None = None,
+    performance_path: Path | None = None,
+    surfaces_path: Path | None = None,
+    docs_performance: Path | None = None,
+    docs_live_recovery: Path | None = None,
     write: bool = True,
 ) -> tuple[bool, list[str]]:
     """Render generated sections. Returns (changed, messages)."""
@@ -472,6 +494,12 @@ def render_docs(
         controllers_path is not None and controllers_path != CONTROLLERS_PATH
     )
     using_custom_ableton = ableton_path is not None and ableton_path != ABLETON_PATH
+    using_custom_performance = (
+        performance_path is not None and performance_path != PERFORMANCE_PATH
+    )
+    using_custom_surfaces = (
+        surfaces_path is not None and surfaces_path != CONTROL_SURFACES_PATH
+    )
     if using_custom_todo and docs_todo is None:
         raise StoreError(
             "docs_todo path is required when rendering with a custom todo_path"
@@ -518,6 +546,13 @@ def render_docs(
         raise StoreError(
             "docs_ableton is required when rendering with a custom ableton_path"
         )
+    if (using_custom_performance or using_custom_surfaces) and (
+        docs_performance is None or docs_live_recovery is None
+    ):
+        raise StoreError(
+            "docs_performance and docs_live_recovery are required with custom "
+            "performance/surface paths"
+        )
 
     todo = load_todo(todo_path)
     wishlist = load_wishlist(wishlist_path)
@@ -558,6 +593,8 @@ def render_docs(
         and not using_custom_midi
         and not using_custom_controllers
         and not using_custom_ableton
+        and not using_custom_performance
+        and not using_custom_surfaces
     )
     if planning_fixture_only:
         return changed, messages
@@ -573,6 +610,8 @@ def render_docs(
             using_custom_midi,
             using_custom_controllers,
             using_custom_ableton,
+            using_custom_performance,
+            using_custom_surfaces,
         )
     )
     if not custom_inputs or inventory_path is not None or docs_inventory is not None:
@@ -657,6 +696,50 @@ def render_docs(
             messages=messages,
         ):
             changed = True
+
+    if (
+        not custom_inputs
+        or performance_path is not None
+        or surfaces_path is not None
+        or docs_performance is not None
+    ):
+        performance = performance_state.load_document(
+            performance_path,
+            controllers_path=controllers_path,
+            surfaces_path=surfaces_path,
+            ableton_path=ableton_path,
+            inventory_path=inventory_path,
+            midi_path=midi_path,
+        )
+        surfaces = control_surface_state.load_document(
+            surfaces_path, inventory_path=inventory_path
+        )
+        readiness = performance_state.evaluate_readiness(
+            performance,
+            controllers_path=controllers_path,
+            surfaces_path=surfaces_path,
+            ableton_path=ableton_path,
+            inventory_path=inventory_path,
+            midi_path=midi_path,
+        )
+        performance_md_path = docs_performance or DOCS_PERFORMANCE_PATH
+        recovery_md_path = docs_live_recovery or DOCS_LIVE_RECOVERY_PATH
+        for path, new_text, display in (
+            (
+                performance_md_path,
+                render_performance_doc(performance, surfaces, readiness),
+                "docs/performance.md",
+            ),
+            (
+                recovery_md_path,
+                render_live_recovery_doc(performance),
+                "docs/live-recovery.md",
+            ),
+        ):
+            if _write_if_changed(
+                path, new_text, display_name=display, write=write, messages=messages
+            ):
+                changed = True
 
     patchbays = patchbay_state.load_raw(patchbays_path)
     channels = channel_state.load_raw(channel_map_path)
@@ -766,6 +849,10 @@ def check_render_sync(
     ableton_path: Path | None = None,
     docs_controllers: Path | None = None,
     docs_ableton: Path | None = None,
+    performance_path: Path | None = None,
+    surfaces_path: Path | None = None,
+    docs_performance: Path | None = None,
+    docs_live_recovery: Path | None = None,
 ) -> list[str]:
     """Return list of stale doc paths. Empty if synchronized."""
     _, messages = render_docs(
@@ -796,6 +883,10 @@ def check_render_sync(
         ableton_path=ableton_path,
         docs_controllers=docs_controllers,
         docs_ableton=docs_ableton,
+        performance_path=performance_path,
+        surfaces_path=surfaces_path,
+        docs_performance=docs_performance,
+        docs_live_recovery=docs_live_recovery,
         write=False,
     )
     return messages

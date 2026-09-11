@@ -1,0 +1,88 @@
+# Non-MIDI control surfaces (not data/controllers.yaml).
+# Evidence: VERIFIED | INTENDED | UNKNOWN
+# Stream Deck+ profiles from RIG-045 design — not claimed inspected/complete.
+# Do not invent every button; only performance-relevant controls with design evidence.
+
+surfaces:
+  - gear_ref: elgato-stream-deck-plus
+    coverage: PARTIAL
+    related_todos: [RIG-045]
+    notes: >-
+      Hands-off performance profiles are design direction (RIG-045).
+      Do not treat as MIDI. Exact button layouts not inventively completed.
+    contexts:
+      - id: pfl-home
+        label: PFL HOME
+        kind: PROFILE
+        evidence: INTENDED
+        controls: []
+      - id: obs-rec
+        label: OBS REC
+        kind: PROFILE
+        evidence: INTENDED
+        controls:
+          - id: start-recording
+            label: Start recording
+            availability: AVAILABLE
+            evidence: INTENDED
+          - id: stop-recording
+            label: Stop recording
+            availability: AVAILABLE
+            evidence: INTENDED
+      - id: obs-scenes
+        label: OBS SCENES
+        kind: PROFILE
+        evidence: INTENDED
+        controls: []
+      - id: obs-safe
+        label: OBS SAFE
+        kind: PROFILE
+        evidence: INTENDED
+        notes: >-
+          Intended emergency page — stop-record, mute, camera isolate, replay save,
+          known scene, panic (RIG-045). Not VERIFIED on device.
+        controls:
+          - id: stop-recording
+            label: Stop recording
+            availability: AVAILABLE
+            evidence: INTENDED
+          - id: mute
+            label: Mute audio
+            availability: AVAILABLE
+            evidence: INTENDED
+          - id: camera-isolate
+            label: Isolate / disable cameras
+            availability: AVAILABLE
+            evidence: INTENDED
+          - id: save-replay
+            label: Save replay
+            availability: AVAILABLE
+            evidence: INTENDED
+          - id: known-scene
+            label: Return to known scene
+            availability: AVAILABLE
+            evidence: INTENDED
+          - id: panic
+            label: Panic / emergency safe
+            availability: AVAILABLE
+            evidence: INTENDED
+      - id: ableton
+        label: ABLETON
+        kind: PROFILE
+        evidence: INTENDED
+        controls: []
+      - id: files
+        label: FILES
+        kind: PROFILE
+        evidence: INTENDED
+        controls: []
+      - id: mac-rig
+        label: MAC-RIG
+        kind: PROFILE
+        evidence: INTENDED
+        controls: []
+      - id: settings
+        label: SETTINGS
+        kind: PROFILE
+        evidence: INTENDED
+        controls: []

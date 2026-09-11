@@ -15,12 +15,15 @@ from music_rig.models import (
     INACTIVE_OWNERSHIP,
     MidiEvidenceStatus,
     MidiMessage,
+    PerformanceDocument,
+    TargetKind,
     TargetState,
 )
 from music_rig.store import (
     ABLETON_PATH,
     CONTROLLERS_PATH,
     MIDI_PATH,
+    PERFORMANCE_PATH,
     StoreError,
     _dump_yaml,
     load_inventory,
@@ -60,6 +63,7 @@ def load_document(
     inventory_path: Path | None = None,
     midi_path: Path | None = None,
     ableton_path: Path | None = None,
+    performance_path: Path | None = None,
 ) -> ControllersDocument:
     raw = load_raw(path)
     errors = validate_controllers_doc(
@@ -67,6 +71,7 @@ def load_document(
         inventory_path=inventory_path,
         midi_path=midi_path,
         ableton_path=ableton_path,
+        performance_path=performance_path,
     )
     if errors:
         raise StoreError("Controllers schema validation failed: " + "; ".join(errors))
@@ -95,6 +100,7 @@ def validate_controllers_doc(
     inventory_path: Path | None = None,
     midi_path: Path | None = None,
     ableton_path: Path | None = None,
+    performance_path: Path | None = None,
 ) -> list[str]:
     try:
         doc = ControllersDocument.model_validate(data)
@@ -105,11 +111,14 @@ def validate_controllers_doc(
         inventory = load_inventory(inventory_path)
         channels = _device_channels(midi_path)
         ableton = ableton_state.load_document(ableton_path)
-    except StoreError as exc:
+        performance_raw = parse_existing_yaml(performance_path or PERFORMANCE_PATH)
+        performance = PerformanceDocument.model_validate(performance_raw)
+    except Exception as exc:
         return [str(exc)]
     tracks = {item.id for item in ableton.tracks}
     sends = {item.id for item in ableton.sends}
     actions = {item.id for item in ableton.actions}
+    performance_actions = {item.id for item in performance.actions}
     for controller in doc.controllers:
         item = inventory.resolve(controller.gear_ref)
         if item is None:
@@ -132,7 +141,17 @@ def validate_controllers_doc(
                     errors.append(f"{control.id}: unknown Ableton track {target.track!r}")
                 if target.send and target.send not in sends:
                     errors.append(f"{control.id}: unknown Ableton send {target.send!r}")
-                if target.action and target.action not in actions:
+                if (
+                    target.kind == TargetKind.PERFORMANCE_ACTION
+                    and target.action not in performance_actions
+                ):
+                    errors.append(
+                        f"{control.id}: unknown performance action {target.action!r}"
+                    )
+                elif (
+                    target.kind == TargetKind.ABLETON_ACTION
+                    and target.action not in actions
+                ):
                     errors.append(f"{control.id}: unknown Ableton action {target.action!r}")
     return errors
 
@@ -156,12 +175,14 @@ def _validated(
     inventory_path: Path | None = None,
     midi_path: Path | None = None,
     ableton_path: Path | None = None,
+    performance_path: Path | None = None,
 ) -> ControllersDocument:
     errors = validate_controllers_doc(
         raw,
         inventory_path=inventory_path,
         midi_path=midi_path,
         ableton_path=ableton_path,
+        performance_path=performance_path,
     )
     if errors:
         raise StoreError("Controllers validation failed: " + "; ".join(errors))
@@ -221,6 +242,7 @@ def _mutate(
     inventory_path: Path | None = None,
     midi_path: Path | None = None,
     ableton_path: Path | None = None,
+    performance_path: Path | None = None,
     data: dict[str, Any] | None = None,
     domain: str,
 ) -> tuple[CurrentPreview, dict[str, Any]]:
@@ -230,6 +252,7 @@ def _mutate(
         inventory_path=inventory_path,
         midi_path=midi_path,
         ableton_path=ableton_path,
+        performance_path=performance_path,
     )
     _controller, _context, before = _locate(doc, gear_ref, context_id, control_id)
     after = update(before)
@@ -239,6 +262,7 @@ def _mutate(
         inventory_path=inventory_path,
         midi_path=midi_path,
         ableton_path=ableton_path,
+        performance_path=performance_path,
     )
     return _preview(domain, gear_ref, context_id, control_id, before, after), raw
 
@@ -380,11 +404,16 @@ def propose_batch(
     inventory_path: Path | None = None,
     midi_path: Path | None = None,
     ableton_path: Path | None = None,
+    performance_path: Path | None = None,
     data: dict[str, Any] | None = None,
 ) -> tuple[CurrentPreview, dict[str, Any]]:
     raw = copy.deepcopy(data if data is not None else load_raw(controllers_path))
     before = _validated(
-        raw, inventory_path=inventory_path, midi_path=midi_path, ableton_path=ableton_path
+        raw,
+        inventory_path=inventory_path,
+        midi_path=midi_path,
+        ableton_path=ableton_path,
+        performance_path=performance_path,
     )
     operations = {
         "set_message": propose_set_message,
@@ -409,10 +438,15 @@ def propose_batch(
             inventory_path=inventory_path,
             midi_path=midi_path,
             ableton_path=ableton_path,
+            performance_path=performance_path,
             **args,
         )
     after = _validated(
-        raw, inventory_path=inventory_path, midi_path=midi_path, ableton_path=ableton_path
+        raw,
+        inventory_path=inventory_path,
+        midi_path=midi_path,
+        ableton_path=ableton_path,
+        performance_path=performance_path,
     )
     before_data = before.model_dump(mode="json", exclude_none=True)
     after_data = after.model_dump(mode="json", exclude_none=True)

@@ -12,7 +12,17 @@ from music_rig.models import (
     QuestionStatus,
 )
 from music_rig.render import check_render_sync
-from music_rig import ableton_state, channel_state, control_state, inventory_state, midi_state, patchbay_state, routing_state
+from music_rig import (
+    ableton_state,
+    channel_state,
+    control_state,
+    control_surface_state,
+    inventory_state,
+    midi_state,
+    patchbay_state,
+    performance_state,
+    routing_state,
+)
 from music_rig.store import (
     CHANGES_PATH,
     CHANNEL_MAP_PATH,
@@ -63,6 +73,10 @@ def run_checks(
     ableton_path: Path | None = None,
     docs_controllers: Path | None = None,
     docs_ableton: Path | None = None,
+    performance_path: Path | None = None,
+    surfaces_path: Path | None = None,
+    docs_performance: Path | None = None,
+    docs_live_recovery: Path | None = None,
 ) -> CheckResult:
     errors: list[str] = []
     warnings: list[str] = []
@@ -100,8 +114,24 @@ def run_checks(
             inventory_path=inventory_path,
             midi_path=midi_path,
             ableton_path=ableton_path,
+            performance_path=performance_path,
         ):
             errors.append(f"controllers: {err}")
+        surfaces_raw = control_surface_state.load_raw(surfaces_path)
+        for err in control_surface_state.validate_control_surfaces_doc(
+            surfaces_raw, inventory_path=inventory_path
+        ):
+            errors.append(f"control-surfaces: {err}")
+        performance_raw = performance_state.load_raw(performance_path)
+        for err in performance_state.validate_performance_doc(
+            performance_raw,
+            controllers_path=controllers_path,
+            surfaces_path=surfaces_path,
+            ableton_path=ableton_path,
+            inventory_path=inventory_path,
+            midi_path=midi_path,
+        ):
+            errors.append(f"performance: {err}")
     except StoreError as exc:
         errors.append(str(exc))
 
@@ -274,6 +304,10 @@ def run_checks(
             ableton_path=ableton_path,
             docs_controllers=docs_controllers,
             docs_ableton=docs_ableton,
+            performance_path=performance_path,
+            surfaces_path=surfaces_path,
+            docs_performance=docs_performance,
+            docs_live_recovery=docs_live_recovery,
         )
         for path in stale:
             errors.append(

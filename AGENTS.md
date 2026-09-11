@@ -143,6 +143,11 @@ uv run rig check
 - Use `rig change` when physical state may have changed but has not been reconciled.
 - `next_session` is the authoritative Next Session queue; TODO status is lifecycle only (`READY`, `IN PROGRESS`, etc.). There is no `NEXT` status.
 - `rig now` is deterministic: active session → IN PROGRESS → Next Session order → highest READY (P0–P3, YAML order) → Just Play. No LLM.
+- Performance readiness is advisory and never gates `rig now --play`.
+  - `NOT_READY`: a required action is missing, has zero bindings, or its sole binding uses a BROKEN control.
+  - `PARTIAL`: required paths retain INTENDED/UNKNOWN evidence, imperfect bindings, unknown/true keyboard requirements for EMERGENCY recovery, or lack VERIFIED bindings.
+  - `READY`: every required action has an AVAILABLE binding and all critical/emergency paths are VERIFIED.
+- Do not bind BROKEN controls or upgrade INTENDED performance evidence to VERIFIED without direct verification.
 - Mutation commands write YAML and re-render docs unless `--no-render` is passed.
 - No CLI mutation command commits or pushes Git.
 - Prefer the CLI/service layer for planning mutations when practical.
