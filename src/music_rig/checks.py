@@ -5,16 +5,17 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from music_rig.models import TERMINAL_FOR_NEXT
+from music_rig.models import TERMINAL_FOR_NEXT, ChangeStatus, QuestionStatus
 from music_rig.render import check_render_sync
-from music_rig.models import ChangeStatus
 from music_rig.store import (
     CHANGES_PATH,
     EXISTING_YAML,
     INBOX_PATH,
+    QUESTIONS_PATH,
     StoreError,
     load_changes,
     load_inbox,
+    load_questions,
     load_routing,
     load_todo,
     load_wishlist,
@@ -35,14 +36,18 @@ def run_checks(
     wishlist_path: Path | None = None,
     inbox_path: Path | None = None,
     changes_path: Path | None = None,
+    questions_path: Path | None = None,
     docs_todo: Path | None = None,
     docs_wishlist: Path | None = None,
+    docs_questions: Path | None = None,
 ) -> CheckResult:
     errors: list[str] = []
     warnings: list[str] = []
 
     todo = None
     wishlist = None
+    questions = None
+    changes = None
     try:
         todo = load_todo(todo_path)
     except StoreError as exc:
@@ -55,7 +60,6 @@ def run_checks(
 
     try:
         inbox = load_inbox(inbox_path)
-        # schema already validated; extra explicit checks
         for item in inbox.items:
             if not item.text.strip():
                 errors.append(f"{item.id} has empty capture text")
@@ -75,9 +79,20 @@ def run_checks(
         errors.append(str(exc))
 
     try:
+        questions = load_questions(questions_path)
+        open_q = sum(
+            1 for q in questions.questions if q.status == QuestionStatus.OPEN
+        )
+        if open_q:
+            warnings.append(f"{open_q} open question(s) remain unresolved.")
+    except StoreError as exc:
+        errors.append(str(exc))
+
+    try:
         load_routing()
     except StoreError as exc:
         errors.append(str(exc))
+
     if todo is not None and wishlist is not None:
         known = {t.id for t in todo.tasks}
         for item in wishlist.items:
@@ -98,12 +113,44 @@ def run_checks(
             if task and task.status.value in TERMINAL_FOR_NEXT:
                 errors.append(f"{tid} is {task.status.value} but still in next_session")
 
+    if questions is not None and todo is not None:
+        known_todos = todo.task_map()
+        known_changes = changes.item_map() if changes is not None else {}
+        for q in questions.questions:
+            for tid in q.related_todos:
+                if tid not in known_todos:
+                    errors.append(f"{q.id} references unknown TODO {tid}")
+            for cid in q.related_changes:
+                if cid not in known_changes:
+                    errors.append(f"{q.id} references unknown change {cid}")
+            # bidirectional agreement when change also lists questions
+            for cid in q.related_changes:
+                chg = known_changes.get(cid)
+                if chg is not None and q.id not in chg.related_questions:
+                    errors.append(
+                        f"{q.id} lists {cid} but {cid} does not list {q.id}"
+                    )
+
+    if changes is not None and questions is not None:
+        qmap = questions.question_map()
+        for chg in changes.items:
+            for qid in chg.related_questions:
+                q = qmap.get(qid)
+                if q is None:
+                    errors.append(f"{chg.id} references unknown question {qid}")
+                elif chg.id not in q.related_changes:
+                    errors.append(
+                        f"{chg.id} lists {qid} but {qid} does not list {chg.id}"
+                    )
+
     try:
         stale = check_render_sync(
             todo_path=todo_path,
             wishlist_path=wishlist_path,
+            questions_path=questions_path,
             docs_todo=docs_todo,
             docs_wishlist=docs_wishlist,
+            docs_questions=docs_questions,
         )
         for path in stale:
             errors.append(
@@ -118,8 +165,8 @@ def run_checks(
         except StoreError as exc:
             errors.append(str(exc))
 
-    # optional structured files already validated above
     _ = INBOX_PATH
     _ = CHANGES_PATH
+    _ = QUESTIONS_PATH
 
     return CheckResult(ok=not errors, errors=errors, warnings=warnings)

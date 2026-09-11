@@ -9,6 +9,7 @@ import yaml
 from music_rig.models import (
     ChangesDocument,
     InboxDocument,
+    OpenQuestionsDocument,
     RoutingDocument,
     SessionLog,
     TodoDocument,
@@ -21,12 +22,14 @@ TODO_PATH = DATA_DIR / "todo.yaml"
 WISHLIST_PATH = DATA_DIR / "wishlist.yaml"
 INBOX_PATH = DATA_DIR / "inbox.yaml"
 CHANGES_PATH = DATA_DIR / "changes.yaml"
+QUESTIONS_PATH = DATA_DIR / "open-questions.yaml"
 SESSIONS_DIR = DATA_DIR / "sessions"
 CHANNEL_MAP_PATH = DATA_DIR / "channel-map.yaml"
 PATCHBAYS_PATH = DATA_DIR / "patchbays.yaml"
 ROUTING_PATH = DATA_DIR / "routing.yaml"
 DOCS_TODO_PATH = ROOT / "docs" / "todo.md"
 DOCS_WISHLIST_PATH = ROOT / "docs" / "wishlist.md"
+DOCS_QUESTIONS_PATH = ROOT / "docs" / "open-questions.md"
 
 EXISTING_YAML = (
     CHANNEL_MAP_PATH,
@@ -133,6 +136,21 @@ def save_changes(doc: ChangesDocument, path: Path | None = None) -> None:
     _atomic_write(target, _dump_yaml(doc.model_dump(mode="json")))
 
 
+def load_questions(path: Path | None = None) -> OpenQuestionsDocument:
+    target = path or QUESTIONS_PATH
+    raw = _load_mapping(target, "open-questions")
+    try:
+        return OpenQuestionsDocument.model_validate(raw)
+    except Exception as exc:
+        raise StoreError(f"Open questions schema validation failed: {exc}") from exc
+
+
+def save_questions(doc: OpenQuestionsDocument, path: Path | None = None) -> None:
+    target = path or QUESTIONS_PATH
+    OpenQuestionsDocument.model_validate(doc.model_dump())
+    _atomic_write(target, _dump_yaml(doc.model_dump(mode="json")))
+
+
 def load_routing(path: Path | None = None) -> RoutingDocument:
     target = path or ROUTING_PATH
     raw = _load_mapping(target, "routing")
@@ -185,10 +203,12 @@ def write_documents(
     wishlist: WishlistDocument | None = None,
     inbox: InboxDocument | None = None,
     changes: ChangesDocument | None = None,
+    questions: OpenQuestionsDocument | None = None,
     todo_path: Path | None = None,
     wishlist_path: Path | None = None,
     inbox_path: Path | None = None,
     changes_path: Path | None = None,
+    questions_path: Path | None = None,
 ) -> None:
     """Validate all provided docs, then write them. Fail before any write on error."""
     payloads: list[tuple[Path, str]] = []
@@ -218,8 +238,30 @@ def write_documents(
                 _dump_yaml(changes.model_dump(mode="json")),
             )
         )
-    for path, text in payloads:
-        _atomic_write(path, text)
+    if questions is not None:
+        OpenQuestionsDocument.model_validate(questions.model_dump())
+        payloads.append(
+            (
+                questions_path or QUESTIONS_PATH,
+                _dump_yaml(questions.model_dump(mode="json")),
+            )
+        )
+    # Stage all temps first, then replace — avoid partial multi-file writes.
+    staged: list[tuple[Path, Path]] = []
+    try:
+        for path, text in payloads:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_suffix(path.suffix + ".tmp")
+            tmp.write_text(text, encoding="utf-8")
+            staged.append((tmp, path))
+        for tmp, path in staged:
+            tmp.replace(path)
+            staged = [(t, p) for t, p in staged if t != tmp]
+    except Exception:
+        for tmp, _path in staged:
+            if tmp.exists():
+                tmp.unlink()
+        raise
 
 
 def parse_existing_yaml(path: Path) -> object:

@@ -107,6 +107,7 @@ def set_change_status(
                     status=status,
                     session_id=item.session_id,
                     affected_areas=list(item.affected_areas),
+                    related_questions=list(item.related_questions),
                 )
                 found = updated
                 changed = True

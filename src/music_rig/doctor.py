@@ -5,17 +5,17 @@ from __future__ import annotations
 from pathlib import Path
 
 from music_rig.checks import run_checks
-from music_rig.models import ChangeStatus, InboxStatus, SessionStatus
+from music_rig.models import ChangeStatus, InboxStatus, QuestionStatus
+from music_rig.reconcile import reconciliation_advisories
 from music_rig.rig_views import load_patchbays, patchbay_unknown_mode_stats
 from music_rig.session_service import find_active
 from music_rig.status import git_summary
 from music_rig.store import (
-    CHANGES_PATH,
-    INBOX_PATH,
     ROOT,
     StoreError,
     load_changes,
     load_inbox,
+    load_questions,
     load_todo,
 )
 
@@ -26,10 +26,12 @@ def build_doctor_text(
     wishlist_path: Path | None = None,
     inbox_path: Path | None = None,
     changes_path: Path | None = None,
+    questions_path: Path | None = None,
     sessions_dir: Path | None = None,
     patchbays_path: Path | None = None,
     docs_todo: Path | None = None,
     docs_wishlist: Path | None = None,
+    docs_questions: Path | None = None,
 ) -> str:
     attention = 0
     lines = ["RIG DOCTOR", ""]
@@ -40,15 +42,22 @@ def build_doctor_text(
         todo_path=todo_path,
         wishlist_path=wishlist_path,
         inbox_path=inbox_path,
+        changes_path=changes_path,
+        questions_path=questions_path,
         docs_todo=docs_todo,
         docs_wishlist=docs_wishlist,
+        docs_questions=docs_questions,
     )
     planning_errors = [
         e
         for e in checks.errors
-        if "TODO" in e or "Wishlist" in e or "inbox" in e.lower() or "out of date" in e
+        if "TODO" in e
+        or "Wishlist" in e
+        or "inbox" in e.lower()
+        or "out of date" in e
+        or "question" in e.lower()
     ]
-    if any("TODO schema" in e or "TODO" in e and "validation" in e for e in checks.errors):
+    if any("TODO schema" in e or ("TODO" in e and "validation" in e) for e in checks.errors):
         lines.append("✗ TODO data invalid")
         attention += 1
     else:
@@ -77,9 +86,21 @@ def build_doctor_text(
     else:
         lines.append("✓ Generated planning docs synchronized")
 
-    # Studio state
+    # Knowledge state
     lines.append("")
-    lines.append("Studio state")
+    lines.append("Knowledge state")
+    try:
+        questions = load_questions(questions_path)
+        open_q = sum(1 for q in questions.questions if q.status == QuestionStatus.OPEN)
+        if open_q:
+            lines.append(f"⚠ {open_q} OPEN question(s)")
+            attention += 1
+        else:
+            lines.append("✓ No OPEN questions")
+    except StoreError as exc:
+        lines.append(f"✗ Questions data invalid: {exc}")
+        attention += 1
+
     try:
         changes = load_changes(changes_path)
         open_chg = sum(1 for c in changes.items if c.status == ChangeStatus.OPEN)
@@ -104,6 +125,17 @@ def build_doctor_text(
         lines.append(f"✗ Inbox data invalid: {exc}")
         attention += 1
 
+    for advisory in reconciliation_advisories(
+        changes_path=changes_path,
+        questions_path=questions_path,
+        todo_path=todo_path,
+    ):
+        lines.append(f"⚠ {advisory}")
+        attention += 1
+
+    # Studio state
+    lines.append("")
+    lines.append("Studio state")
     active = find_active(sessions_dir)
     if active:
         lines.append(f"⚠ Active session {active.id}")
@@ -167,7 +199,6 @@ def build_doctor_text(
         lines.append("✗ MkDocs source structure missing")
         attention += 1
 
-    # Non-planning schema errors that aren't covered above
     other_errors = [
         e
         for e in checks.errors
@@ -176,6 +207,7 @@ def build_doctor_text(
         and "Wishlist" not in e
         and "out of date" not in e
         and "inbox" not in e.lower()
+        and "question" not in e.lower()
     ]
     if other_errors:
         lines.append("")

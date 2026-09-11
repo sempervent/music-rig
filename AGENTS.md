@@ -32,14 +32,24 @@ Use the repository itself as the source of remembered state, not chat memory or 
 | Inbox | [data/inbox.yaml](data/inbox.yaml) | Uncategorized captures — observations only, not CURRENT truth |
 | Changes | [data/changes.yaml](data/changes.yaml) | Structured “reality may have changed” records — not auto-CURRENT |
 | Sessions | [data/sessions/](data/sessions/) | Studio session logs — operational history |
-| Open questions | [docs/open-questions.md](docs/open-questions.md) | Unresolved facts — not tasks (still Markdown-only) |
+| Open questions (canonical) | [data/open-questions.yaml](data/open-questions.yaml) | Unresolved factual uncertainties (`Q-*`) |
+| Open questions (rendered) | [docs/open-questions.md](docs/open-questions.md) | Human-facing questions; generated section owned by `uv run rig render` |
 
 ### Planning CLI
 
 ```bash
 uv sync --extra dev --extra docs
 uv run rig status
+uv run rig now
+uv run rig now --play
 uv run rig doctor
+uv run rig reconcile
+
+# Questions
+uv run rig question list
+uv run rig question show Q-008
+uv run rig question resolve Q-008
+uv run rig question todo Q-008
 
 # Work
 uv run rig todo start RIG-001
@@ -78,17 +88,55 @@ uv run rig render --check
 uv run rig check
 ```
 
-- Canonical planning data: `data/todo.yaml`, `data/wishlist.yaml`, `data/inbox.yaml`.
+- Canonical planning data: `data/todo.yaml`, `data/wishlist.yaml`, `data/inbox.yaml`, `data/open-questions.yaml`, `data/changes.yaml`.
 - Session logs: `data/sessions/SES-*.yaml` (operational history, not CURRENT truth).
 - Change captures: `data/changes.yaml` (`CHG-*`) — OPEN means the physical/logical rig may differ from documented CURRENT until reconciled.
-- Do **not** hand-edit generated TODO/Wishlist Markdown sections.
+- Questions: `data/open-questions.yaml` (`Q-*`) — unresolved facts. Resolving records an answer; it does **not** rewrite CURRENT.
+- Do **not** hand-edit generated TODO/Wishlist/Questions Markdown sections.
 - `next_session` is the authoritative Next Session queue; TODO status is lifecycle only (`READY`, `IN PROGRESS`, etc.). There is no `NEXT` status.
+- `rig now` is deterministic: active session → IN PROGRESS → Next Session order → highest READY (P0–P3, YAML order) → Just Play. No LLM.
 - Mutation commands write YAML and re-render docs unless `--no-render` is passed.
 - No CLI mutation command commits or pushes Git.
-- Inbox captures and session discoveries are observations, not confirmed CURRENT rig truth.
-- Change records are not applied automatically; mark APPLIED only after CURRENT docs/data are reconciled.
-- Open questions remain human-maintained Markdown for now.
 - Prefer the CLI/service layer for planning mutations when practical.
+
+### Evidence / truth hierarchy
+
+```text
+CURRENT
+    reconciled authoritative repository state
+
+OPEN CHANGE
+    explicit report that physical/logical reality may differ from CURRENT
+
+RESOLVED QUESTION
+    answered factual uncertainty; may still require CURRENT reconciliation
+
+SESSION DISCOVERY
+    evidence observed during a session
+
+INBOX
+    untriaged observation
+
+TODO
+    accepted work, not factual truth
+
+WISHLIST
+    possible future capability, not factual truth
+```
+
+```text
+Question = an unresolved factual uncertainty.
+```
+
+A resolved Question does not automatically alter CURRENT.
+OPEN change records mean the physical rig may differ from documented CURRENT state.
+Before treating CURRENT docs as unquestionably authoritative:
+- inspect OPEN CHG records
+- inspect OPEN questions for affected areas
+- reconcile them if the task concerns those areas
+
+Do not automatically apply captured changes.
+Do not elevate discoveries to CURRENT facts without reconciliation.
 
 ### Planning layers (do not collapse)
 
@@ -116,16 +164,6 @@ CHANGE (CHG-*)
 CURRENT
     reconciled authoritative state
 ```
-
-Agents must preserve these distinctions.
-
-OPEN change records mean the physical rig may differ from documented CURRENT state.
-Before treating CURRENT docs as unquestionably authoritative:
-- inspect OPEN CHG records
-- reconcile them if the task concerns affected areas
-
-Do not automatically apply captured changes.
-Do not elevate discoveries to CURRENT facts without reconciliation.
 
 ```text
 Wishlist item
