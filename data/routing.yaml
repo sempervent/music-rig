@@ -1,4 +1,5 @@
 # High-level CURRENT routes. Pedal detail: docs/pedal-chains.md. Patchbays: data/patchbays.yaml.
+# named_paths: structured CLI projections of the same CURRENT facts (not a second source of truth).
 routes:
   clean_mixer_capture:
     status: CURRENT
@@ -56,3 +57,149 @@ routes:
     from: Alesis SR-18 MAIN L/R
     to: TASCAM 11/12
     via_patchbay: PB-B
+
+named_paths:
+  aux:
+    label: AUX SEND wet loop
+    status: CURRENT
+    route_ref: aux_send_loop
+    tree:
+      label: Alesis AUX SEND
+      children:
+        - label: BOSS RC-1
+          children:
+            - label: Cry Baby
+              children:
+                - label: JOYO A/B/Bypass
+                  children:
+                    - label: "A = DIRTY (see: rig path show dirty)"
+                    - label: "B = SPACE (see: rig path show space)"
+                    - label: BOSS CH-1 stereo out
+                      children:
+                        - label: Alesis return / line return
+  dirty:
+    label: JOYO DIRTY — Send A
+    status: CURRENT
+    tree:
+      label: JOYO SEND A
+      children:
+        - label: BOSS OD-1
+          children:
+            - label: BOSS BD-2
+              children:
+                - label: BOSS JB-2
+                  children:
+                    - label: BOSS MT-2w
+                      children:
+                        - label: BOSS DS-1
+                          children:
+                            - label: JOYO RETURN A
+  space:
+    label: JOYO SPACE — Send B
+    status: CURRENT
+    tree:
+      label: JOYO SEND B
+      children:
+        - label: SY-1
+          children:
+            - label: SEND
+              children:
+                - label: PH-3
+                  children:
+                    - label: TR-2
+                      children:
+                        - label: SY-1 RETURN
+            - label: OUTPUT
+              children:
+                - label: LS-2 [A+B MIX ↔ BYPASS]
+                  children:
+                    - label: Loop A
+                      children:
+                        - label: SL-2
+                          children:
+                            - label: DD-8
+                    - label: Loop B
+                      children:
+                        - label: TE-2
+                          children:
+                            - label: RE-2
+                    - label: OUT
+                      children:
+                        - label: JOYO RETURN B
+  kaoss:
+    label: KAOSS Replay monitor/sample path
+    status: CURRENT
+    route_ref: kaoss_capture
+    tree:
+      label: Alesis Monitor Out
+      children:
+        - label: KAOSS Replay
+          children:
+            - label: TASCAM 9/10
+  clean_mixer:
+    label: Clean mixer capture
+    status: CURRENT
+    route_ref: clean_mixer_capture
+    tree:
+      label: Alesis Main Out
+      children:
+        - label: TASCAM 1/2
+  acoustic:
+    label: Acoustic clean capture
+    status: CURRENT
+    route_ref: acoustic_clean
+    tree:
+      label: Acoustic instrument
+      children:
+        - label: BOSS acoustic preamp
+          children:
+            - label: A/B/Y clean leg
+              children:
+                - label: TASCAM 5
+            - label: "other A/B/Y leg: UNKNOWN"
+  bass:
+    label: Bass clean capture
+    status: CURRENT
+    route_ref: bass_clean
+    tree:
+      label: Bass
+      children:
+        - label: BBox preamp
+          children:
+            - label: A/B/Y clean leg
+              children:
+                - label: TASCAM 6
+            - label: "other A/B/Y leg: UNKNOWN"
+  electric:
+    label: Electric guitar clean capture
+    status: CURRENT
+    route_ref: electric_guitar_clean
+    tree:
+      label: Electric guitar
+      children:
+        - label: Flamma preamp
+          children:
+            - label: A/B/Y clean leg
+              children:
+                - label: TASCAM 7
+            - label: "other A/B/Y leg: UNKNOWN"
+  minikorg:
+    label: miniKORG direct capture
+    status: CURRENT
+    route_ref: miniKORG_direct
+    tree:
+      label: miniKORG stereo out
+      children:
+        - label: PB-B
+          children:
+            - label: TASCAM 3/4
+  sr18:
+    label: SR-18 direct capture
+    status: CURRENT
+    route_ref: sr18_direct
+    tree:
+      label: Alesis SR-18 MAIN L/R
+      children:
+        - label: PB-B
+          children:
+            - label: TASCAM 11/12

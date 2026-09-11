@@ -30,13 +30,16 @@ Use the repository itself as the source of remembered state, not chat memory or 
 | Wishlist (canonical) | [data/wishlist.yaml](data/wishlist.yaml) | Structured speculative desires |
 | Wishlist (rendered) | [docs/wishlist.md](docs/wishlist.md) | Human-facing wishlist view; generated section owned by `uv run rig render` |
 | Inbox | [data/inbox.yaml](data/inbox.yaml) | Uncategorized captures — observations only, not CURRENT truth |
-| Open questions | [docs/open-questions.md](docs/open-questions.md) | Unresolved facts — not tasks (still Markdown-only in Stage 2) |
+| Changes | [data/changes.yaml](data/changes.yaml) | Structured “reality may have changed” records — not auto-CURRENT |
+| Sessions | [data/sessions/](data/sessions/) | Studio session logs — operational history |
+| Open questions | [docs/open-questions.md](docs/open-questions.md) | Unresolved facts — not tasks (still Markdown-only) |
 
 ### Planning CLI
 
 ```bash
 uv sync --extra dev --extra docs
 uv run rig status
+uv run rig doctor
 
 # Work
 uv run rig todo start RIG-001
@@ -55,16 +58,35 @@ uv run rig capture "RE-2 noisy after DD-8"
 uv run rig inbox list
 uv run rig inbox triage CAP-001
 
+# Studio session
+uv run rig session start
+uv run rig session note "PH-3 confirmed before TR-2"
+uv run rig session discovery "RE-2 quiet on separate power"
+uv run rig session end
+
+# Read CURRENT wiring at the rack
+uv run rig channels
+uv run rig patchbay PB-B
+uv run rig path list
+uv run rig path show space
+
+# Physical reality changed (does not edit CURRENT docs)
+uv run rig change "Moved TR-2 after PH-3" --category PEDAL_CHAIN
+uv run rig changes list
+
 uv run rig render --check
 uv run rig check
 ```
 
 - Canonical planning data: `data/todo.yaml`, `data/wishlist.yaml`, `data/inbox.yaml`.
+- Session logs: `data/sessions/SES-*.yaml` (operational history, not CURRENT truth).
+- Change captures: `data/changes.yaml` (`CHG-*`) — OPEN means the physical/logical rig may differ from documented CURRENT until reconciled.
 - Do **not** hand-edit generated TODO/Wishlist Markdown sections.
 - `next_session` is the authoritative Next Session queue; TODO status is lifecycle only (`READY`, `IN PROGRESS`, etc.). There is no `NEXT` status.
 - Mutation commands write YAML and re-render docs unless `--no-render` is passed.
 - No CLI mutation command commits or pushes Git.
-- Inbox captures are observations, not confirmed CURRENT rig truth.
+- Inbox captures and session discoveries are observations, not confirmed CURRENT rig truth.
+- Change records are not applied automatically; mark APPLIED only after CURRENT docs/data are reconciled.
 - Open questions remain human-maintained Markdown for now.
 - Prefer the CLI/service layer for planning mutations when practical.
 
@@ -77,6 +99,33 @@ uv run rig check
 | Open questions | Unknown facts | Approved work to resolve them |
 | Wishlist | Ideas worth evaluating | Accepted tasks or purchase orders |
 | Todo | Work accepted as worth doing | Speculative gear acquisition |
+| Session log | What happened during a studio session | Automatic CURRENT updates |
+| Change capture | Statement that reality may have changed | That CURRENT docs are already reconciled |
+| Inbox | Unclassified observations | Confirmed routing facts |
+
+```text
+Session NOTE
+    informal observation
+
+Session DISCOVERY
+    stronger evidence, but still not necessarily CURRENT
+
+CHANGE (CHG-*)
+    explicit statement that reality changed
+
+CURRENT
+    reconciled authoritative state
+```
+
+Agents must preserve these distinctions.
+
+OPEN change records mean the physical rig may differ from documented CURRENT state.
+Before treating CURRENT docs as unquestionably authoritative:
+- inspect OPEN CHG records
+- reconcile them if the task concerns affected areas
+
+Do not automatically apply captured changes.
+Do not elevate discoveries to CURRENT facts without reconciliation.
 
 ```text
 Wishlist item

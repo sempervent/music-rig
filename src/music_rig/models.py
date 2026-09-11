@@ -11,8 +11,12 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 RIG_ID_RE = re.compile(r"^RIG-\d{3}$")
 CAP_ID_RE = re.compile(r"^CAP-\d{3}$")
+CHG_ID_RE = re.compile(r"^CHG-\d{3}$")
+SES_ID_RE = re.compile(r"^SES-\d{8}-\d{6}$")
 RigId = Annotated[str, Field(pattern=r"^RIG-\d{3}$")]
 CapId = Annotated[str, Field(pattern=r"^CAP-\d{3}$")]
+ChgId = Annotated[str, Field(pattern=r"^CHG-\d{3}$")]
+SesId = Annotated[str, Field(pattern=r"^SES-\d{8}-\d{6}$")]
 
 TERMINAL_FOR_NEXT = frozenset({"DONE", "CANCELLED", "DEFERRED"})
 
@@ -215,3 +219,130 @@ class InboxDocument(BaseModel):
         numbers = [int(item.id.split("-")[1]) for item in self.items]
         nxt = (max(numbers) + 1) if numbers else 1
         return f"CAP-{nxt:03d}"
+
+
+class SessionStatus(str, Enum):
+    ACTIVE = "ACTIVE"
+    COMPLETED = "COMPLETED"
+    ABORTED = "ABORTED"
+
+
+class SessionEventType(str, Enum):
+    NOTE = "NOTE"
+    DISCOVERY = "DISCOVERY"
+    TODO_STARTED = "TODO_STARTED"
+    TODO_COMPLETED = "TODO_COMPLETED"
+    CAPTURE = "CAPTURE"
+    CHANGE = "CHANGE"
+
+
+class SessionEvent(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    timestamp: datetime
+    type: SessionEventType
+    text: str = Field(min_length=1)
+    todo_id: RigId | None = None
+    capture_id: CapId | None = None
+    change_id: ChgId | None = None
+
+
+class SessionLog(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: SesId
+    started_at: datetime
+    ended_at: datetime | None = None
+    status: SessionStatus
+    focus: str = ""
+    events: list[SessionEvent] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _ended_rules(self) -> SessionLog:
+        if self.status == SessionStatus.ACTIVE and self.ended_at is not None:
+            raise ValueError("ACTIVE sessions must not have ended_at")
+        if self.status != SessionStatus.ACTIVE and self.ended_at is None:
+            raise ValueError("Completed/aborted sessions require ended_at")
+        return self
+
+
+class ChangeStatus(str, Enum):
+    OPEN = "OPEN"
+    APPLIED = "APPLIED"
+    DISMISSED = "DISMISSED"
+
+
+class ChangeCategory(str, Enum):
+    AUDIO_ROUTING = "AUDIO_ROUTING"
+    PEDAL_CHAIN = "PEDAL_CHAIN"
+    PATCHBAY = "PATCHBAY"
+    MIDI = "MIDI"
+    ABLETON = "ABLETON"
+    INVENTORY = "INVENTORY"
+    CONTROLLERS = "CONTROLLERS"
+    VIDEO = "VIDEO"
+    OTHER = "OTHER"
+
+
+class ChangeRecord(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: ChgId
+    created_at: datetime
+    category: ChangeCategory
+    summary: str = Field(min_length=1)
+    details: str = ""
+    status: ChangeStatus = ChangeStatus.OPEN
+    session_id: SesId | None = None
+    affected_areas: list[str] = Field(default_factory=list)
+
+
+class ChangesDocument(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[ChangeRecord] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _unique_ids(self) -> ChangesDocument:
+        ids = [item.id for item in self.items]
+        if len(ids) != len(set(ids)):
+            raise ValueError("change CHG IDs must be unique")
+        return self
+
+    def item_map(self) -> dict[str, ChangeRecord]:
+        return {item.id: item for item in self.items}
+
+    def next_id(self) -> str:
+        numbers = [int(item.id.split("-")[1]) for item in self.items]
+        nxt = (max(numbers) + 1) if numbers else 1
+        return f"CHG-{nxt:03d}"
+
+
+class PathTreeNode(BaseModel):
+    """Read model for named_paths trees in routing.yaml."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    label: str = Field(min_length=1)
+    children: list[PathTreeNode] = Field(default_factory=list)
+
+
+PathTreeNode.model_rebuild()
+
+
+class NamedPath(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    label: str = Field(min_length=1)
+    status: str = "CURRENT"
+    route_ref: str | None = None
+    tree: PathTreeNode
+
+
+class RoutingDocument(BaseModel):
+    """Partial read model: routes mapping + optional named_paths."""
+
+    model_config = ConfigDict(extra="allow")
+
+    routes: dict[str, dict] = Field(default_factory=dict)
+    named_paths: dict[str, NamedPath] = Field(default_factory=dict)

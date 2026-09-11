@@ -97,23 +97,51 @@ Clean paths use preamp → A/B/Y before the confirmed TASCAM clean legs (5/6/7).
 
 ## Planning CLI (`rig`)
 
-Canonical planning data:
+Canonical planning and studio-ops data:
 
 ```text
 data/todo.yaml       = canonical TODO data
 data/wishlist.yaml   = canonical wishlist data
-data/inbox.yaml      = uncategorized capture inbox (CLI-only)
+data/inbox.yaml      = uncategorized capture inbox
+data/changes.yaml    = physical/logical change captures (not auto-CURRENT)
+data/sessions/       = studio session logs (one YAML file per session)
 docs/todo.md         = human-facing rendered representation
 docs/wishlist.md     = human-facing rendered representation
 ```
 
 Do not manually edit the generated marker sections in the Markdown files.
-Inbox captures are not CURRENT routing truth until triaged into TODO/docs.
+Inbox captures, session discoveries, and OPEN changes are not CURRENT routing truth until reconciled into docs/data.
 
 ```bash
 uv sync --extra dev --extra docs
 uv run rig --help
 uv run rig status
+
+# Begin working
+uv run rig session start
+uv run rig session status
+
+# See current wiring
+uv run rig channels
+uv run rig patchbay list
+uv run rig patchbay PB-B
+uv run rig path list
+uv run rig path show space
+
+# While working
+uv run rig session note "PH-3 confirmed before TR-2"
+uv run rig session discovery "RE-2 quiet on separate power"
+uv run rig session capture "Maybe try Privia into miniKORG"
+
+# Physical rig changed
+uv run rig change "Moved pedal X after pedal Y" --category PEDAL_CHAIN
+uv run rig changes list
+
+# End
+uv run rig session end
+
+# Maintenance overview
+uv run rig doctor
 
 uv run rig todo list
 uv run rig todo show RIG-001
@@ -136,6 +164,8 @@ uv run rig check
 ```
 
 Mutation commands write YAML and re-render Markdown unless `--no-render` is passed.
+`rig change` records drift; it does not rewrite CURRENT routing.
+`rig doctor` is advisory (human-facing); `rig check` remains the CI gate.
 No CLI command commits or pushes Git.
 
 ## Documentation CI/CD

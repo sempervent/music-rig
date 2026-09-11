@@ -1,0 +1,192 @@
+"""Human-facing advisory maintenance overview (not CI-blocking)."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from music_rig.checks import run_checks
+from music_rig.models import ChangeStatus, InboxStatus, SessionStatus
+from music_rig.rig_views import load_patchbays, patchbay_unknown_mode_stats
+from music_rig.session_service import find_active
+from music_rig.status import git_summary
+from music_rig.store import (
+    CHANGES_PATH,
+    INBOX_PATH,
+    ROOT,
+    StoreError,
+    load_changes,
+    load_inbox,
+    load_todo,
+)
+
+
+def build_doctor_text(
+    *,
+    todo_path: Path | None = None,
+    wishlist_path: Path | None = None,
+    inbox_path: Path | None = None,
+    changes_path: Path | None = None,
+    sessions_dir: Path | None = None,
+    patchbays_path: Path | None = None,
+    docs_todo: Path | None = None,
+    docs_wishlist: Path | None = None,
+) -> str:
+    attention = 0
+    lines = ["RIG DOCTOR", ""]
+
+    # Planning
+    lines.append("Planning")
+    checks = run_checks(
+        todo_path=todo_path,
+        wishlist_path=wishlist_path,
+        inbox_path=inbox_path,
+        docs_todo=docs_todo,
+        docs_wishlist=docs_wishlist,
+    )
+    planning_errors = [
+        e
+        for e in checks.errors
+        if "TODO" in e or "Wishlist" in e or "inbox" in e.lower() or "out of date" in e
+    ]
+    if any("TODO schema" in e or "TODO" in e and "validation" in e for e in checks.errors):
+        lines.append("✗ TODO data invalid")
+        attention += 1
+    else:
+        try:
+            load_todo(todo_path)
+            lines.append("✓ TODO data valid")
+        except StoreError:
+            lines.append("✗ TODO data invalid")
+            attention += 1
+
+    if any("Wishlist" in e for e in checks.errors):
+        lines.append("✗ Wishlist data invalid")
+        attention += 1
+    else:
+        lines.append("✓ Wishlist data valid")
+
+    try:
+        todo = load_todo(todo_path)
+        lines.append(f"✓ Next Session: {len(todo.next_session)} tasks")
+    except StoreError:
+        pass
+
+    if any("out of date" in e for e in checks.errors):
+        lines.append("✗ Generated planning docs out of sync")
+        attention += 1
+    else:
+        lines.append("✓ Generated planning docs synchronized")
+
+    # Studio state
+    lines.append("")
+    lines.append("Studio state")
+    try:
+        changes = load_changes(changes_path)
+        open_chg = sum(1 for c in changes.items if c.status == ChangeStatus.OPEN)
+        if open_chg:
+            lines.append(f"⚠ {open_chg} OPEN change record(s)")
+            attention += 1
+        else:
+            lines.append("✓ No OPEN change records")
+    except StoreError as exc:
+        lines.append(f"✗ Changes data invalid: {exc}")
+        attention += 1
+
+    try:
+        inbox = load_inbox(inbox_path)
+        open_inbox = sum(1 for i in inbox.items if i.status == InboxStatus.OPEN)
+        if open_inbox:
+            lines.append(f"⚠ {open_inbox} OPEN inbox capture(s)")
+            attention += 1
+        else:
+            lines.append("✓ No OPEN inbox captures")
+    except StoreError as exc:
+        lines.append(f"✗ Inbox data invalid: {exc}")
+        attention += 1
+
+    active = find_active(sessions_dir)
+    if active:
+        lines.append(f"⚠ Active session {active.id}")
+        attention += 1
+    else:
+        lines.append("✓ No active session")
+
+    # Current-data gaps
+    lines.append("")
+    lines.append("Current-data gaps")
+    try:
+        stats = patchbay_unknown_mode_stats(patchbays_path=patchbays_path)
+        data = load_patchbays(patchbays_path)
+        model_unknown = [
+            name
+            for name, bay in (data.get("patchbays") or {}).items()
+            if str(bay.get("hardware_model", "unknown")).lower() == "unknown"
+        ]
+        if stats:
+            for name, count in stats:
+                lines.append(f"⚠ {name} has {count} UNKNOWN normalization mode(s)")
+                attention += 1
+        else:
+            lines.append("✓ No populated UNKNOWN patchbay modes")
+        if model_unknown:
+            lines.append("⚠ PB model → letter mapping incomplete")
+            attention += 1
+        else:
+            lines.append("✓ Patchbay hardware models documented")
+    except StoreError as exc:
+        lines.append(f"✗ Patchbay data invalid: {exc}")
+        attention += 1
+
+    # Repository
+    lines.append("")
+    lines.append("Repository")
+    branch, tree = git_summary()
+    if branch is None:
+        lines.append("⚠ Git status unavailable")
+        attention += 1
+    else:
+        if branch == "main":
+            lines.append("✓ on main")
+        else:
+            lines.append(f"⚠ branch {branch}")
+            attention += 1
+        if tree == "clean":
+            lines.append("✓ working tree clean")
+        else:
+            lines.append("⚠ working tree has changes")
+            attention += 1
+
+    # Documentation
+    lines.append("")
+    lines.append("Documentation")
+    mkdocs = ROOT / "mkdocs.yml"
+    docs = ROOT / "docs"
+    if mkdocs.exists() and docs.is_dir():
+        lines.append("✓ MkDocs source structure present")
+    else:
+        lines.append("✗ MkDocs source structure missing")
+        attention += 1
+
+    # Non-planning schema errors that aren't covered above
+    other_errors = [
+        e
+        for e in checks.errors
+        if e not in planning_errors
+        and "TODO" not in e
+        and "Wishlist" not in e
+        and "out of date" not in e
+        and "inbox" not in e.lower()
+    ]
+    if other_errors:
+        lines.append("")
+        lines.append("Validation")
+        for err in other_errors:
+            lines.append(f"✗ {err}")
+            attention += 1
+
+    lines.append("")
+    if attention:
+        lines.append(f"{attention} item(s) worth attention.")
+    else:
+        lines.append("Nothing needs attention.")
+    return "\n".join(lines) + "\n"

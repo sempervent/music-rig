@@ -1,0 +1,4 @@
+# Structured physical/logical change captures.
+# OPEN means reality may differ from documented CURRENT until reconciled.
+# APPLIED means CURRENT docs/data were updated to match; DISMISSED means not applicable.
+items: []
