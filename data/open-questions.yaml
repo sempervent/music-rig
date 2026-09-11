@@ -150,6 +150,8 @@ questions:
     answer: ""
     notes: ""
     resolved_at: null
+    target:
+      domain: midi.clock_master
 
   - id: Q-015
     question: What is the verified physical MIDI topology using U6MIDI Pro + Thru5 WC?
@@ -160,6 +162,8 @@ questions:
     answer: ""
     notes: ""
     resolved_at: null
+    target:
+      domain: midi.verify
 
   - id: Q-016
     question: What exact FCB1010 switch map is assigned in banks 00/01/02?

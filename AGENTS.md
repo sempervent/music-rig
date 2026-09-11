@@ -24,6 +24,9 @@ Use the repository itself as the source of remembered state, not chat memory or 
 | Patchbay ops | [docs/patchbays.md](docs/patchbays.md) | Human-readable patchbay reference at the rack |
 | Pedals | [docs/pedal-chains.md](docs/pedal-chains.md) | Exact CURRENT active pedal topology |
 | Inventory | [docs/inventory.md](docs/inventory.md) / [data/inventory.yaml](data/inventory.yaml) | Equipment ownership and role — not necessarily current signal-path membership |
+| MIDI | [data/midi.yaml](data/midi.yaml) | Canonical MIDI devices, links, channels, clock, and Ableton port evidence |
+| MIDI topology | [docs/midi-topology.md](docs/midi-topology.md) / [diagrams/midi-topology.mmd](diagrams/midi-topology.mmd) | Generated physical-link projections |
+| MIDI clock | [docs/midi-clock.md](docs/midi-clock.md) | Generated clock/channel/Ableton overview plus controller notes |
 | Diagrams | [diagrams/](diagrams/) | Visual projections of the same authoritative state |
 | Todo (canonical) | [data/todo.yaml](data/todo.yaml) | Structured accepted work — edit this, not generated Markdown sections |
 | Todo (rendered) | [docs/todo.md](docs/todo.md) | Human-facing TODO view; generated section owned by `uv run rig render` |
@@ -82,6 +85,10 @@ uv run rig gear usage boss-rc-1
 uv run rig patchbay PB-B
 uv run rig path list
 uv run rig path show space
+uv run rig midi summary
+uv run rig midi links
+uv run rig midi channels
+uv run rig midi clock
 
 # Physical reality changed (does not edit CURRENT docs)
 uv run rig change "Moved TR-2 after PH-3" --category PEDAL_CHAIN
@@ -94,6 +101,7 @@ uv run rig current path move space TR-2 --branch sy1-send --after PH-3 --dry-run
 uv run rig current path move space TR-2 --branch sy1-send --after PH-3
 uv run rig current gear set-condition big-muff ISSUE
 uv run rig current gear acquire "BOSS RC-600"
+uv run rig current midi verify
 
 uv run rig render --check
 uv run rig check
@@ -114,6 +122,10 @@ uv run rig check
 - Acquisition is an explicit transactional boundary: create inventory and mark the
   wishlist entry ACQUIRED together. Do not treat wishlist entries as owned beforehand.
 - Do not invent inventory locations or infer patchbay unit-to-PB-letter mappings.
+- Keep MIDI physical links, channel assignments, clock, and Ableton Track / Sync /
+  Remote as separate evidence domains. `INTENDED` is not `VERIFIED`.
+- Do not invent MIDI ports, physical links, Ableton preference state, or controller
+  switch/knob maps. Use `rig current midi ...` only from direct evidence.
 - Keep `rig status` compact; inventory counts belong in `rig gear` / `rig doctor`.
 - Do not infer a CURRENT route update from inbox observations, session discoveries, freeform OPEN changes, or unresolved questions.
 - Use `rig change` when physical state may have changed but has not been reconciled.

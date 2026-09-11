@@ -24,16 +24,24 @@ from music_rig.routing_projections import (
     render_pedal_chains_section,
 )
 from music_rig.inventory_projections import render_inventory_section
-from music_rig import channel_state, inventory_state, patchbay_state, routing_state
+from music_rig.midi_projections import (
+    render_midi_clock_section,
+    render_midi_topology_mermaid,
+    render_midi_topology_section,
+)
+from music_rig import channel_state, inventory_state, midi_state, patchbay_state, routing_state
 from music_rig.store import (
     CHANNEL_MAP_PATH,
     DIAGRAM_AUX_LOOP_PATH,
     DIAGRAM_PATCHBAYS_PATH,
     DIAGRAM_TASCAM_PATH,
+    DIAGRAM_MIDI_TOPOLOGY_PATH,
     DOCS_ALESIS_PATH,
     DOCS_PATCHBAYS_PATH,
     DOCS_PEDAL_CHAINS_PATH,
     DOCS_INVENTORY_PATH,
+    DOCS_MIDI_CLOCK_PATH,
+    DOCS_MIDI_TOPOLOGY_PATH,
     DOCS_QUESTIONS_PATH,
     DOCS_ROUTING_PATH,
     DOCS_TASCAM_PATH,
@@ -43,6 +51,7 @@ from music_rig.store import (
     QUESTIONS_PATH,
     ROUTING_PATH,
     INVENTORY_PATH,
+    MIDI_PATH,
     TODO_PATH,
     WISHLIST_PATH,
     StoreError,
@@ -70,6 +79,10 @@ PEDAL_CHAINS_START = "<!-- rig:pedal-chains:start -->"
 PEDAL_CHAINS_END = "<!-- rig:pedal-chains:end -->"
 INVENTORY_START = "<!-- rig:inventory:start -->"
 INVENTORY_END = "<!-- rig:inventory:end -->"
+MIDI_TOPOLOGY_START = "<!-- rig:midi-topology:start -->"
+MIDI_TOPOLOGY_END = "<!-- rig:midi-topology:end -->"
+MIDI_CLOCK_START = "<!-- rig:midi-clock:start -->"
+MIDI_CLOCK_END = "<!-- rig:midi-clock:end -->"
 
 TODO_BANNER = (
     "<!-- GENERATED FROM data/todo.yaml BY `uv run rig render`. "
@@ -357,6 +370,21 @@ def apply_inventory_render(markdown: str, doc) -> str:
     )
 
 
+def apply_midi_topology_render(markdown: str, doc) -> str:
+    return _replace_region(
+        markdown,
+        MIDI_TOPOLOGY_START,
+        MIDI_TOPOLOGY_END,
+        render_midi_topology_section(doc),
+    )
+
+
+def apply_midi_clock_render(markdown: str, doc) -> str:
+    return _replace_region(
+        markdown, MIDI_CLOCK_START, MIDI_CLOCK_END, render_midi_clock_section(doc)
+    )
+
+
 def _write_if_changed(
     path: Path,
     new_text: str,
@@ -395,6 +423,10 @@ def render_docs(
     routing_path: Path | None = None,
     inventory_path: Path | None = None,
     docs_inventory: Path | None = None,
+    midi_path: Path | None = None,
+    docs_midi_topology: Path | None = None,
+    docs_midi_clock: Path | None = None,
+    diagram_midi_topology: Path | None = None,
     write: bool = True,
 ) -> tuple[bool, list[str]]:
     """Render generated sections. Returns (changed, messages)."""
@@ -409,6 +441,7 @@ def render_docs(
     using_custom_inv = (
         inventory_path is not None and inventory_path != INVENTORY_PATH
     )
+    using_custom_midi = midi_path is not None and midi_path != MIDI_PATH
     if using_custom_todo and docs_todo is None:
         raise StoreError(
             "docs_todo path is required when rendering with a custom todo_path"
@@ -437,6 +470,15 @@ def render_docs(
     if using_custom_inv and docs_inventory is None:
         raise StoreError(
             "docs_inventory is required when rendering with a custom inventory_path"
+        )
+    if using_custom_midi and (
+        docs_midi_topology is None
+        or docs_midi_clock is None
+        or diagram_midi_topology is None
+    ):
+        raise StoreError(
+            "docs_midi_topology, docs_midi_clock, and diagram_midi_topology are "
+            "required when rendering with a custom midi_path"
         )
 
     todo = load_todo(todo_path)
@@ -475,6 +517,7 @@ def render_docs(
         and not using_custom_pb
         and not using_custom_ch
         and not using_custom_rt
+        and not using_custom_midi
     )
     if planning_fixture_only:
         return changed, messages
@@ -487,6 +530,7 @@ def render_docs(
             using_custom_pb,
             using_custom_ch,
             using_custom_rt,
+            using_custom_midi,
         )
     )
     if not custom_inputs or inventory_path is not None or docs_inventory is not None:
@@ -503,6 +547,38 @@ def render_docs(
             messages=messages,
         ):
             changed = True
+
+    if not custom_inputs or midi_path is not None or docs_midi_topology is not None:
+        midi = midi_state.load_document(midi_path, inventory_path=inventory_path)
+        midi_topology_path = docs_midi_topology or DOCS_MIDI_TOPOLOGY_PATH
+        midi_clock_path = docs_midi_clock or DOCS_MIDI_CLOCK_PATH
+        midi_diagram_path = diagram_midi_topology or DIAGRAM_MIDI_TOPOLOGY_PATH
+        midi_pairs = [
+            (
+                midi_topology_path,
+                apply_midi_topology_render(
+                    midi_topology_path.read_text(encoding="utf-8"), midi
+                ),
+                "docs/midi-topology.md",
+            ),
+            (
+                midi_clock_path,
+                apply_midi_clock_render(
+                    midi_clock_path.read_text(encoding="utf-8"), midi
+                ),
+                "docs/midi-clock.md",
+            ),
+            (
+                midi_diagram_path,
+                render_midi_topology_mermaid(midi),
+                "diagrams/midi-topology.mmd",
+            ),
+        ]
+        for path, new_text, display in midi_pairs:
+            if _write_if_changed(
+                path, new_text, display_name=display, write=write, messages=messages
+            ):
+                changed = True
 
     patchbays = patchbay_state.load_raw(patchbays_path)
     channels = channel_state.load_raw(channel_map_path)
@@ -604,6 +680,10 @@ def check_render_sync(
     diagram_aux_loop: Path | None = None,
     inventory_path: Path | None = None,
     docs_inventory: Path | None = None,
+    midi_path: Path | None = None,
+    docs_midi_topology: Path | None = None,
+    docs_midi_clock: Path | None = None,
+    diagram_midi_topology: Path | None = None,
 ) -> list[str]:
     """Return list of stale doc paths. Empty if synchronized."""
     _, messages = render_docs(
@@ -626,6 +706,10 @@ def check_render_sync(
         diagram_aux_loop=diagram_aux_loop,
         inventory_path=inventory_path,
         docs_inventory=docs_inventory,
+        midi_path=midi_path,
+        docs_midi_topology=docs_midi_topology,
+        docs_midi_clock=docs_midi_clock,
+        diagram_midi_topology=diagram_midi_topology,
         write=False,
     )
     return messages

@@ -1,0 +1,104 @@
+# Canonical CURRENT MIDI topology (not audio routing).
+# Evidence statuses: VERIFIED | INTENDED | UNKNOWN
+# Do not treat INTENDED design as VERIFIED CURRENT fact.
+# Physical cable topology remains UNKNOWN until RIG-037 / Q-015.
+# Controller switch/knob maps are out of scope for this document (Stage 9+).
+
+endpoints:
+  - id: ableton
+    kind: software
+    name: Ableton Live
+  - id: macbook
+    kind: host
+    name: MacBook
+
+devices:
+  - gear_ref: cme-u6midi-pro
+    role: usb-midi-router
+    notes: 3 in / 3 out; route / merge / filter / remap — OWNED
+  - gear_ref: cme-midi-thru5-wc
+    role: midi-thru
+    notes: Hardware thru distribution — OWNED; not a programmable remapper
+  - gear_ref: tascam-us-16x08
+    role: audio-interface-midi
+    notes: May participate in MIDI paths; exact CURRENT use UNKNOWN
+  - gear_ref: korg-minikorg
+    role: synth
+  - gear_ref: kaoss-replay
+    role: sampler-effects
+  - gear_ref: boss-sl-2
+    role: pedal
+  - gear_ref: casio-privia
+    role: instrument
+  - gear_ref: korg-padkontrol
+    role: controller
+  - gear_ref: behringer-fcb1010
+    role: foot-controller
+    notes: USB Uno recognition unresolved (RIG-022); switch maps out of Stage 8 scope
+  - gear_ref: novation-remote-zero-sl
+    role: controller
+  - gear_ref: launchpad-x
+    role: controller
+  - gear_ref: novation-launch-control-3
+    role: controller
+
+# Exact physical links are UNKNOWN. High-level intent is documented in docs,
+# not invented as VERIFIED DIN/USB port edges here.
+connections: []
+
+channels:
+  - gear_ref: casio-privia
+    channel: 1
+    status: INTENDED
+    notes: Planning isolation; confirm in RIG-037 / Q-015
+  - gear_ref: korg-padkontrol
+    channel: 10
+    status: INTENDED
+    notes: Drums; confirm in RIG-037
+  - gear_ref: novation-remote-zero-sl
+    channel: 15
+    status: INTENDED
+    notes: "Confirm in RIG-037; encoder #6 broken (inventory)"
+  - gear_ref: behringer-fcb1010
+    channel: 16
+    status: INTENDED
+    notes: Target channel; EXP A/B CC map is controller-mapping Stage 9+ (RIG-035)
+
+clock:
+  master:
+    endpoint_ref: ableton
+    status: INTENDED
+    notes: >-
+      Desired default. Not VERIFIED CURRENT — see Q-014 and TODO RIG-031.
+      Do not treat this as confirmed practice yet.
+  destinations:
+    - gear_ref: korg-minikorg
+      enabled: unknown
+      status: INTENDED
+      notes: Listed as intended clock consumer in docs/midi-clock.md
+    - gear_ref: kaoss-replay
+      enabled: unknown
+      status: INTENDED
+      notes: Listed as intended clock consumer; may sometimes lead (Q-014)
+    - gear_ref: boss-sl-2
+      enabled: unknown
+      status: INTENDED
+      notes: Listed as intended clock consumer; may sometimes lead (Q-014)
+  transport:
+    status: UNKNOWN
+    notes: Transport start/stop not separately verified
+
+# Ableton Track / Sync / Remote not physically verified as CURRENT settings.
+# RIG-037 / FCB troubleshooting checklist mention enabling Track+Remote for inputs
+# as investigation steps — that is not a VERIFIED CURRENT port map.
+ableton_ports: []
+
+# Programmable U6MIDI Pro routes: none VERIFIED in repository evidence.
+routes: []
+
+unknowns:
+  - Physical USB + DIN topology (U6MIDI Pro + Thru5 WC roles) — Q-015 / RIG-037
+  - Whether Ableton is master clock in practice — Q-014 / RIG-031
+  - Ableton Preferences Track / Sync / Remote per port — RIG-037
+  - Exact U6MIDI Pro programmed routes/filters — RIG-037
+  - Feedback-prevention path / All Notes Off path — RIG-037

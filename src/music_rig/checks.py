@@ -12,7 +12,7 @@ from music_rig.models import (
     QuestionStatus,
 )
 from music_rig.render import check_render_sync
-from music_rig import channel_state, inventory_state, patchbay_state, routing_state
+from music_rig import channel_state, inventory_state, midi_state, patchbay_state, routing_state
 from music_rig.store import (
     CHANGES_PATH,
     CHANNEL_MAP_PATH,
@@ -55,6 +55,10 @@ def run_checks(
     diagram_aux_loop: Path | None = None,
     inventory_path: Path | None = None,
     docs_inventory: Path | None = None,
+    midi_path: Path | None = None,
+    docs_midi_topology: Path | None = None,
+    docs_midi_clock: Path | None = None,
+    diagram_midi_topology: Path | None = None,
 ) -> CheckResult:
     errors: list[str] = []
     warnings: list[str] = []
@@ -65,6 +69,15 @@ def run_checks(
     changes = None
     try:
         todo = load_todo(todo_path)
+    except StoreError as exc:
+        errors.append(str(exc))
+
+    try:
+        midi = midi_state.load_raw(midi_path)
+        for err in midi_state.validate_midi_doc(
+            midi, inventory_path=inventory_path
+        ):
+            errors.append(f"midi: {err}")
     except StoreError as exc:
         errors.append(str(exc))
 
@@ -218,6 +231,10 @@ def run_checks(
             diagram_aux_loop=diagram_aux_loop,
             inventory_path=inventory_path,
             docs_inventory=docs_inventory,
+            midi_path=midi_path,
+            docs_midi_topology=docs_midi_topology,
+            docs_midi_clock=docs_midi_clock,
+            diagram_midi_topology=diagram_midi_topology,
         )
         for path in stale:
             errors.append(
