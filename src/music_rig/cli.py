@@ -13,6 +13,8 @@ from music_rig import (
     change_service,
     channel_state,
     current_service,
+    control_state,
+    ableton_state,
     inbox_service,
     inventory_state,
     midi_state,
@@ -35,6 +37,14 @@ from music_rig.models import (
     MidiEvidenceStatus,
     MidiTransport,
     MidiTriState,
+    ControlAvailability,
+    ControlTarget,
+    MidiMessage,
+    MidiMessageType,
+    PhysicalControlType,
+    TargetKind,
+    TargetState,
+    ValueBehavior,
     TodoPriority,
     TodoStatus,
     TodoTask,
@@ -56,6 +66,8 @@ from music_rig.store import (
     load_inbox,
     load_inventory,
     load_midi,
+    load_controllers,
+    load_ableton,
     load_todo,
     load_wishlist,
 )
@@ -88,6 +100,8 @@ reconcile_app = typer.Typer(
 path_app = typer.Typer(help="Read-only CURRENT named paths.", no_args_is_help=True)
 gear_app = typer.Typer(help="Owned equipment inventory.", no_args_is_help=True)
 midi_app = typer.Typer(help="Read-only CURRENT MIDI state.", no_args_is_help=True)
+controls_app = typer.Typer(help="Controller mapping evidence and gaps.", no_args_is_help=True)
+ableton_app = typer.Typer(help="Durable Ableton mapping targets.", no_args_is_help=True)
 current_app = typer.Typer(
     help="Modify authoritative CURRENT state (typed, previewed).",
     no_args_is_help=True,
@@ -112,6 +126,10 @@ current_midi_app = typer.Typer(
     help="CURRENT MIDI mutations (data/midi.yaml).",
     no_args_is_help=True,
 )
+current_controls_app = typer.Typer(
+    help="CURRENT controller mapping mutations (data/controllers.yaml).",
+    no_args_is_help=True,
+)
 app.add_typer(todo_app, name="todo")
 app.add_typer(wish_app, name="wish")
 todo_app.add_typer(next_app, name="next")
@@ -123,12 +141,15 @@ app.add_typer(reconcile_app, name="reconcile")
 app.add_typer(path_app, name="path")
 app.add_typer(gear_app, name="gear")
 app.add_typer(midi_app, name="midi")
+app.add_typer(controls_app, name="controls")
+app.add_typer(ableton_app, name="ableton")
 app.add_typer(current_app, name="current")
 current_app.add_typer(current_pb_app, name="patchbay")
 current_app.add_typer(current_ch_app, name="channels")
 current_app.add_typer(current_path_app, name="path")
 current_app.add_typer(current_gear_app, name="gear")
 current_app.add_typer(current_midi_app, name="midi")
+current_app.add_typer(current_controls_app, name="controls")
 
 
 def _fail(message: str, code: int = 1) -> None:
@@ -2698,6 +2719,492 @@ def current_midi_verify(
     except StoreError as exc:
         _fail(str(exc))
     _midi_mutation_options(preview, data, yes=yes, dry_run=dry_run, question=question, change=change, no_render=no_render)
+
+
+def _controller_record(gear: str):
+    doc = control_state.load_document()
+    record = next((item for item in doc.controllers if item.gear_ref == gear), None)
+    if record is None:
+        raise StoreError(f"Unknown controller gear_ref {gear!r}.")
+    return doc, record
+
+
+@controls_app.command("summary")
+def controls_summary() -> None:
+    try:
+        doc = control_state.load_document()
+    except StoreError as exc:
+        _fail(str(exc))
+    table = Table(title="CONTROLLER MAPPINGS")
+    for label in ("Gear ref", "Coverage", "Contexts", "Controls", "Mapped", "Gaps"):
+        table.add_column(label)
+    gaps = control_state.find_gaps(doc)
+    for item in doc.controllers:
+        controls = [control for context in item.contexts for control in context.controls]
+        mapped = sum(control.target.state == TargetState.MAPPED for control in controls)
+        item_gaps = sum(gap["gear"] == item.gear_ref for gap in gaps)
+        table.add_row(
+            item.gear_ref,
+            item.coverage.value,
+            str(len(item.contexts)),
+            str(len(controls)),
+            str(mapped),
+            str(item_gaps),
+        )
+    console.print(table)
+
+
+@controls_app.command("devices")
+def controls_devices() -> None:
+    controls_summary()
+
+
+@controls_app.command("show")
+def controls_show(gear: str) -> None:
+    try:
+        _doc, record = _controller_record(gear)
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"[bold]{record.gear_ref}[/bold] — {record.coverage.value}")
+    console.print(record.notes or "—")
+    table = Table(title="CONTROLS")
+    for label in ("Context", "Control", "Type", "Availability", "Messages", "Target", "Evidence"):
+        table.add_column(label)
+    for context in record.contexts:
+        for control in context.controls:
+            messages = "; ".join(
+                f"{m.type.value} {m.number} ch {m.channel or '—'} ({m.value_behavior.value})"
+                for m in control.messages
+            ) or "—"
+            target = control.target.state.value
+            if control.target.state == TargetState.MAPPED:
+                ref = control.target.track or control.target.send or control.target.action or control.target.notes or "—"
+                target = f"{control.target.kind.value}: {ref}"
+            table.add_row(
+                context.id,
+                control.id,
+                control.physical_type.value,
+                control.availability.value,
+                messages,
+                target,
+                control.evidence.value,
+            )
+    console.print(table)
+
+
+@controls_app.command("contexts")
+def controls_contexts(gear: Optional[str] = None) -> None:
+    try:
+        doc = control_state.load_document()
+    except StoreError as exc:
+        _fail(str(exc))
+    table = Table(title="CONTROLLER CONTEXTS")
+    for label in ("Gear ref", "ID", "Label", "Kind", "Evidence", "Controls"):
+        table.add_column(label)
+    for controller in doc.controllers:
+        if gear and controller.gear_ref != gear:
+            continue
+        for context in controller.contexts:
+            table.add_row(
+                controller.gear_ref,
+                context.id,
+                context.label,
+                context.kind.value,
+                context.evidence.value,
+                str(len(context.controls)),
+            )
+    console.print(table)
+
+
+@controls_app.command("context")
+def controls_context(gear: str, context_id: str) -> None:
+    try:
+        _doc, record = _controller_record(gear)
+        context = next((item for item in record.contexts if item.id == context_id), None)
+        if context is None:
+            raise StoreError(f"Unknown controller context {gear}/{context_id}.")
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"[bold]{gear}/{context.id}[/bold] — {context.label}")
+    console.print(f"Kind: {context.kind.value}  Evidence: {context.evidence.value}")
+    console.print(context.notes or "—")
+    for control in context.controls:
+        console.print(
+            f"{control.id}  {control.physical_type.value}  "
+            f"{control.availability.value}  {control.target.state.value}"
+        )
+    if not context.controls:
+        console.print("(no controls modeled)")
+
+
+@controls_app.command("gaps")
+def controls_gaps(gear: Optional[str] = None) -> None:
+    try:
+        gaps = control_state.find_gaps(control_state.load_document())
+    except StoreError as exc:
+        _fail(str(exc))
+    table = Table(title="CONTROLLER MAPPING GAPS")
+    for label in ("Gear ref", "Context", "Control", "Gap"):
+        table.add_column(label)
+    for gap in gaps:
+        if gear and gap["gear"] != gear:
+            continue
+        table.add_row(gap["gear"], gap["context"], gap["control"], gap["gap"])
+    console.print(table)
+
+
+@controls_app.command("conflicts")
+def controls_conflicts(gear: Optional[str] = None) -> None:
+    try:
+        conflicts = control_state.find_conflicts(control_state.load_document())
+    except StoreError as exc:
+        _fail(str(exc))
+    table = Table(title="CONTROLLER MESSAGE CONFLICTS")
+    for label in ("Gear ref", "Context", "Message", "Controls"):
+        table.add_column(label)
+    for conflict in conflicts:
+        if gear and conflict["gear"] != gear:
+            continue
+        table.add_row(
+            conflict["gear"],
+            conflict["context"],
+            conflict["message"],
+            conflict["controls"],
+        )
+    if not conflicts:
+        table.add_row("—", "—", "—", "none")
+    console.print(table)
+
+
+def _ableton_table(title: str, items, label_field: str) -> None:
+    table = Table(title=title)
+    for label in ("ID", "Label", "Evidence", "Notes"):
+        table.add_column(label)
+    for item in items:
+        table.add_row(
+            item.id,
+            getattr(item, label_field),
+            item.evidence.value,
+            item.notes or "—",
+        )
+    console.print(table)
+
+
+@ableton_app.command("tracks")
+def ableton_tracks() -> None:
+    try:
+        doc = load_ableton()
+    except StoreError as exc:
+        _fail(str(exc))
+    _ableton_table("ABLETON TRACKS", doc.tracks, "name")
+
+
+@ableton_app.command("sends")
+def ableton_sends() -> None:
+    try:
+        doc = load_ableton()
+    except StoreError as exc:
+        _fail(str(exc))
+    _ableton_table("ABLETON SENDS", doc.sends, "label")
+
+
+@ableton_app.command("targets")
+def ableton_targets() -> None:
+    try:
+        doc = load_ableton()
+    except StoreError as exc:
+        _fail(str(exc))
+    _ableton_table("ABLETON TRACKS", doc.tracks, "name")
+    _ableton_table("ABLETON SENDS", doc.sends, "label")
+    _ableton_table("ABLETON ACTIONS", doc.actions, "label")
+
+
+def _commit_controls_preview(
+    preview,
+    data: dict,
+    *,
+    yes: bool,
+    dry_run: bool,
+    question: Optional[str],
+    change: Optional[str],
+    no_render: bool,
+) -> None:
+    if not _confirm_current(preview, yes=yes, dry_run=dry_run):
+        if dry_run:
+            current_service.commit_controllers(
+                data,
+                preview,
+                dry_run=True,
+                render=False,
+                question_id=question,
+                change_id=change,
+            )
+            raise typer.Exit(0)
+        if not preview.changed:
+            raise typer.Exit(0)
+        raise typer.Abort()
+    resolve_q, apply_chg, answer = _maybe_resolve_evidence(
+        question_id=question,
+        change_id=change,
+        answer_hint=preview.message,
+        yes=yes,
+    )
+    try:
+        result = current_service.commit_controllers(
+            data,
+            preview,
+            render=not no_render,
+            question_id=question,
+            change_id=change,
+            resolve_q=resolve_q,
+            apply_chg=apply_chg,
+            answer=answer,
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"[green]Applied:[/green] {result.message}")
+
+
+def _message_from_cli(
+    message_type: str, number: int, channel: Optional[str], behavior: str
+) -> MidiMessage:
+    channel_value: int | str | None = channel
+    if channel and channel.isdigit():
+        channel_value = int(channel)
+    return MidiMessage(
+        type=MidiMessageType(message_type.strip().upper().replace("-", "_")),
+        number=number,
+        channel=channel_value,
+        value_behavior=ValueBehavior(behavior.strip().lower()),
+    )
+
+
+def _control_options(preview, data, yes, dry_run, question, change, no_render):
+    _commit_controls_preview(
+        preview,
+        data,
+        yes=yes,
+        dry_run=dry_run,
+        question=question,
+        change=change,
+        no_render=no_render,
+    )
+
+
+@current_controls_app.command("set-message")
+def current_controls_set_message(
+    gear: str,
+    context: str,
+    control: str,
+    message_type: str,
+    number: int = typer.Argument(..., min=0, max=127),
+    channel: Optional[str] = typer.Option(None, "--channel"),
+    behavior: str = typer.Option("fixed", "--behavior"),
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    question: Optional[str] = typer.Option(None, "--question"),
+    change: Optional[str] = typer.Option(None, "--change"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        preview, data = control_state.propose_set_message(
+            gear, context, control, _message_from_cli(message_type, number, channel, behavior)
+        )
+    except (StoreError, ValueError) as exc:
+        _fail(str(exc))
+    _control_options(preview, data, yes, dry_run, question, change, no_render)
+
+
+@current_controls_app.command("add-message")
+def current_controls_add_message(
+    gear: str,
+    context: str,
+    control: str,
+    message_type: str,
+    number: int = typer.Argument(..., min=0, max=127),
+    channel: Optional[str] = typer.Option(None, "--channel"),
+    behavior: str = typer.Option("fixed", "--behavior"),
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    question: Optional[str] = typer.Option(None, "--question"),
+    change: Optional[str] = typer.Option(None, "--change"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        preview, data = control_state.add_message(
+            gear, context, control, _message_from_cli(message_type, number, channel, behavior)
+        )
+    except (StoreError, ValueError) as exc:
+        _fail(str(exc))
+    _control_options(preview, data, yes, dry_run, question, change, no_render)
+
+
+@current_controls_app.command("remove-message")
+def current_controls_remove_message(
+    gear: str,
+    context: str,
+    control: str,
+    index: int = typer.Argument(0, min=0),
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    question: Optional[str] = typer.Option(None, "--question"),
+    change: Optional[str] = typer.Option(None, "--change"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        preview, data = control_state.remove_message(gear, context, control, index)
+    except StoreError as exc:
+        _fail(str(exc))
+    _control_options(preview, data, yes, dry_run, question, change, no_render)
+
+
+@current_controls_app.command("clear-message")
+def current_controls_clear_message(
+    gear: str,
+    context: str,
+    control: str,
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    question: Optional[str] = typer.Option(None, "--question"),
+    change: Optional[str] = typer.Option(None, "--change"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        preview, data = control_state.clear_messages(gear, context, control)
+    except StoreError as exc:
+        _fail(str(exc))
+    _control_options(preview, data, yes, dry_run, question, change, no_render)
+
+
+@current_controls_app.command("set-target")
+def current_controls_set_target(
+    gear: str,
+    context: str,
+    control: str,
+    state: str,
+    kind: Optional[str] = typer.Option(None, "--kind"),
+    track: Optional[str] = typer.Option(None, "--track"),
+    send: Optional[str] = typer.Option(None, "--send"),
+    action: Optional[str] = typer.Option(None, "--action"),
+    notes: Optional[str] = typer.Option(None, "--notes"),
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    question: Optional[str] = typer.Option(None, "--question"),
+    change: Optional[str] = typer.Option(None, "--change"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        target = ControlTarget(
+            state=TargetState(state.upper()),
+            kind=TargetKind(kind.upper()) if kind else None,
+            track=track,
+            send=send,
+            action=action,
+            notes=notes,
+        )
+        preview, data = control_state.propose_set_target(gear, context, control, target)
+    except (StoreError, ValueError) as exc:
+        _fail(str(exc))
+    _control_options(preview, data, yes, dry_run, question, change, no_render)
+
+
+@current_controls_app.command("clear-target")
+def current_controls_clear_target(
+    gear: str,
+    context: str,
+    control: str,
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    question: Optional[str] = typer.Option(None, "--question"),
+    change: Optional[str] = typer.Option(None, "--change"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        preview, data = control_state.clear_target(gear, context, control)
+    except StoreError as exc:
+        _fail(str(exc))
+    _control_options(preview, data, yes, dry_run, question, change, no_render)
+
+
+@current_controls_app.command("set-evidence")
+def current_controls_set_evidence(
+    gear: str,
+    context: str,
+    control: str,
+    evidence: str,
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    question: Optional[str] = typer.Option(None, "--question"),
+    change: Optional[str] = typer.Option(None, "--change"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        preview, data = control_state.propose_set_evidence(
+            gear, context, control, evidence
+        )
+    except (StoreError, ValueError) as exc:
+        _fail(str(exc))
+    _control_options(preview, data, yes, dry_run, question, change, no_render)
+
+
+@current_controls_app.command("set-availability")
+def current_controls_set_availability(
+    gear: str,
+    context: str,
+    control: str,
+    availability: str,
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    question: Optional[str] = typer.Option(None, "--question"),
+    change: Optional[str] = typer.Option(None, "--change"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        preview, data = control_state.propose_set_availability(
+            gear, context, control, availability
+        )
+    except (StoreError, ValueError) as exc:
+        _fail(str(exc))
+    _control_options(preview, data, yes, dry_run, question, change, no_render)
+
+
+@current_controls_app.command("verify")
+def current_controls_verify(
+    gear: str,
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    question: Optional[str] = typer.Option(None, "--question"),
+    change: Optional[str] = typer.Option(None, "--change"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    """Review modeled controls and apply evidence changes as one transaction."""
+    try:
+        _doc, record = _controller_record(gear)
+    except StoreError as exc:
+        _fail(str(exc))
+    mutations = []
+    for context in record.contexts:
+        console.print(f"[bold]{context.id}[/bold] — {context.label}")
+        if not context.controls:
+            console.print("  no controls modeled; no assignments inferred")
+        for control in context.controls:
+            verified = typer.confirm(
+                f"Verified {control.id} message/target as modeled?",
+                default=control.evidence == MidiEvidenceStatus.VERIFIED,
+            )
+            mutations.append(
+                {
+                    "op": "set_evidence",
+                    "context_id": context.id,
+                    "control_id": control.id,
+                    "evidence": "VERIFIED" if verified else control.evidence.value,
+                }
+            )
+    try:
+        preview, data = control_state.propose_batch(mutations, gear_ref=gear)
+    except StoreError as exc:
+        _fail(str(exc))
+    _control_options(preview, data, yes, dry_run, question, change, no_render)
 
 
 @app.command("now")

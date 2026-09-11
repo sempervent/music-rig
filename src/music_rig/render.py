@@ -29,14 +29,20 @@ from music_rig.midi_projections import (
     render_midi_topology_mermaid,
     render_midi_topology_section,
 )
-from music_rig import channel_state, inventory_state, midi_state, patchbay_state, routing_state
+from music_rig.control_projections import render_controller_mappings_section
+from music_rig.ableton_projections import render_ableton_section
+from music_rig import ableton_state, channel_state, control_state, inventory_state, midi_state, patchbay_state, routing_state
 from music_rig.store import (
+    ABLETON_PATH,
     CHANNEL_MAP_PATH,
+    CONTROLLERS_PATH,
     DIAGRAM_AUX_LOOP_PATH,
     DIAGRAM_PATCHBAYS_PATH,
     DIAGRAM_TASCAM_PATH,
     DIAGRAM_MIDI_TOPOLOGY_PATH,
     DOCS_ALESIS_PATH,
+    DOCS_ABLETON_PATH,
+    DOCS_CONTROLLERS_PATH,
     DOCS_PATCHBAYS_PATH,
     DOCS_PEDAL_CHAINS_PATH,
     DOCS_INVENTORY_PATH,
@@ -83,6 +89,10 @@ MIDI_TOPOLOGY_START = "<!-- rig:midi-topology:start -->"
 MIDI_TOPOLOGY_END = "<!-- rig:midi-topology:end -->"
 MIDI_CLOCK_START = "<!-- rig:midi-clock:start -->"
 MIDI_CLOCK_END = "<!-- rig:midi-clock:end -->"
+CONTROLLERS_START = "<!-- rig:controllers:start -->"
+CONTROLLERS_END = "<!-- rig:controllers:end -->"
+ABLETON_START = "<!-- rig:ableton:start -->"
+ABLETON_END = "<!-- rig:ableton:end -->"
 
 TODO_BANNER = (
     "<!-- GENERATED FROM data/todo.yaml BY `uv run rig render`. "
@@ -385,6 +395,18 @@ def apply_midi_clock_render(markdown: str, doc) -> str:
     )
 
 
+def apply_controllers_render(markdown: str, doc) -> str:
+    return _replace_region(
+        markdown, CONTROLLERS_START, CONTROLLERS_END, render_controller_mappings_section(doc)
+    )
+
+
+def apply_ableton_render(markdown: str, doc) -> str:
+    return _replace_region(
+        markdown, ABLETON_START, ABLETON_END, render_ableton_section(doc)
+    )
+
+
 def _write_if_changed(
     path: Path,
     new_text: str,
@@ -427,6 +449,10 @@ def render_docs(
     docs_midi_topology: Path | None = None,
     docs_midi_clock: Path | None = None,
     diagram_midi_topology: Path | None = None,
+    controllers_path: Path | None = None,
+    ableton_path: Path | None = None,
+    docs_controllers: Path | None = None,
+    docs_ableton: Path | None = None,
     write: bool = True,
 ) -> tuple[bool, list[str]]:
     """Render generated sections. Returns (changed, messages)."""
@@ -442,6 +468,10 @@ def render_docs(
         inventory_path is not None and inventory_path != INVENTORY_PATH
     )
     using_custom_midi = midi_path is not None and midi_path != MIDI_PATH
+    using_custom_controllers = (
+        controllers_path is not None and controllers_path != CONTROLLERS_PATH
+    )
+    using_custom_ableton = ableton_path is not None and ableton_path != ABLETON_PATH
     if using_custom_todo and docs_todo is None:
         raise StoreError(
             "docs_todo path is required when rendering with a custom todo_path"
@@ -479,6 +509,14 @@ def render_docs(
         raise StoreError(
             "docs_midi_topology, docs_midi_clock, and diagram_midi_topology are "
             "required when rendering with a custom midi_path"
+        )
+    if using_custom_controllers and docs_controllers is None:
+        raise StoreError(
+            "docs_controllers is required when rendering with a custom controllers_path"
+        )
+    if using_custom_ableton and docs_ableton is None:
+        raise StoreError(
+            "docs_ableton is required when rendering with a custom ableton_path"
         )
 
     todo = load_todo(todo_path)
@@ -518,6 +556,8 @@ def render_docs(
         and not using_custom_ch
         and not using_custom_rt
         and not using_custom_midi
+        and not using_custom_controllers
+        and not using_custom_ableton
     )
     if planning_fixture_only:
         return changed, messages
@@ -531,6 +571,8 @@ def render_docs(
             using_custom_ch,
             using_custom_rt,
             using_custom_midi,
+            using_custom_controllers,
+            using_custom_ableton,
         )
     )
     if not custom_inputs or inventory_path is not None or docs_inventory is not None:
@@ -579,6 +621,42 @@ def render_docs(
                 path, new_text, display_name=display, write=write, messages=messages
             ):
                 changed = True
+
+    if not custom_inputs or controllers_path is not None or docs_controllers is not None:
+        ableton = ableton_state.load_document(ableton_path)
+        controllers = control_state.load_document(
+            controllers_path,
+            inventory_path=inventory_path,
+            midi_path=midi_path,
+            ableton_path=ableton_path,
+        )
+        controller_md_path = docs_controllers or DOCS_CONTROLLERS_PATH
+        new_text = apply_controllers_render(
+            controller_md_path.read_text(encoding="utf-8"), controllers
+        )
+        if _write_if_changed(
+            controller_md_path,
+            new_text,
+            display_name="docs/controller-mappings.md",
+            write=write,
+            messages=messages,
+        ):
+            changed = True
+
+    if not custom_inputs or ableton_path is not None or docs_ableton is not None:
+        ableton = ableton_state.load_document(ableton_path)
+        ableton_md_path = docs_ableton or DOCS_ABLETON_PATH
+        new_text = apply_ableton_render(
+            ableton_md_path.read_text(encoding="utf-8"), ableton
+        )
+        if _write_if_changed(
+            ableton_md_path,
+            new_text,
+            display_name="docs/ableton-track-map.md",
+            write=write,
+            messages=messages,
+        ):
+            changed = True
 
     patchbays = patchbay_state.load_raw(patchbays_path)
     channels = channel_state.load_raw(channel_map_path)
@@ -684,6 +762,10 @@ def check_render_sync(
     docs_midi_topology: Path | None = None,
     docs_midi_clock: Path | None = None,
     diagram_midi_topology: Path | None = None,
+    controllers_path: Path | None = None,
+    ableton_path: Path | None = None,
+    docs_controllers: Path | None = None,
+    docs_ableton: Path | None = None,
 ) -> list[str]:
     """Return list of stale doc paths. Empty if synchronized."""
     _, messages = render_docs(
@@ -710,6 +792,10 @@ def check_render_sync(
         docs_midi_topology=docs_midi_topology,
         docs_midi_clock=docs_midi_clock,
         diagram_midi_topology=diagram_midi_topology,
+        controllers_path=controllers_path,
+        ableton_path=ableton_path,
+        docs_controllers=docs_controllers,
+        docs_ableton=docs_ableton,
         write=False,
     )
     return messages

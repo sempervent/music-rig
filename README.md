@@ -90,6 +90,7 @@ Clean paths use preamp → A/B/Y before the confirmed TASCAM clean legs (5/6/7).
 - [Alesis mixer map](docs/alesis-mixer-map.md)
 - [Pedal chains](docs/pedal-chains.md)
 - [Ableton track map](docs/ableton-track-map.md)
+- [Controller mappings](docs/controller-mappings.md)
 - [MIDI topology](docs/midi-topology.md)
 - [MIDI clock and controller notes](docs/midi-clock.md)
 - [Reamp and DI notes](docs/reamp-and-di.md)
@@ -107,6 +108,8 @@ data/wishlist.yaml        = canonical wishlist data
 data/inbox.yaml           = uncategorized capture inbox
 data/changes.yaml         = physical/logical change captures (not auto-CURRENT)
 data/open-questions.yaml  = unresolved factual questions (canonical)
+data/controllers.yaml     = canonical controller mapping evidence
+data/ableton.yaml         = durable Ableton mapping targets
 data/sessions/            = studio session logs (one YAML file per session)
 docs/todo.md              = human-facing rendered representation
 docs/wishlist.md          = human-facing rendered representation
@@ -155,6 +158,12 @@ uv run rig midi links
 uv run rig midi channels
 uv run rig midi clock
 uv run rig midi ableton
+uv run rig controls summary
+uv run rig controls show behringer-fcb1010
+uv run rig controls context behringer-fcb1010 bank-00
+uv run rig controls gaps
+uv run rig controls conflicts
+uv run rig ableton targets
 
 # Evidence vs CURRENT truth
 # I noticed something:        rig capture / rig change
@@ -200,6 +209,7 @@ uv run rig current midi set-clock-master ableton --question Q-014
 uv run rig current midi set-clock korg-minikorg unknown
 uv run rig current midi ableton-set <port-id> --track on --remote on
 uv run rig current midi verify
+uv run rig current controls verify behringer-fcb1010
 
 # While working
 uv run rig session note "PH-3 confirmed before TR-2"

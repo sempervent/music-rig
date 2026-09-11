@@ -28,6 +28,7 @@ from music_rig.store import (
     ROUTING_PATH,
     INVENTORY_PATH,
     MIDI_PATH,
+    CONTROLLERS_PATH,
     TODO_PATH,
     WISHLIST_PATH,
     StoreError,
@@ -37,7 +38,7 @@ from music_rig.store import (
     load_todo,
     write_text_files,
 )
-from music_rig import channel_state, inventory_state, midi_state, patchbay_state, routing_state
+from music_rig import channel_state, control_state, inventory_state, midi_state, patchbay_state, routing_state
 
 Clock = Callable[[], datetime]
 
@@ -451,6 +452,59 @@ def commit_midi(
         raise StoreError("MIDI validation failed: " + "; ".join(errors))
     existing = target.read_text(encoding="utf-8") if target.exists() else None
     text = midi_state.dump_with_header(proposed_data, existing_text=existing)
+    return _commit(
+        preview=preview,
+        primary_path=target,
+        primary_text=text,
+        dry_run=dry_run,
+        render=render,
+        question_id=question_id,
+        change_id=change_id,
+        resolve_q=resolve_q,
+        apply_chg=apply_chg,
+        answer=answer,
+        clock=clock,
+        questions_path=questions_path,
+        changes_path=changes_path,
+        docs_todo=docs_todo,
+        docs_wishlist=docs_wishlist,
+        docs_questions=docs_questions,
+    )
+
+
+def commit_controllers(
+    proposed_data: dict,
+    preview: CurrentPreview,
+    *,
+    dry_run: bool = False,
+    render: bool = True,
+    question_id: str | None = None,
+    change_id: str | None = None,
+    resolve_q: bool = False,
+    apply_chg: bool = False,
+    answer: str = "",
+    clock: Clock = default_clock,
+    controllers_path: Path | None = None,
+    inventory_path: Path | None = None,
+    midi_path: Path | None = None,
+    ableton_path: Path | None = None,
+    questions_path: Path | None = None,
+    changes_path: Path | None = None,
+    docs_todo=None,
+    docs_wishlist=None,
+    docs_questions=None,
+) -> CurrentPreview:
+    target = controllers_path or CONTROLLERS_PATH
+    errors = control_state.validate_controllers_doc(
+        proposed_data,
+        inventory_path=inventory_path,
+        midi_path=midi_path,
+        ableton_path=ableton_path,
+    )
+    if errors:
+        raise StoreError("Controllers validation failed: " + "; ".join(errors))
+    existing = target.read_text(encoding="utf-8") if target.exists() else None
+    text = control_state.dump_with_header(proposed_data, existing_text=existing)
     return _commit(
         preview=preview,
         primary_path=target,

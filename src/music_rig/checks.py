@@ -12,7 +12,7 @@ from music_rig.models import (
     QuestionStatus,
 )
 from music_rig.render import check_render_sync
-from music_rig import channel_state, inventory_state, midi_state, patchbay_state, routing_state
+from music_rig import ableton_state, channel_state, control_state, inventory_state, midi_state, patchbay_state, routing_state
 from music_rig.store import (
     CHANGES_PATH,
     CHANNEL_MAP_PATH,
@@ -59,6 +59,10 @@ def run_checks(
     docs_midi_topology: Path | None = None,
     docs_midi_clock: Path | None = None,
     diagram_midi_topology: Path | None = None,
+    controllers_path: Path | None = None,
+    ableton_path: Path | None = None,
+    docs_controllers: Path | None = None,
+    docs_ableton: Path | None = None,
 ) -> CheckResult:
     errors: list[str] = []
     warnings: list[str] = []
@@ -83,6 +87,21 @@ def run_checks(
 
     try:
         wishlist = load_wishlist(wishlist_path)
+    except StoreError as exc:
+        errors.append(str(exc))
+
+    try:
+        ableton_raw = ableton_state.load_raw(ableton_path)
+        for err in ableton_state.validate_ableton_doc(ableton_raw):
+            errors.append(f"ableton: {err}")
+        controllers_raw = control_state.load_raw(controllers_path)
+        for err in control_state.validate_controllers_doc(
+            controllers_raw,
+            inventory_path=inventory_path,
+            midi_path=midi_path,
+            ableton_path=ableton_path,
+        ):
+            errors.append(f"controllers: {err}")
     except StoreError as exc:
         errors.append(str(exc))
 
@@ -175,6 +194,22 @@ def run_checks(
                     errors.append(
                         f"Wishlist '{item.item}' references unknown TODO {ref}"
                     )
+        if todo_path is None or controllers_path is not None:
+            try:
+                controllers = control_state.load_document(
+                    controllers_path,
+                    inventory_path=inventory_path,
+                    midi_path=midi_path,
+                    ableton_path=ableton_path,
+                )
+                for controller in controllers.controllers:
+                    for ref in controller.related_todos:
+                        if ref not in known:
+                            errors.append(
+                                f"Controller {controller.gear_ref!r} references unknown TODO {ref}"
+                            )
+            except StoreError:
+                pass
 
     if todo is not None:
         by_id = todo.task_map()
@@ -235,6 +270,10 @@ def run_checks(
             docs_midi_topology=docs_midi_topology,
             docs_midi_clock=docs_midi_clock,
             diagram_midi_topology=diagram_midi_topology,
+            controllers_path=controllers_path,
+            ableton_path=ableton_path,
+            docs_controllers=docs_controllers,
+            docs_ableton=docs_ableton,
         )
         for path in stale:
             errors.append(

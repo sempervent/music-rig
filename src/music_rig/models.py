@@ -349,7 +349,7 @@ class QuestionStatus(str, Enum):
 class QuestionTarget(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    domain: str  # patchbay.* | channel.* | routing.* | inventory.* | midi.*
+    domain: str  # patchbay.* | channel.* | routing.* | inventory.* | midi.* | controls.*
     bay: str | None = None
     pair: str | None = None
     device: str | None = None
@@ -358,6 +358,7 @@ class QuestionTarget(BaseModel):
     branch: str | None = None
     node: str | None = None
     gear: str | None = None
+    context: str | None = None
 
 
 class OwnershipStatus(str, Enum):
@@ -497,6 +498,230 @@ class MidiEvidenceStatus(str, Enum):
     VERIFIED = "VERIFIED"
     INTENDED = "INTENDED"
     UNKNOWN = "UNKNOWN"
+
+
+class ControlCoverage(str, Enum):
+    PARTIAL = "PARTIAL"
+    COMPLETE = "COMPLETE"
+    UNKNOWN = "UNKNOWN"
+
+
+class ContextKind(str, Enum):
+    BANK = "BANK"
+    TEMPLATE = "TEMPLATE"
+    MODE = "MODE"
+    GLOBAL = "GLOBAL"
+
+
+class PhysicalControlType(str, Enum):
+    BUTTON = "BUTTON"
+    SWITCH = "SWITCH"
+    FOOTSWITCH = "FOOTSWITCH"
+    KNOB = "KNOB"
+    ENCODER = "ENCODER"
+    FADER = "FADER"
+    PAD = "PAD"
+    EXPRESSION = "EXPRESSION"
+    OTHER = "OTHER"
+
+
+class ControlAvailability(str, Enum):
+    AVAILABLE = "AVAILABLE"
+    BROKEN = "BROKEN"
+    UNKNOWN = "UNKNOWN"
+
+
+class MidiMessageType(str, Enum):
+    CC = "CC"
+    NOTE = "NOTE"
+    PROGRAM_CHANGE = "PROGRAM_CHANGE"
+
+
+class ValueBehavior(str, Enum):
+    FIXED = "fixed"
+    TOGGLE = "toggle"
+    RANGE = "range"
+    MOMENTARY = "momentary"
+
+
+class TargetState(str, Enum):
+    MAPPED = "MAPPED"
+    UNASSIGNED = "UNASSIGNED"
+    UNKNOWN = "UNKNOWN"
+
+
+class TargetKind(str, Enum):
+    ABLETON_TRACK = "ABLETON_TRACK"
+    ABLETON_SEND = "ABLETON_SEND"
+    ABLETON_ACTION = "ABLETON_ACTION"
+    EXTERNAL_MIDI = "EXTERNAL_MIDI"
+    OTHER = "OTHER"
+
+
+class MidiMessage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: MidiMessageType
+    number: int = Field(ge=0, le=127)
+    channel: int | str | None = None
+    value_behavior: ValueBehavior
+
+    @field_validator("channel")
+    @classmethod
+    def _valid_controller_channel(cls, value: int | str | None) -> int | str | None:
+        if value is None:
+            return None
+        if isinstance(value, int):
+            if 1 <= value <= 16:
+                return value
+            raise ValueError("controller MIDI channel must be 1-16, DEVICE, or null")
+        if value.strip().upper() != "DEVICE":
+            raise ValueError("controller MIDI channel must be 1-16, DEVICE, or null")
+        return "DEVICE"
+
+
+class ControlTarget(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    state: TargetState
+    kind: TargetKind | None = None
+    track: str | None = None
+    send: str | None = None
+    action: str | None = None
+    notes: str | None = None
+
+    @model_validator(mode="after")
+    def _mapped_target_has_kind(self) -> ControlTarget:
+        if self.state == TargetState.MAPPED and self.kind is None:
+            raise ValueError("MAPPED control target requires kind")
+        if self.state != TargetState.MAPPED and any(
+            (self.kind, self.track, self.send, self.action)
+        ):
+            raise ValueError("UNASSIGNED/UNKNOWN target cannot contain mapping fields")
+        required = {
+            TargetKind.ABLETON_TRACK: self.track,
+            TargetKind.ABLETON_SEND: self.send,
+            TargetKind.ABLETON_ACTION: self.action,
+        }
+        if self.kind in required and not required[self.kind]:
+            raise ValueError(f"{self.kind.value} target requires its reference field")
+        return self
+
+
+class ControlMapping(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1)
+    label: str = Field(min_length=1)
+    physical_type: PhysicalControlType
+    availability: ControlAvailability
+    evidence: MidiEvidenceStatus
+    messages: list[MidiMessage] = Field(default_factory=list)
+    target: ControlTarget
+    notes: str = ""
+
+    @model_validator(mode="after")
+    def _broken_is_unassigned(self) -> ControlMapping:
+        if (
+            self.availability == ControlAvailability.BROKEN
+            and self.target.state != TargetState.UNASSIGNED
+        ):
+            raise ValueError(f"{self.id}: BROKEN controls must be UNASSIGNED")
+        return self
+
+
+class ControllerContext(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1)
+    label: str = Field(min_length=1)
+    kind: ContextKind
+    evidence: MidiEvidenceStatus
+    notes: str = ""
+    controls: list[ControlMapping] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _unique_controls(self) -> ControllerContext:
+        ids = [control.id.casefold() for control in self.controls]
+        if len(ids) != len(set(ids)):
+            raise ValueError(f"{self.id}: control IDs must be unique")
+        return self
+
+
+class ControllerRecord(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    gear_ref: str = Field(min_length=1)
+    coverage: ControlCoverage
+    related_todos: list[RigId] = Field(default_factory=list)
+    notes: str = ""
+    contexts: list[ControllerContext] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _unique_contexts(self) -> ControllerRecord:
+        ids = [context.id.casefold() for context in self.contexts]
+        if len(ids) != len(set(ids)):
+            raise ValueError(f"{self.gear_ref}: context IDs must be unique")
+        return self
+
+
+class ControllersDocument(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    controllers: list[ControllerRecord] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _unique_controllers(self) -> ControllersDocument:
+        refs = [controller.gear_ref.casefold() for controller in self.controllers]
+        if len(refs) != len(set(refs)):
+            raise ValueError("controller gear_refs must be unique")
+        return self
+
+
+class AbletonTrack(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    evidence: MidiEvidenceStatus
+    notes: str = ""
+
+
+class AbletonSend(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1)
+    label: str = Field(min_length=1)
+    evidence: MidiEvidenceStatus
+    notes: str = ""
+
+
+class AbletonAction(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1)
+    label: str = Field(min_length=1)
+    evidence: MidiEvidenceStatus
+    notes: str = ""
+
+
+class AbletonDocument(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tracks: list[AbletonTrack] = Field(default_factory=list)
+    sends: list[AbletonSend] = Field(default_factory=list)
+    actions: list[AbletonAction] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _unique_target_ids(self) -> AbletonDocument:
+        for label, values in (
+            ("Ableton track", [item.id.casefold() for item in self.tracks]),
+            ("Ableton send", [item.id.casefold() for item in self.sends]),
+            ("Ableton action", [item.id.casefold() for item in self.actions]),
+        ):
+            if len(values) != len(set(values)):
+                raise ValueError(f"{label} IDs must be unique")
+        return self
 
 
 class MidiTransport(str, Enum):

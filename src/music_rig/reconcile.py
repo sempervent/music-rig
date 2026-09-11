@@ -46,6 +46,7 @@ CATEGORY_LIKELY_FILES: dict[ChangeCategory, list[str]] = {
         "diagrams/midi-topology.mmd",
     ],
     ChangeCategory.ABLETON: [
+        "data/ableton.yaml",
         "docs/ableton-track-map.md",
     ],
     ChangeCategory.INVENTORY: [
@@ -53,8 +54,8 @@ CATEGORY_LIKELY_FILES: dict[ChangeCategory, list[str]] = {
         "docs/inventory.md",
     ],
     ChangeCategory.CONTROLLERS: [
-        "docs/midi-clock.md",
-        "data/inventory.yaml",
+        "data/controllers.yaml",
+        "docs/controller-mappings.md",
     ],
     ChangeCategory.VIDEO: [
         "docs/open-questions.md",
@@ -76,7 +77,8 @@ AREA_LIKELY_FILES: dict[str, list[str]] = {
         "docs/midi-clock.md",
         "diagrams/midi-topology.mmd",
     ],
-    "performance": ["docs/ableton-track-map.md"],
+    "performance": ["data/ableton.yaml", "docs/ableton-track-map.md"],
+    "controls": ["data/controllers.yaml", "docs/controller-mappings.md"],
     "video": ["docs/ableton-track-map.md", "docs/todo.md"],
 }
 
@@ -292,6 +294,16 @@ def format_reconcile_question(
         elif target is not None and target.domain == "midi.verify":
             lines.append("  This question maps to CURRENT MIDI topology verification.")
             lines.append("    uv run rig current midi verify")
+            lines.append(f"    # optionally pass --question {q.id} on the apply step")
+        elif (
+            target is not None
+            and target.domain in {"controls.verify", "controls.context"}
+            and target.gear
+        ):
+            lines.append(
+                f"  This question maps to controller verification for {target.gear}."
+            )
+            lines.append(f"    uv run rig current controls verify {target.gear}")
             lines.append(f"    # optionally pass --question {q.id} on the apply step")
         else:
             lines.append("  inspect the physical rig")
