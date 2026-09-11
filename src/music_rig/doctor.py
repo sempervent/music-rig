@@ -21,6 +21,8 @@ from music_rig.store import (
     load_changes,
     load_inbox,
     load_questions,
+    load_inventory,
+    load_routing,
     load_todo,
 )
 
@@ -41,6 +43,8 @@ def build_doctor_text(
     docs_routing: Path | None = None,
     docs_pedal_chains: Path | None = None,
     diagram_aux_loop: Path | None = None,
+    inventory_path: Path | None = None,
+    docs_inventory: Path | None = None,
 ) -> str:
     attention = 0
     lines = ["RIG DOCTOR", ""]
@@ -60,6 +64,8 @@ def build_doctor_text(
         docs_routing=docs_routing,
         docs_pedal_chains=docs_pedal_chains,
         diagram_aux_loop=diagram_aux_loop,
+        inventory_path=inventory_path,
+        docs_inventory=docs_inventory,
     )
     planning_errors = [
         e
@@ -251,6 +257,49 @@ def build_doctor_text(
             lines.append("✓ No OPEN PEDAL_CHAIN / AUDIO_ROUTING changes")
     except StoreError:
         pass
+
+    # Inventory identity
+    lines.append("")
+    lines.append("Inventory")
+    try:
+        inventory = load_inventory(inventory_path)
+        lines.append(f"✓ Inventory valid: {len(inventory.items)} records")
+        routing = load_routing(routing_path)
+        refs = [
+            node
+            for path in routing.named_paths.values()
+            for branch in path.branches.values()
+            for node in branch.nodes
+            if node.gear_ref
+        ]
+        unresolved = [node.gear_ref for node in refs if not inventory.resolve(node.gear_ref or "")]
+        if unresolved:
+            lines.append(f"✗ {len(unresolved)} routing gear_ref(s) unresolved")
+            attention += 1
+        else:
+            lines.append(f"✓ {len(refs)} routing gear_ref(s) resolve")
+        unlinked_devices = [
+            node
+            for path in routing.named_paths.values()
+            for branch in path.branches.values()
+            for node in branch.nodes
+            if node.kind == "device" and not node.gear_ref
+        ]
+        if unlinked_devices:
+            lines.append(
+                f"⚠ {len(unlinked_devices)} device-kind routing node(s) lack gear_ref"
+            )
+            attention += 1
+        else:
+            lines.append("✓ All device-kind routing nodes have gear_ref")
+        lines.append(
+            "⚠ Patchbay model → PB letter mapping remains UNKNOWN (Q-007); "
+            "do not infer unit assignments"
+        )
+        attention += 1
+    except StoreError as exc:
+        lines.append(f"✗ Inventory data invalid: {exc}")
+        attention += 1
 
     # Repository
     lines.append("")

@@ -53,6 +53,7 @@ class WishStatus(str, Enum):
     BORROW_FIRST = "BORROW FIRST"
     BUY_LATER = "BUY LATER"
     BUY_NOW = "BUY NOW"
+    ACQUIRED = "ACQUIRED"
     REDUNDANT = "REDUNDANT"
     REJECTED = "REJECTED"
     WAITING = "WAITING"
@@ -154,6 +155,7 @@ class WishlistItem(BaseModel):
     notes: str = ""
     details: str = ""
     todo_refs: list[RigId] = Field(default_factory=list)
+    inventory_ref: str | None = None
 
     @field_validator("todo_refs")
     @classmethod
@@ -161,6 +163,16 @@ class WishlistItem(BaseModel):
         if len(value) != len(set(value)):
             raise ValueError("todo_refs must not contain duplicates")
         return value
+
+    @model_validator(mode="after")
+    def _acquired_requires_inventory(self) -> WishlistItem:
+        if self.status == WishStatus.ACQUIRED and not (
+            self.inventory_ref and self.inventory_ref.strip()
+        ):
+            raise ValueError(
+                f"Wishlist item {self.item!r} ACQUIRED requires inventory_ref"
+            )
+        return self
 
 
 class WishlistDocument(BaseModel):
@@ -337,7 +349,7 @@ class QuestionStatus(str, Enum):
 class QuestionTarget(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    domain: str  # patchbay.mode | patchbay.model | channel.source | routing.verify
+    domain: str  # patchbay.mode | patchbay.model | channel.source | routing.verify | inventory.patchbay_mapping
     bay: str | None = None
     pair: str | None = None
     device: str | None = None
@@ -345,6 +357,100 @@ class QuestionTarget(BaseModel):
     path: str | None = None
     branch: str | None = None
     node: str | None = None
+    gear: str | None = None
+
+
+class OwnershipStatus(str, Enum):
+    OWNED = "OWNED"
+    RETIRED = "RETIRED"
+    SOLD = "SOLD"
+    LOANED_OUT = "LOANED_OUT"
+    UNKNOWN = "UNKNOWN"
+
+
+class GearCondition(str, Enum):
+    WORKING = "WORKING"
+    ISSUE = "ISSUE"
+    BROKEN = "BROKEN"
+    UNKNOWN = "UNKNOWN"
+
+
+INACTIVE_OWNERSHIP = frozenset(
+    {
+        OwnershipStatus.RETIRED,
+        OwnershipStatus.SOLD,
+        OwnershipStatus.LOANED_OUT,
+    }
+)
+
+
+class InventoryUnit(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1)
+    notes: str = ""
+
+
+class InventoryItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    manufacturer: str | None = None
+    model: str | None = None
+    category: str = Field(min_length=1)
+    quantity: int = Field(default=1, ge=1)
+    ownership_status: OwnershipStatus = OwnershipStatus.OWNED
+    condition: GearCondition = GearCondition.UNKNOWN
+    location: str | None = None
+    notes: str = ""
+    units: list[InventoryUnit] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _units_match_quantity(self) -> InventoryItem:
+        if self.units and len(self.units) != self.quantity:
+            raise ValueError(
+                f"{self.id}: units length ({len(self.units)}) must equal quantity "
+                f"({self.quantity})"
+            )
+        return self
+
+
+class InventoryDocument(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[InventoryItem] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _unique_ids(self) -> InventoryDocument:
+        ids = [i.id for i in self.items]
+        if len(ids) != len(set(ids)):
+            raise ValueError("inventory item IDs must be unique")
+        unit_ids: list[str] = []
+        for item in self.items:
+            for unit in item.units:
+                unit_ids.append(unit.id)
+                if unit.id in ids:
+                    raise ValueError(
+                        f"unit id {unit.id!r} collides with inventory item id"
+                    )
+        if len(unit_ids) != len(set(unit_ids)):
+            raise ValueError("inventory unit IDs must be unique")
+        return self
+
+    def item_map(self) -> dict[str, InventoryItem]:
+        return {i.id: i for i in self.items}
+
+    def resolve(self, gear_id: str) -> InventoryItem | None:
+        """Resolve item id or unit id to parent InventoryItem."""
+        key = gear_id.strip().lower()
+        for item in self.items:
+            if item.id.lower() == key:
+                return item
+            for unit in item.units:
+                if unit.id.lower() == key:
+                    return item
+        return None
 
 
 class OpenQuestion(BaseModel):
@@ -442,6 +548,8 @@ class RoutingNode(BaseModel):
     mode: str | None = None
     note: str | None = None
     signal: str | None = None  # optional mono/stereo annotation; read-only in Stage 6
+    gear_ref: str | None = None  # explicit inventory item/unit id
+    kind: str | None = None  # device | endpoint | utility
 
 
 class RoutingBranch(BaseModel):

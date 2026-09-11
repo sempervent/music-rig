@@ -101,6 +101,7 @@ Canonical planning and studio-ops data:
 
 ```text
 data/todo.yaml            = canonical TODO data
+data/inventory.yaml       = canonical owned-equipment identities
 data/wishlist.yaml        = canonical wishlist data
 data/inbox.yaml           = uncategorized capture inbox
 data/changes.yaml         = physical/logical change captures (not auto-CURRENT)
@@ -140,6 +141,9 @@ uv run rig session status
 
 # See current wiring
 uv run rig channels
+uv run rig gear list
+uv run rig gear show boss-rc-1
+uv run rig gear usage boss-rc-1
 uv run rig patchbay list
 uv run rig patchbay PB-B
 uv run rig path list
@@ -170,6 +174,15 @@ uv run rig current path move space TR-2 --branch sy1-send --after PH-3 --dry-run
 uv run rig current path move space TR-2 --branch sy1-send --after PH-3
 uv run rig change "TR-2 may have moved" --category PEDAL_CHAIN
 
+# Maintain owned gear (preview + confirmation)
+uv run rig current gear add
+uv run rig current gear set-condition big-muff ISSUE
+uv run rig current gear set-location boss-rc-1 "<verified location>"
+uv run rig current gear retire flamma-mod
+
+# Cross the explicit wishlist → inventory acquisition boundary
+uv run rig current gear acquire "BOSS RC-600"
+
 # While working
 uv run rig session note "PH-3 confirmed before TR-2"
 uv run rig session discovery "RE-2 quiet on separate power"
@@ -197,6 +210,10 @@ uv run rig check
 Mutation commands write YAML and re-render Markdown unless `--no-render` is passed.
 `rig change` / `rig question resolve` record evidence; they do not rewrite CURRENT routing.
 `rig current …` modifies authoritative CURRENT state (typed, previewed, confirm by default).
+Inventory IDs are stable exact references. Owned gear is not necessarily in CURRENT
+routing; routed gear cannot be retired, sold, or loaned out until those references
+are removed. Wishlist items become owned only through the acquisition workflow,
+which writes inventory and wishlist state transactionally.
 `rig now` is deterministic and explainable (no LLM).
 `rig doctor` is advisory; `rig check` remains the CI gate.
 No CLI command commits or pushes Git.

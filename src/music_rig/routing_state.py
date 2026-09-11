@@ -116,7 +116,9 @@ def semantic_fingerprint(doc: RoutingDocument | dict[str, Any]) -> dict[str, Any
     return out
 
 
-def validate_routing_doc(data: dict[str, Any]) -> list[str]:
+def validate_routing_doc(
+    data: dict[str, Any], *, inventory_path: Path | None = None
+) -> list[str]:
     errors: list[str] = []
     if not isinstance(data, dict):
         return ["routing document must be a mapping"]
@@ -174,6 +176,25 @@ def validate_routing_doc(data: dict[str, Any]) -> list[str]:
         # cycle detection via attach graph (branch attach -> parent node -> branch)
         if _has_attach_cycle(path):
             errors.append(f"path {pid}: cyclic branch attach structure")
+    try:
+        from music_rig.store import load_inventory
+
+        inventory = load_inventory(inventory_path)
+    except StoreError:
+        inventory = None
+    if inventory is not None:
+        for path_id, raw_path in named.items():
+            try:
+                path = NamedPath.model_validate(raw_path)
+            except Exception:
+                continue
+            for branch_id, branch in path.branches.items():
+                for node in branch.nodes:
+                    if node.gear_ref and inventory.resolve(node.gear_ref) is None:
+                        errors.append(
+                            f"path {path_id} branch {branch_id}: gear_ref "
+                            f"{node.gear_ref!r} does not resolve in inventory"
+                        )
     return errors
 
 
@@ -591,6 +612,8 @@ def propose_set_mode(
         mode=new_mode,
         note=node.note,
         signal=node.signal,
+        gear_ref=node.gear_ref,
+        kind=node.kind,
     )
     new_nodes = list(br.nodes)
     new_nodes[idx] = updated

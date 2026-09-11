@@ -75,6 +75,8 @@ questions:
     answer: ""
     notes: ""
     resolved_at: null
+    target:
+      domain: inventory.patchbay_mapping
 
   - id: Q-008
     question: What normalization mode (normal / half-normal / thru) is each populated PB-B pair set to?

@@ -1,95 +1,118 @@
 # Inventory
 
-Ownership and role. **Owned ≠ currently in the active signal path.** Active topology lives in [Pedal Chains](pedal-chains.md) and [Current Routing](current-routing.md).
+`data/inventory.yaml` is the canonical ownership record. Stable item and unit IDs
+connect inventory to CURRENT routing and acquired wishlist entries.
 
-## Interfaces and mixers
+**Owned does not mean CURRENT.** A device can be owned and available without being
+present in any active signal path. CURRENT topology remains canonical in
+[Current Routing](current-routing.md) and [Pedal Chains](pedal-chains.md).
 
-| Device | Role | Notes |
-|---|---|---|
-| TASCAM US-16x08 | Main audio interface | Clean, synth, acoustic, bass, electric, KAOSS, SR-18 stems |
-| Alesis mixer | Live routing and AUX SEND hub | Feeds main clean capture and wet loop |
+Wishlist entries are not inventory. Acquisition is the explicit boundary that
+creates an inventory record and marks the wishlist entry `ACQUIRED`.
 
-## Instruments and sound sources
+Patchbay hardware identity remains intentionally separate from PB-A/PB-B/PB-C/PB-D.
+The model-to-letter mapping is UNKNOWN until the physical units are inspected
+(Q-007); unit assignments must not be inferred.
 
-| Device | Role | Notes |
-|---|---|---|
-| Casio Privia | Piano | Alesis 5/6 (via PB-B) |
-| Korg miniKORG | Synth | TASCAM 3/4 (via PB-B); AUDIO IN 1/2 on PB-B lower 35/36 |
-| Alesis SR-18 | Drum machine | TASCAM 11/12 (via PB-B) |
-| Acoustic instrument | Instrument | Clean → TASCAM 5 after BOSS acoustic preamp |
-| Bass | Instrument | Alesis 1 (prior); clean → TASCAM 6 after BBox preamp |
-| Electric guitar | Instrument | Alesis 2 (prior); clean → TASCAM 7 after Flamma preamp |
-| Electric kazoo | Instrument/noise source | Alesis 4 |
+<!-- rig:inventory:start -->
+<!-- GENERATED FROM data/inventory.yaml BY `uv run rig render`. DO NOT EDIT THIS SECTION DIRECTLY. -->
 
-## Preamps and splitters
+## Interfaces Mixers
 
-| Device | Role | Notes |
-|---|---|---|
-| BOSS acoustic preamp | Acoustic front end | Before A/B/Y; clean leg → TASCAM 5 |
-| BBox preamp | Bass front end | Before A/B/Y; clean leg → TASCAM 6 |
-| Flamma preamp | Electric guitar front end | Before A/B/Y; clean leg → TASCAM 7 |
-| A/B/Y splitters | Path split after preamps | Clean TASCAM legs confirmed; other legs UNKNOWN |
+| ID | Name | Manufacturer | Model | Qty | Status | Condition | Notes |
+|---|---|---|---|---:|---|---|---|
+| tascam-us-16x08 | TASCAM US-16x08 | TASCAM | US-16x08 | 1 | OWNED | UNKNOWN | Main audio interface |
+| alesis-mixer | Alesis mixer | Alesis | UNKNOWN | 1 | OWNED | UNKNOWN | Live routing and AUX SEND hub |
 
-## Loopers and samplers
+## Instruments
 
-| Device | Role | Notes |
-|---|---|---|
-| BOSS RC-1 | Looper | CURRENT in AUX SEND ahead of wah / JOYO; external STOP/UNDO footswitch works |
-| KAOSS Replay | Sampler/effects/performance brain | Fed by Alesis monitor out; captured on TASCAM 9/10 |
+| ID | Name | Manufacturer | Model | Qty | Status | Condition | Notes |
+|---|---|---|---|---:|---|---|---|
+| bass | Bass | — | — | 1 | OWNED | UNKNOWN | — |
+| electric-guitar | Electric guitar | — | — | 1 | OWNED | UNKNOWN | — |
+| acoustic-instrument | Acoustic instrument | — | — | 1 | OWNED | UNKNOWN | — |
+| electric-kazoo | Electric kazoo | — | — | 1 | OWNED | UNKNOWN | — |
+| casio-privia | Casio Privia | Casio | Privia | 1 | OWNED | UNKNOWN | — |
+| korg-minikorg | Korg miniKORG | Korg | miniKORG | 1 | OWNED | UNKNOWN | — |
+| alesis-sr-18 | Alesis SR-18 | Alesis | SR-18 | 1 | OWNED | UNKNOWN | — |
+
+## Preamps
+
+| ID | Name | Manufacturer | Model | Qty | Status | Condition | Notes |
+|---|---|---|---|---:|---|---|---|
+| boss-acoustic-preamp | BOSS acoustic preamp | BOSS | — | 1 | OWNED | UNKNOWN | Acoustic front end before A/B/Y |
+| bbox-preamp | BBox preamp | BBox | — | 1 | OWNED | UNKNOWN | Bass front end before A/B/Y |
+| flamma-preamp | Flamma preamp | Flamma | — | 1 | OWNED | UNKNOWN | Electric guitar front end before A/B/Y |
+
+## Utility
+
+| ID | Name | Manufacturer | Model | Qty | Status | Condition | Notes |
+|---|---|---|---|---:|---|---|---|
+| aby-splitters | A/B/Y splitters | — | — | 1 | OWNED | UNKNOWN | Clean TASCAM legs confirmed; other legs UNKNOWN |
+| mxr-trs-split-tap | MXR TRS split + tap | MXR | — | 1 | OWNED | UNKNOWN | — |
+| radial-prormp | Radial ProRMP | Radial | ProRMP | 1 | OWNED | UNKNOWN | AUX SEND placement was too quiet; not default wet-loop device |
+| pyle-pro-pdc22 | PYLE-PRO PDC22 dual DI | PYLE-PRO | PDC22 | 1 | OWNED | UNKNOWN | — |
+
+## Loopers Samplers
+
+| ID | Name | Manufacturer | Model | Qty | Status | Condition | Notes |
+|---|---|---|---|---:|---|---|---|
+| boss-rc-1 | BOSS RC-1 | BOSS | RC-1 | 1 | OWNED | UNKNOWN | — |
+| kaoss-replay | KAOSS Replay | Korg | KAOSS Replay | 1 | OWNED | UNKNOWN | — |
 
 ## Patchbays
 
-| Item | Role | Notes |
-|---|---|---|
-| PB-A / PB-B / PB-C / PB-D | Named 48-point TRS patchbays | Only PB-B has documented jack assignments |
-| 2× ART Pro Audio P48 | Patchbay hardware | Which units map to which PB letter: UNKNOWN |
-| 2× Behringer PX3000 | Patchbay hardware | Which units map to which PB letter: UNKNOWN |
+| ID | Name | Manufacturer | Model | Qty | Status | Condition | Notes |
+|---|---|---|---|---:|---|---|---|
+| art-p48 | ART Pro Audio P48 | ART | P48 | 2 | OWNED | UNKNOWN | Which physical units map to PB-A/B/C/D is UNKNOWN |
+| behringer-px3000 | Behringer PX3000 | Behringer | PX3000 | 2 | OWNED | UNKNOWN | Which physical units map to PB-A/B/C/D is UNKNOWN |
 
-## Splitters, routers, DI, and reamp
+## Routers
 
-| Device | Role | Notes |
-|---|---|---|
-| JOYO A/B/Bypass router | Switch/route wet chain | CURRENT: A = DIRTY, B = SPACE |
-| BOSS LS-2 | Line selector | CURRENT in SPACE after SY-1; A+B MIX ↔ BYPASS |
-| Radial ProRMP | Reamp box | AUX SEND signal was too attenuated; not default wet-loop device |
-| PYLE-PRO PDC22 dual DI | Dual DI | Can tap two mono channels or stereo L/R into TASCAM/mixer paths |
-| MXR TRS split + tap | Utility splitter/tap | Candidate for expression/TAP/control workflows |
+| ID | Name | Manufacturer | Model | Qty | Status | Condition | Notes |
+|---|---|---|---|---:|---|---|---|
+| joyo-ab-bypass | JOYO A/B/Bypass router | JOYO | — | 1 | OWNED | UNKNOWN | CURRENT A = DIRTY, B = SPACE |
 
-## Pedals — CURRENT active path
+## Pedals
 
-| Location | Devices |
-|---|---|
-| AUX front | RC-1, Cry Baby |
-| DIRTY (JOYO A) | OD-1, BD-2, JB-2, MT-2w, DS-1 |
-| SPACE (JOYO B) | SY-1 (PH-3 → TR-2 in SEND/RETURN), LS-2 with LOOP A: SL-2 → DD-8, LOOP B: TE-2 → RE-2 |
-| Post-JOYO | CH-1 |
-
-## Pedals — OWNED / AVAILABLE, not in CURRENT active chain
-
-| Device | Notes |
-|---|---|
-| Flamma Mod | Previously in older SPACE experiments; not CURRENT |
-| PH-2 | Previously in older SPACE experiments; not CURRENT |
-| Big Muff | Failed/no audio; bench-test |
+| ID | Name | Manufacturer | Model | Qty | Status | Condition | Notes |
+|---|---|---|---|---:|---|---|---|
+| cry-baby | Cry Baby | — | — | 1 | OWNED | UNKNOWN | — |
+| boss-od-1 | BOSS OD-1 | BOSS | OD-1 | 1 | OWNED | UNKNOWN | — |
+| boss-bd-2 | BOSS BD-2 | BOSS | BD-2 | 1 | OWNED | UNKNOWN | — |
+| boss-jb-2 | BOSS JB-2 | BOSS | JB-2 | 1 | OWNED | UNKNOWN | — |
+| boss-mt-2w | BOSS MT-2w | BOSS | MT-2w | 1 | OWNED | UNKNOWN | — |
+| boss-ds-1 | BOSS DS-1 | BOSS | DS-1 | 1 | OWNED | UNKNOWN | — |
+| boss-sy-1 | BOSS SY-1 | BOSS | SY-1 | 1 | OWNED | UNKNOWN | — |
+| boss-ph-3 | BOSS PH-3 | BOSS | PH-3 | 1 | OWNED | UNKNOWN | — |
+| boss-tr-2 | BOSS TR-2 | BOSS | TR-2 | 1 | OWNED | UNKNOWN | — |
+| boss-ls-2 | BOSS LS-2 | BOSS | LS-2 | 1 | OWNED | UNKNOWN | CURRENT SPACE after SY-1; mode A+B MIX ↔ BYPASS |
+| boss-sl-2 | BOSS SL-2 | BOSS | SL-2 | 1 | OWNED | UNKNOWN | — |
+| boss-dd-8 | BOSS DD-8 | BOSS | DD-8 | 1 | OWNED | UNKNOWN | — |
+| boss-te-2 | BOSS TE-2 | BOSS | TE-2 | 1 | OWNED | UNKNOWN | — |
+| boss-re-2 | BOSS RE-2 | BOSS | RE-2 | 1 | OWNED | UNKNOWN | Noise noted historically; gain/noise isolation pending |
+| boss-ch-1 | BOSS CH-1 | BOSS | CH-1 | 1 | OWNED | UNKNOWN | Post-JOYO stereo stage |
+| flamma-mod | Flamma Mod | Flamma | — | 1 | OWNED | UNKNOWN | OWNED but not in CURRENT SPACE topology |
+| boss-ph-2 | BOSS PH-2 | BOSS | PH-2 | 1 | OWNED | UNKNOWN | OWNED but not in CURRENT SPACE topology |
+| big-muff | Big Muff | — | — | 1 | OWNED | ISSUE | Failed/no audio; bench-test (RIG-020) |
 
 ## Controllers
 
-| Device | Role | Notes |
-|---|---|---|
-| Launchpad X | Ableton control | Recording issue appears solved by this |
-| Novation Launch Control 3 | Ableton performance macros / sends | OWNED; Send D mapping TODO RIG-034 |
-| Korg padKONTROL | Drum pads | MIDI channel 10 drums; footswitch clip-record workflow TODO RIG-039 |
-| Behringer FCB1010 | Foot controller | Target ch16; EXP A CC111 / EXP B CC112 (finalize RIG-035); USB Uno recognition unresolved |
-| Novation ReMOTE ZeRO SL | MIDI controller | Target ch15; encoder #6 broken; template finalize RIG-036 |
-| Elgato Stream Deck+ | OBS / hands-off ops | OWNED; profile finish TODO RIG-045 |
-| MOSKY Dual Switch | Momentary dual footswitch | Useful with RC-1 STOP/UNDO; likely better than single switch |
-| BOSS EV-30 | Dual expression pedal | Candidate for SL-2 / PH-3 / other expression-capable pedals |
+| ID | Name | Manufacturer | Model | Qty | Status | Condition | Notes |
+|---|---|---|---|---:|---|---|---|
+| launchpad-x | Launchpad X | Novation | Launchpad X | 1 | OWNED | UNKNOWN | — |
+| novation-launch-control-3 | Novation Launch Control 3 | Novation | Launch Control 3 | 1 | OWNED | UNKNOWN | — |
+| korg-padkontrol | Korg padKONTROL | Korg | padKONTROL | 1 | OWNED | UNKNOWN | — |
+| behringer-fcb1010 | Behringer FCB1010 | Behringer | FCB1010 | 1 | OWNED | UNKNOWN | — |
+| novation-remote-zero-sl | Novation ReMOTE ZeRO SL | Novation | ReMOTE ZeRO SL | 1 | OWNED | ISSUE | Encoder |
+| elgato-stream-deck-plus | Elgato Stream Deck+ | Elgato | Stream Deck+ | 1 | OWNED | UNKNOWN | — |
+| mosky-dual-switch | MOSKY Dual Switch | MOSKY | — | 1 | OWNED | UNKNOWN | — |
+| boss-ev-30 | BOSS EV-30 | BOSS | EV-30 | 1 | OWNED | UNKNOWN | — |
 
-## MIDI interfaces / distribution
+## Midi Utilities
 
-| Device | Role | Notes |
-|---|---|---|
-| CME U6MIDI Pro | USB MIDI interface / router | 3 in / 3 out; routing, merging, filtering/remapping — OWNED |
-| CME MIDI Thru5 WC | Hardware MIDI thru | Clock/controller distribution — OWNED |
-
-Do **not** wishlist another generic MIDI thru/splitter while these are owned. Document topology via TODO RIG-037.
+| ID | Name | Manufacturer | Model | Qty | Status | Condition | Notes |
+|---|---|---|---|---:|---|---|---|
+| cme-u6midi-pro | CME U6MIDI Pro | CME | U6MIDI Pro | 1 | OWNED | UNKNOWN | 3 in / 3 out; route / merge / filter |
+| cme-midi-thru5-wc | CME MIDI Thru5 WC | CME | MIDI Thru5 WC | 1 | OWNED | UNKNOWN | Hardware thru distribution |
+<!-- rig:inventory:end -->

@@ -38,6 +38,7 @@ def git_summary() -> tuple[str | None, str | None]:
 
 
 def build_status_text() -> str:
+    # Intentionally compact: inventory detail/counts live under `rig gear` and doctor.
     todo = load_todo()
     wish = load_wishlist()
     inbox = load_inbox()

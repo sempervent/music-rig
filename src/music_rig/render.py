@@ -23,7 +23,8 @@ from music_rig.routing_projections import (
     render_current_routing_section,
     render_pedal_chains_section,
 )
-from music_rig import channel_state, patchbay_state, routing_state
+from music_rig.inventory_projections import render_inventory_section
+from music_rig import channel_state, inventory_state, patchbay_state, routing_state
 from music_rig.store import (
     CHANNEL_MAP_PATH,
     DIAGRAM_AUX_LOOP_PATH,
@@ -32,6 +33,7 @@ from music_rig.store import (
     DOCS_ALESIS_PATH,
     DOCS_PATCHBAYS_PATH,
     DOCS_PEDAL_CHAINS_PATH,
+    DOCS_INVENTORY_PATH,
     DOCS_QUESTIONS_PATH,
     DOCS_ROUTING_PATH,
     DOCS_TASCAM_PATH,
@@ -40,10 +42,12 @@ from music_rig.store import (
     PATCHBAYS_PATH,
     QUESTIONS_PATH,
     ROUTING_PATH,
+    INVENTORY_PATH,
     TODO_PATH,
     WISHLIST_PATH,
     StoreError,
     load_questions,
+    load_inventory,
     load_todo,
     load_wishlist,
 )
@@ -64,6 +68,8 @@ ROUTING_START = "<!-- rig:routing:start -->"
 ROUTING_END = "<!-- rig:routing:end -->"
 PEDAL_CHAINS_START = "<!-- rig:pedal-chains:start -->"
 PEDAL_CHAINS_END = "<!-- rig:pedal-chains:end -->"
+INVENTORY_START = "<!-- rig:inventory:start -->"
+INVENTORY_END = "<!-- rig:inventory:end -->"
 
 TODO_BANNER = (
     "<!-- GENERATED FROM data/todo.yaml BY `uv run rig render`. "
@@ -345,6 +351,12 @@ def apply_pedal_chains_render(markdown: str, data: dict) -> str:
     )
 
 
+def apply_inventory_render(markdown: str, doc) -> str:
+    return _replace_region(
+        markdown, INVENTORY_START, INVENTORY_END, render_inventory_section(doc)
+    )
+
+
 def _write_if_changed(
     path: Path,
     new_text: str,
@@ -381,6 +393,8 @@ def render_docs(
     diagram_tascam: Path | None = None,
     diagram_aux_loop: Path | None = None,
     routing_path: Path | None = None,
+    inventory_path: Path | None = None,
+    docs_inventory: Path | None = None,
     write: bool = True,
 ) -> tuple[bool, list[str]]:
     """Render generated sections. Returns (changed, messages)."""
@@ -392,6 +406,9 @@ def render_docs(
         channel_map_path is not None and channel_map_path != CHANNEL_MAP_PATH
     )
     using_custom_rt = routing_path is not None and routing_path != ROUTING_PATH
+    using_custom_inv = (
+        inventory_path is not None and inventory_path != INVENTORY_PATH
+    )
     if using_custom_todo and docs_todo is None:
         raise StoreError(
             "docs_todo path is required when rendering with a custom todo_path"
@@ -416,6 +433,10 @@ def render_docs(
         raise StoreError(
             "docs_routing and docs_pedal_chains are required when rendering "
             "with a custom routing_path"
+        )
+    if using_custom_inv and docs_inventory is None:
+        raise StoreError(
+            "docs_inventory is required when rendering with a custom inventory_path"
         )
 
     todo = load_todo(todo_path)
@@ -457,6 +478,31 @@ def render_docs(
     )
     if planning_fixture_only:
         return changed, messages
+
+    custom_inputs = any(
+        (
+            using_custom_todo,
+            using_custom_wish,
+            using_custom_q,
+            using_custom_pb,
+            using_custom_ch,
+            using_custom_rt,
+        )
+    )
+    if not custom_inputs or inventory_path is not None or docs_inventory is not None:
+        inventory = load_inventory(inventory_path)
+        inventory_md_path = docs_inventory or DOCS_INVENTORY_PATH
+        new_inventory = apply_inventory_render(
+            inventory_md_path.read_text(encoding="utf-8"), inventory
+        )
+        if _write_if_changed(
+            inventory_md_path,
+            new_inventory,
+            display_name="docs/inventory.md",
+            write=write,
+            messages=messages,
+        ):
+            changed = True
 
     patchbays = patchbay_state.load_raw(patchbays_path)
     channels = channel_state.load_raw(channel_map_path)
@@ -556,6 +602,8 @@ def check_render_sync(
     diagram_patchbays: Path | None = None,
     diagram_tascam: Path | None = None,
     diagram_aux_loop: Path | None = None,
+    inventory_path: Path | None = None,
+    docs_inventory: Path | None = None,
 ) -> list[str]:
     """Return list of stale doc paths. Empty if synchronized."""
     _, messages = render_docs(
@@ -576,6 +624,8 @@ def check_render_sync(
         diagram_patchbays=diagram_patchbays,
         diagram_tascam=diagram_tascam,
         diagram_aux_loop=diagram_aux_loop,
+        inventory_path=inventory_path,
+        docs_inventory=docs_inventory,
         write=False,
     )
     return messages
