@@ -14,6 +14,7 @@ from music_rig.models import (
 from music_rig.render import check_render_sync
 from music_rig import (
     ableton_state,
+    backup_state,
     channel_state,
     control_state,
     control_surface_state,
@@ -23,7 +24,9 @@ from music_rig import (
     performance_state,
     routing_state,
 )
+from music_rig.automation import known_plan_category
 from music_rig.store import (
+    BACKUPS_PATH,
     CHANGES_PATH,
     CHANNEL_MAP_PATH,
     EXISTING_YAML,
@@ -77,6 +80,9 @@ def run_checks(
     surfaces_path: Path | None = None,
     docs_performance: Path | None = None,
     docs_live_recovery: Path | None = None,
+    backups_path: Path | None = None,
+    docs_backups: Path | None = None,
+    docs_automation: Path | None = None,
 ) -> CheckResult:
     errors: list[str] = []
     warnings: list[str] = []
@@ -132,6 +138,35 @@ def run_checks(
             midi_path=midi_path,
         ):
             errors.append(f"performance: {err}")
+        try:
+            performance_doc = performance_state.load_document(
+                performance_path,
+                controllers_path=controllers_path,
+                surfaces_path=surfaces_path,
+                ableton_path=ableton_path,
+                inventory_path=inventory_path,
+                midi_path=midi_path,
+            )
+            for action in performance_doc.actions:
+                for effect in action.effects:
+                    if not known_plan_category(effect):
+                        errors.append(
+                            f"performance: action {action.id} effect "
+                            f"{effect.kind.value} has no automation plan category"
+                        )
+        except StoreError:
+            pass
+    except StoreError as exc:
+        errors.append(str(exc))
+
+    try:
+        # Skip production backups cross-checks when only a planning TODO fixture is in play.
+        if backups_path is not None or todo_path is None:
+            backups_raw = backup_state.load_raw(backups_path or BACKUPS_PATH)
+            for err in backup_state.validate_backups_doc(
+                backups_raw, todo_path=todo_path
+            ):
+                errors.append(f"backups: {err}")
     except StoreError as exc:
         errors.append(str(exc))
 
@@ -308,6 +343,9 @@ def run_checks(
             surfaces_path=surfaces_path,
             docs_performance=docs_performance,
             docs_live_recovery=docs_live_recovery,
+            backups_path=backups_path,
+            docs_backups=docs_backups,
+            docs_automation=docs_automation,
         )
         for path in stale:
             errors.append(

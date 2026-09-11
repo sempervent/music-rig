@@ -1,0 +1,110 @@
+# Canonical backup / archive plan (design intent).
+# Paths live only in gitignored `.rig.local.yaml` via locator_key.
+# Evidence: INTENDED until a restore/export is verified on a machine.
+# Do not put absolute user paths in this file.
+
+items:
+  - id: repository-state
+    label: Repository canonical YAML snapshot
+    category: Repository
+    kind: REPOSITORY_STATE
+    importance: CRITICAL
+    evidence: INTENDED
+    locator_key: repository-state
+    manual_instructions: >-
+      Create with `uv run rig snapshot create`. Embeds automatically in
+      `uv run rig backup create`.
+    related_todos: [RIG-016]
+    notes: Dated full-rig configuration snapshot of data/*.yaml (RIG-016).
+
+  - id: pfl-jam-ableton-set
+    label: Ableton PFL jam template / set
+    category: Ableton
+    kind: FILE_COPY
+    importance: CRITICAL
+    evidence: INTENDED
+    locator_key: pfl_jam_ableton_set
+    manual_instructions: >-
+      Point paths.pfl_jam_ableton_set in `.rig.local.yaml` at the Live Set
+      or project file, then run `uv run rig backup create`.
+    related_todos: [RIG-018, RIG-043]
+    notes: Template location + version/date should be documented once restored once.
+
+  - id: controller-mappings
+    label: Controller mappings export
+    category: Controllers
+    kind: MANUAL_EXPORT
+    importance: IMPORTANT
+    evidence: INTENDED
+    locator_key: controller_mappings_export
+    manual_instructions: >-
+      Export Launchpad, Launch Control 3, padKONTROL, FCB1010, ZeRO SL, and
+      related mapping files from each editor/device. Optionally set
+      paths.controller_mappings_export if a collected folder exists.
+    related_todos: [RIG-017, RIG-043]
+    notes: Prefer external archive path; do not dump large binaries into git.
+
+  - id: stream-deck-profiles
+    label: Stream Deck+ profiles
+    category: Stream Deck
+    kind: MANUAL_EXPORT
+    importance: IMPORTANT
+    evidence: INTENDED
+    locator_key: stream_deck_export
+    manual_instructions: >-
+      Export Stream Deck+ profiles (PFL HOME, OBS REC/SCENES/SAFE, ABLETON,
+      FILES, MAC-RIG, SETTINGS) from the Elgato software and archive outside git.
+    related_todos: [RIG-017, RIG-043, RIG-045]
+    notes: Hands-off profile intent remains INTENDED until device-verified.
+
+  - id: obs-profile-scenes
+    label: OBS profile and scene collection
+    category: OBS
+    kind: MANUAL_EXPORT
+    importance: IMPORTANT
+    evidence: INTENDED
+    locator_key: obs_export
+    manual_instructions: >-
+      Export OBS profile + scene collection (including SAFE stop/mute/isolate
+      intents) and store the archive path via paths.obs_export when available.
+    related_todos: [RIG-043, RIG-045]
+    notes: No OBS websocket automation in Stage 11.
+
+  - id: kaoss-settings
+    label: KAOSS Replay settings backup
+    category: KAOSS Replay
+    kind: MANUAL_EXPORT
+    importance: IMPORTANT
+    evidence: INTENDED
+    locator_key: kaoss_backup
+    manual_instructions: >-
+      Capture KAOSS Replay settings / project backup per device procedure and
+      archive outside the repository.
+    related_todos: [RIG-043]
+    notes: Sampling/monitor path is separate from clean TASCAM captures.
+
+  - id: pfl-samples-assets
+    label: Important samples / PFL assets
+    category: Samples
+    kind: MANUAL_EXPORT
+    importance: OPTIONAL
+    evidence: INTENDED
+    locator_key: null
+    manual_instructions: >-
+      Manually archive important samples and PFL assets to an external location.
+      Do not commit large media into git.
+    related_todos: [RIG-043]
+    notes: Location documented in local notes only; no canonical absolute path.
+
+  - id: u6midi-routes
+    label: U6MIDI Pro route configuration
+    category: Controllers
+    kind: MANUAL_EXPORT
+    importance: OPTIONAL
+    evidence: INTENDED
+    locator_key: null
+    manual_instructions: >-
+      Export or photograph U6MIDI Pro route configuration and archive with the
+      controller backup set.
+    related_todos: [RIG-043]
+    notes: Covered by RIG-043 definition of done; paths unknown in repo.

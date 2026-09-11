@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import subprocess
 from collections import Counter
+from pathlib import Path
 
 from music_rig.models import ChangeStatus, InboxStatus, QuestionStatus, TodoStatus, WishStatus
 from music_rig.session_service import find_active
@@ -17,24 +18,60 @@ from music_rig.store import (
 )
 
 
-def git_summary() -> tuple[str | None, str | None]:
+def _git_cwd(root: Path | None = None) -> Path:
+    return root or ROOT
+
+
+def git_branch(root: Path | None = None) -> str | None:
     try:
         branch = subprocess.check_output(
             ["git", "branch", "--show-current"],
-            cwd=ROOT,
+            cwd=_git_cwd(root),
             text=True,
             stderr=subprocess.DEVNULL,
         ).strip()
+        return branch or None
+    except Exception:
+        return None
+
+
+def git_working_tree_clean(root: Path | None = None) -> bool | None:
+    try:
         dirty = subprocess.check_output(
             ["git", "status", "--porcelain"],
-            cwd=ROOT,
+            cwd=_git_cwd(root),
             text=True,
             stderr=subprocess.DEVNULL,
         ).strip()
-        tree = "dirty" if dirty else "clean"
-        return branch or None, tree
+        return not bool(dirty)
     except Exception:
+        return None
+
+
+def git_commit_sha(*, short: bool = True, root: Path | None = None) -> str | None:
+    try:
+        args = ["git", "rev-parse"]
+        if short:
+            args.append("--short")
+        args.append("HEAD")
+        sha = subprocess.check_output(
+            args,
+            cwd=_git_cwd(root),
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+        return sha or None
+    except Exception:
+        return None
+
+
+def git_summary(root: Path | None = None) -> tuple[str | None, str | None]:
+    branch = git_branch(root=root)
+    clean = git_working_tree_clean(root=root)
+    if branch is None and clean is None:
         return None, None
+    tree = None if clean is None else ("clean" if clean else "dirty")
+    return branch, tree
 
 
 def build_status_text() -> str:

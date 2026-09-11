@@ -26,6 +26,10 @@ from music_rig.store import (
     load_todo,
 )
 from music_rig import control_state, performance_state
+from music_rig.automation import CAPABILITIES, CapabilityStatus, list_capabilities
+from music_rig.backup_state import BackupReadiness, status_items
+from music_rig.local_config import load_local_config
+from music_rig.snapshot_service import list_snapshots
 
 
 def build_doctor_text(
@@ -389,6 +393,54 @@ def build_doctor_text(
         attention += 1
     else:
         lines.append("✓ Performance projections synchronized")
+
+    # Preservation (snapshots / backups / local config)
+    lines.append("")
+    lines.append("Preservation")
+    local = load_local_config()
+    if local is None:
+        lines.append("⚠ Local config absent (advisory; copy .rig.local.example.yaml)")
+        attention += 1
+    else:
+        lines.append("✓ Local config present (path values not shown)")
+    try:
+        snaps = list_snapshots()
+        lines.append(f"✓ Local snapshots: {len(snaps)}")
+    except Exception:
+        lines.append("⚠ Snapshot listing unavailable")
+        attention += 1
+    try:
+        statuses = status_items()
+        ready = sum(1 for item in statuses if item.readiness == BackupReadiness.READY)
+        manual = sum(1 for item in statuses if item.readiness == BackupReadiness.MANUAL)
+        lines.append(
+            f"⚠ Backup plan: {ready} READY, {manual} MANUAL "
+            f"(of {len(statuses)} items; missing local paths are not CI errors)"
+        )
+        attention += 1
+    except StoreError as exc:
+        lines.append(f"✗ Backup plan invalid: {exc}")
+        attention += 1
+
+    # Automation honesty
+    lines.append("")
+    lines.append("Automation")
+    available = [
+        family.value
+        for family, status in list_capabilities()
+        if status == CapabilityStatus.AVAILABLE
+    ]
+    unimplemented = [
+        family.value
+        for family, status in CAPABILITIES.items()
+        if status == CapabilityStatus.NOT_IMPLEMENTED
+    ]
+    lines.append(f"✓ Available: {', '.join(available)}")
+    lines.append(
+        f"⚠ Not implemented (no fake success): {', '.join(unimplemented)}"
+    )
+    attention += 1
+    lines.append("✓ Simulate/preflight never execute external actions")
 
     # Inventory identity
     lines.append("")

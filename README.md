@@ -91,6 +91,10 @@ Clean paths use preamp → A/B/Y before the confirmed TASCAM clean legs (5/6/7).
 - [Pedal chains](docs/pedal-chains.md)
 - [Ableton track map](docs/ableton-track-map.md)
 - [Controller mappings](docs/controller-mappings.md)
+- [Performance](docs/performance.md)
+- [Live recovery](docs/live-recovery.md)
+- [Backups](docs/backups.md)
+- [Automation readiness](docs/automation-readiness.md)
 - [MIDI topology](docs/midi-topology.md)
 - [MIDI clock and controller notes](docs/midi-clock.md)
 - [Reamp and DI notes](docs/reamp-and-di.md)
@@ -112,14 +116,19 @@ data/controllers.yaml     = canonical controller mapping evidence
 data/ableton.yaml         = durable Ableton mapping targets
 data/performance.yaml     = PFL performance modes, actions, bindings, and recovery
 data/control-surfaces.yaml = non-MIDI performance control surfaces
+data/backups.yaml         = canonical backup / archive plan (no absolute paths)
 data/sessions/            = studio session logs (one YAML file per session)
+.rig.local.example.yaml   = template for machine-local path locators (copy to `.rig.local.yaml`)
 docs/todo.md              = human-facing rendered representation
 docs/wishlist.md          = human-facing rendered representation
 docs/open-questions.md    = human-facing questions (generated section)
+docs/backups.md           = generated backup plan
+docs/automation-readiness.md = generated automation capability honesty
 ```
 
 Do not manually edit the generated marker sections in the Markdown files.
 Inbox captures, session discoveries, OPEN changes, and OPEN questions are not CURRENT routing truth until reconciled into docs/data.
+Never commit `.rig.local.yaml`, `.rig/` snapshots, or absolute user paths in canonical YAML.
 
 ```bash
 uv sync --extra dev --extra docs
@@ -213,6 +222,28 @@ uv run rig current midi ableton-set <port-id> --track on --remote on
 uv run rig current midi verify
 uv run rig current controls verify behringer-fcb1010
 
+uv run rig performance readiness
+uv run rig performance plan panic
+uv run rig performance simulate panic
+uv run rig performance preflight --mode pfl-jam
+uv run rig automation capabilities
+
+# Snapshots vs git vs backup packages
+# - git: version history for the repo
+# - rig snapshot: dated copy of data/*.yaml under .rig/snapshots (gitignored)
+# - rig backup: archive package with embedded snapshot + configured file copies
+uv run rig snapshot create
+uv run rig snapshot list
+uv run rig snapshot show SNAP-YYYYMMDD-HHMMSS
+uv run rig snapshot diff SNAP-A current
+uv run rig snapshot verify SNAP-YYYYMMDD-HHMMSS
+uv run rig backup plan
+uv run rig backup status
+uv run rig backup create --output /path/to/archive
+
+# Broad `--snapshot-before` on mutation commands is deferred; run
+# `uv run rig snapshot create` manually before risky changes.
+
 # While working
 uv run rig session note "PH-3 confirmed before TR-2"
 uv run rig session discovery "RE-2 quiet on separate power"
@@ -253,6 +284,16 @@ Performance readiness is also advisory and never blocks `rig now --play`:
 control; `PARTIAL` means evidence or hands-off recovery remains incomplete; `READY`
 requires AVAILABLE bindings and VERIFIED critical/emergency paths. INTENDED evidence
 must not be promoted to VERIFIED without direct verification.
+
+`rig performance simulate` always prints
+`SIMULATION — NO EXTERNAL ACTIONS WILL BE EXECUTED` and never connects to OBS,
+Ableton, MIDI, Stream Deck, or sends keys. `rig performance preflight` is optional
+setup advice only.
+
+Snapshots preserve canonical YAML; they are not CURRENT physical truth and are not a
+git substitute. Backup packages embed a snapshot and copy only FILE_COPY /
+DIRECTORY_COPY items whose local paths are configured; MANUAL_EXPORT items stay
+operator-driven.
 
 MIDI physical links, channel assignments, clock state, and Ableton Track / Sync /
 Remote settings are separate evidence domains. `INTENDED` records design intent;
