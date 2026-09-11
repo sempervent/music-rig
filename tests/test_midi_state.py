@@ -115,8 +115,10 @@ def test_production_midi_is_conservative_and_valid():
     questions = load_questions().question_map()
     assert questions["Q-014"].target.domain == "midi.clock_master"
     assert questions["Q-015"].target.domain == "midi.verify"
-    assert questions["Q-016"].target is None
-    assert questions["Q-017"].target is None
+    assert questions["Q-016"].target.domain == "controls.verify"
+    assert questions["Q-016"].target.gear == "behringer-fcb1010"
+    assert questions["Q-017"].target.domain == "controls.verify"
+    assert questions["Q-017"].target.gear == "novation-remote-zero-sl"
 
 
 @pytest.mark.parametrize("channel", [0, 17, "ALL", ""])

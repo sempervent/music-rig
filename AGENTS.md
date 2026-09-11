@@ -27,6 +27,8 @@ Use the repository itself as the source of remembered state, not chat memory or 
 | MIDI | [data/midi.yaml](data/midi.yaml) | Canonical MIDI devices, links, channels, clock, and Ableton port evidence |
 | MIDI topology | [docs/midi-topology.md](docs/midi-topology.md) / [diagrams/midi-topology.mmd](diagrams/midi-topology.mmd) | Generated physical-link projections |
 | MIDI clock | [docs/midi-clock.md](docs/midi-clock.md) | Generated clock/channel/Ableton overview plus controller notes |
+| Controller maps | [data/controllers.yaml](data/controllers.yaml) / [docs/controller-mappings.md](docs/controller-mappings.md) | Canonical mapping evidence and generated tables |
+| Ableton targets | [data/ableton.yaml](data/ableton.yaml) / [docs/ableton-track-map.md](docs/ableton-track-map.md) | Durable track/send/action targets; not a Live Set dump |
 | Diagrams | [diagrams/](diagrams/) | Visual projections of the same authoritative state |
 | Todo (canonical) | [data/todo.yaml](data/todo.yaml) | Structured accepted work — edit this, not generated Markdown sections |
 | Todo (rendered) | [docs/todo.md](docs/todo.md) | Human-facing TODO view; generated section owned by `uv run rig render` |
@@ -89,6 +91,8 @@ uv run rig midi summary
 uv run rig midi links
 uv run rig midi channels
 uv run rig midi clock
+uv run rig controls summary
+uv run rig ableton targets
 
 # Physical reality changed (does not edit CURRENT docs)
 uv run rig change "Moved TR-2 after PH-3" --category PEDAL_CHAIN
@@ -102,6 +106,7 @@ uv run rig current path move space TR-2 --branch sy1-send --after PH-3
 uv run rig current gear set-condition big-muff ISSUE
 uv run rig current gear acquire "BOSS RC-600"
 uv run rig current midi verify
+uv run rig current controls verify behringer-fcb1010
 
 uv run rig render --check
 uv run rig check
@@ -124,8 +129,15 @@ uv run rig check
 - Do not invent inventory locations or infer patchbay unit-to-PB-letter mappings.
 - Keep MIDI physical links, channel assignments, clock, and Ableton Track / Sync /
   Remote as separate evidence domains. `INTENDED` is not `VERIFIED`.
+- Keep controller mappings in `data/controllers.yaml` and durable Ableton targets in
+  `data/ableton.yaml`; neither overrides MIDI topology evidence.
+- Separate physical control, emitted MIDI message, MIDI channel, target action, and
+  evidence state. Do not infer targets from MIDI numbers. Do not fuzzy-match Ableton
+  targets. Do not assign active mappings to BROKEN controls. Do not upgrade INTENDED
+  mappings to VERIFIED without explicit verification.
 - Do not invent MIDI ports, physical links, Ableton preference state, or controller
-  switch/knob maps. Use `rig current midi ...` only from direct evidence.
+  switch/knob maps. Use `rig current midi ...` / `rig current controls ...` only from
+  direct evidence.
 - Keep `rig status` compact; inventory counts belong in `rig gear` / `rig doctor`.
 - Do not infer a CURRENT route update from inbox observations, session discoveries, freeform OPEN changes, or unresolved questions.
 - Use `rig change` when physical state may have changed but has not been reconciled.

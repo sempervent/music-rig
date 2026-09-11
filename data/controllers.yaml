@@ -1,0 +1,175 @@
+# Canonical controller mapping state (not MIDI topology — see data/midi.yaml).
+# Evidence: VERIFIED | INTENDED | UNKNOWN
+# Do not upgrade INTENDED → VERIFIED without explicit physical/software verification.
+# Do not invent per-switch/knob assignments merely because hardware has unused controls.
+# Stream Deck / OBS automation is out of scope.
+
+controllers:
+  - gear_ref: behringer-fcb1010
+    coverage: PARTIAL
+    related_todos: [RIG-035, RIG-022]
+    notes: >-
+      Channel 16 and bank roles are design direction (RIG-035). Exact switch map is OPEN (Q-016).
+      EXP A/B CC numbers are documented intent; Ableton targets UNKNOWN.
+    contexts:
+      - id: bank-00
+        label: Arm + FX
+        kind: BANK
+        evidence: INTENDED
+        notes: Design direction — exact switch assignments UNKNOWN (Q-016 / RIG-035)
+        controls:
+          - id: exp-a
+            label: EXP A
+            physical_type: EXPRESSION
+            availability: AVAILABLE
+            evidence: INTENDED
+            messages:
+              - type: CC
+                number: 111
+                channel: DEVICE
+                value_behavior: range
+            target:
+              state: UNKNOWN
+          - id: exp-b
+            label: EXP B
+            physical_type: EXPRESSION
+            availability: AVAILABLE
+            evidence: INTENDED
+            messages:
+              - type: CC
+                number: 112
+                channel: DEVICE
+                value_behavior: range
+            target:
+              state: UNKNOWN
+      - id: bank-01
+        label: Looper
+        kind: BANK
+        evidence: INTENDED
+        notes: Bank role INTENDED; footswitch assignments not modeled until confirmed
+        controls: []
+      - id: bank-02
+        label: Scene Launcher
+        kind: BANK
+        evidence: INTENDED
+        notes: Bank role INTENDED; footswitch assignments not modeled until confirmed
+        controls: []
+
+  - gear_ref: novation-remote-zero-sl
+    coverage: PARTIAL
+    related_todos: [RIG-036]
+    notes: >-
+      Templates listed as design direction (RIG-036). Which templates are loaded is OPEN (Q-017).
+      Encoder #6 is physically broken — do not assign active mappings to it.
+    contexts:
+      - id: pfl-send-c
+        label: PFL SEND C
+        kind: TEMPLATE
+        evidence: INTENDED
+        notes: >-
+          Design intent: sliders/buttons/encoders for Send C and levels across performance tracks.
+          Exact control-to-track assignments not documented — left unmodeled.
+        controls:
+          - id: pad-08
+            label: PAD 8
+            physical_type: PAD
+            availability: AVAILABLE
+            evidence: INTENDED
+            messages: []
+            target:
+              state: MAPPED
+              kind: ABLETON_ACTION
+              action: template-home
+            notes: PAD 8 → HOME (RIG-036); MIDI message unknown
+          - id: encoder-06
+            label: Encoder #6
+            physical_type: ENCODER
+            availability: BROKEN
+            evidence: VERIFIED
+            messages: []
+            target:
+              state: UNASSIGNED
+            notes: Physically broken — no active mapping
+      - id: reverb-fx
+        label: REVERB FX
+        kind: TEMPLATE
+        evidence: INTENDED
+        controls: []
+      - id: delay-send
+        label: DELAY / SEND FX
+        kind: TEMPLATE
+        evidence: INTENDED
+        controls: []
+      - id: midi-gen
+        label: MIDI GEN
+        kind: TEMPLATE
+        evidence: INTENDED
+        controls: []
+      - id: mastering
+        label: MASTERING
+        kind: TEMPLATE
+        evidence: INTENDED
+        controls: []
+      - id: quant
+        label: QUANT
+        kind: TEMPLATE
+        evidence: INTENDED
+        controls: []
+      - id: fx
+        label: FX
+        kind: TEMPLATE
+        evidence: INTENDED
+        controls: []
+      - id: chaos
+        label: CHAOS
+        kind: TEMPLATE
+        evidence: INTENDED
+        controls: []
+
+  - gear_ref: novation-launch-control-3
+    coverage: PARTIAL
+    related_todos: [RIG-034]
+    notes: >-
+      Primary direction is Ableton Send D across active performance tracks (RIG-034).
+      Exact knob/button assignments not invented — verify live set first (Q-018 / RIG-038).
+    contexts:
+      - id: performance
+        label: Performance (Send D focus)
+        kind: MODE
+        evidence: INTENDED
+        notes: Context intent only; individual controls unmodeled until RIG-034 completes
+        controls: []
+
+  - gear_ref: korg-padkontrol
+    coverage: PARTIAL
+    related_todos: [RIG-039]
+    notes: >-
+      MIDI ch10 for drums. Footswitch has been used for Ableton clip-record via Max for Live.
+      Two-press stop issue not documented as solved (RIG-039) — mapping INTENDED, not VERIFIED success.
+    contexts:
+      - id: global
+        label: Global
+        kind: GLOBAL
+        evidence: INTENDED
+        controls:
+          - id: footswitch
+            label: Footswitch
+            physical_type: FOOTSWITCH
+            availability: AVAILABLE
+            evidence: INTENDED
+            messages: []
+            target:
+              state: MAPPED
+              kind: ABLETON_ACTION
+              action: clip-record
+            notes: >-
+              Clip-record control via M4L. Prior workflow required two presses to stop;
+              behavior imperfect until RIG-039.
+
+  - gear_ref: launchpad-x
+    coverage: UNKNOWN
+    related_todos: []
+    notes: >-
+      Owned and used with Ableton recording/control. No custom mapping documented in repo —
+      do not invent pad/note maps.
+    contexts: []

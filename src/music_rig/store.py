@@ -7,7 +7,9 @@ from pathlib import Path
 import yaml
 
 from music_rig.models import (
+    AbletonDocument,
     ChangesDocument,
+    ControllersDocument,
     InboxDocument,
     InventoryDocument,
     MidiDocument,
@@ -31,6 +33,8 @@ PATCHBAYS_PATH = DATA_DIR / "patchbays.yaml"
 ROUTING_PATH = DATA_DIR / "routing.yaml"
 INVENTORY_PATH = DATA_DIR / "inventory.yaml"
 MIDI_PATH = DATA_DIR / "midi.yaml"
+CONTROLLERS_PATH = DATA_DIR / "controllers.yaml"
+ABLETON_PATH = DATA_DIR / "ableton.yaml"
 DOCS_TODO_PATH = ROOT / "docs" / "todo.md"
 DOCS_WISHLIST_PATH = ROOT / "docs" / "wishlist.md"
 DOCS_QUESTIONS_PATH = ROOT / "docs" / "open-questions.md"
@@ -42,6 +46,8 @@ DOCS_PEDAL_CHAINS_PATH = ROOT / "docs" / "pedal-chains.md"
 DOCS_INVENTORY_PATH = ROOT / "docs" / "inventory.md"
 DOCS_MIDI_TOPOLOGY_PATH = ROOT / "docs" / "midi-topology.md"
 DOCS_MIDI_CLOCK_PATH = ROOT / "docs" / "midi-clock.md"
+DOCS_CONTROLLERS_PATH = ROOT / "docs" / "controller-mappings.md"
+DOCS_ABLETON_PATH = ROOT / "docs" / "ableton-track-map.md"
 DIAGRAM_PATCHBAYS_PATH = ROOT / "diagrams" / "patchbays.mmd"
 DIAGRAM_TASCAM_PATH = ROOT / "diagrams" / "tascam-channel-map.mmd"
 DIAGRAM_AUX_LOOP_PATH = ROOT / "diagrams" / "aux-send-loop.mmd"
@@ -53,6 +59,8 @@ EXISTING_YAML = (
     PATCHBAYS_PATH,
     ROUTING_PATH,
     MIDI_PATH,
+    CONTROLLERS_PATH,
+    ABLETON_PATH,
 )
 
 
@@ -222,6 +230,36 @@ def load_midi(path: Path | None = None) -> MidiDocument:
 def save_midi(doc: MidiDocument, path: Path | None = None) -> None:
     target = path or MIDI_PATH
     MidiDocument.model_validate(doc.model_dump())
+    _atomic_write(target, _dump_yaml(doc.model_dump(mode="json", exclude_none=True)))
+
+
+def load_controllers(path: Path | None = None) -> ControllersDocument:
+    target = path or CONTROLLERS_PATH
+    raw = _load_mapping(target, "controllers")
+    try:
+        return ControllersDocument.model_validate(raw)
+    except Exception as exc:
+        raise StoreError(f"Controllers schema validation failed: {exc}") from exc
+
+
+def save_controllers(doc: ControllersDocument, path: Path | None = None) -> None:
+    target = path or CONTROLLERS_PATH
+    ControllersDocument.model_validate(doc.model_dump())
+    _atomic_write(target, _dump_yaml(doc.model_dump(mode="json", exclude_none=True)))
+
+
+def load_ableton(path: Path | None = None) -> AbletonDocument:
+    target = path or ABLETON_PATH
+    raw = _load_mapping(target, "Ableton")
+    try:
+        return AbletonDocument.model_validate(raw)
+    except Exception as exc:
+        raise StoreError(f"Ableton schema validation failed: {exc}") from exc
+
+
+def save_ableton(doc: AbletonDocument, path: Path | None = None) -> None:
+    target = path or ABLETON_PATH
+    AbletonDocument.model_validate(doc.model_dump())
     _atomic_write(target, _dump_yaml(doc.model_dump(mode="json", exclude_none=True)))
 
 

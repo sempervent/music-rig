@@ -1,21 +1,43 @@
 # Ableton Track Map
 
-## Known track plan
+<!-- rig:ableton:start -->
+<!-- GENERATED FROM data/ableton.yaml BY `uv run rig render`. DO NOT EDIT THIS SECTION DIRECTLY. -->
 
-| Ableton Track | Source | TASCAM Input(s) | Notes |
+## Tracks
+
+| ID | Label | Evidence | Notes |
 |---|---|---|---|
-| Drums | padKONTROL / Launchpad X | MIDI ch10 | Drum control |
-| miniKORG | miniKORG | 3/4 | Stereo synth |
-| MIXER | Alesis main out | 1/2 | Clean stereo mixer bus |
-| KAOSS | KAOSS Replay | 9/10 | Stereo KAOSS output |
-| ACOUSTIC CLEAN | Acoustic | 5 | Dry acoustic after preamp |
-| BASS CLEAN | Bass | 6 | Dry bass after preamp |
-| GUITAR CLEAN | Electric guitar | 7 | Dry electric after preamp |
-| SR-18 | Alesis SR-18 | 11/12 | Drum machine direct |
-| KAOSS - Privia | KAOSS-derived | 9/10 | Label clips by source when sampling |
-| KAOSS - Kazoo | KAOSS-derived | 9/10 | Label clips by source when sampling |
-| KAOSS - Bass | KAOSS-derived | 9/10 | Label clips by source when sampling |
-| KAOSS - Guitar | KAOSS-derived | 9/10 | Label clips by source when sampling |
+| drums | Drums | INTENDED | padKONTROL / Launchpad X MIDI ch10 — from docs/ableton-track-map.md |
+| minikorg | miniKORG | INTENDED | TASCAM 3/4 |
+| mixer | MIXER | INTENDED | Alesis main out → TASCAM 1/2 |
+| kaoss | KAOSS | INTENDED | KAOSS Replay → TASCAM 9/10 |
+| acoustic-clean | ACOUSTIC CLEAN | INTENDED | TASCAM 5 |
+| bass-clean | BASS CLEAN | INTENDED | TASCAM 6 |
+| guitar-clean | GUITAR CLEAN | INTENDED | TASCAM 7 |
+| sr18 | SR-18 | INTENDED | TASCAM 11/12 |
+| kaoss-privia | KAOSS - Privia | INTENDED | — |
+| kaoss-kazoo | KAOSS - Kazoo | INTENDED | — |
+| kaoss-bass | KAOSS - Bass | INTENDED | — |
+| kaoss-guitar | KAOSS - Guitar | INTENDED | — |
+
+## Sends
+
+| ID | Label | Evidence | Notes |
+|---|---|---|---|
+| send-a | Send A | INTENDED | — |
+| send-b | Send B | INTENDED | — |
+| send-c | Send C | INTENDED | ZeRO PFL SEND C design direction (RIG-036) |
+| send-d | Send D | INTENDED | Launch Control 3 primary performance direction (RIG-034) |
+
+## Actions
+
+| ID | Label | Evidence | Notes |
+|---|---|---|---|
+| clip-record | Clip Record | INTENDED | padKONTROL footswitch / M4L target (RIG-039) |
+| scene-launch | Scene Launch | INTENDED | FCB bank-02 design direction (RIG-035) |
+| track-arm | Track Arm | INTENDED | FCB bank-00 design direction (RIG-035) |
+| template-home | Template HOME | INTENDED | ZeRO PAD 8 → HOME (RIG-036) |
+<!-- rig:ableton:end -->
 
 ## Clip naming convention
 

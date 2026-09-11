@@ -25,6 +25,7 @@ from music_rig.store import (
     load_routing,
     load_todo,
 )
+from music_rig import control_state
 
 
 def build_doctor_text(
@@ -49,6 +50,10 @@ def build_doctor_text(
     docs_midi_topology: Path | None = None,
     docs_midi_clock: Path | None = None,
     diagram_midi_topology: Path | None = None,
+    controllers_path: Path | None = None,
+    ableton_path: Path | None = None,
+    docs_controllers: Path | None = None,
+    docs_ableton: Path | None = None,
 ) -> str:
     attention = 0
     lines = ["RIG DOCTOR", ""]
@@ -74,6 +79,10 @@ def build_doctor_text(
         docs_midi_topology=docs_midi_topology,
         docs_midi_clock=docs_midi_clock,
         diagram_midi_topology=diagram_midi_topology,
+        controllers_path=controllers_path,
+        ableton_path=ableton_path,
+        docs_controllers=docs_controllers,
+        docs_ableton=docs_ableton,
     )
     planning_errors = [
         e
@@ -292,6 +301,39 @@ def build_doctor_text(
         attention += 1
     else:
         lines.append("✓ MIDI projections synchronized")
+
+    lines.append("")
+    lines.append("Controllers")
+    controller_errors = [error for error in checks.errors if error.startswith("controllers:")]
+    controller_stale = [
+        error
+        for error in checks.errors
+        if "controller-mappings.md" in error or "ableton-track-map.md" in error
+    ]
+    if controller_errors:
+        lines.append("✗ Controller mappings invalid")
+        attention += 1
+    else:
+        lines.append("✓ Controller mappings valid")
+        try:
+            gaps = control_state.find_gaps(
+                control_state.load_document(
+                    controllers_path,
+                    inventory_path=inventory_path,
+                    midi_path=midi_path,
+                    ableton_path=ableton_path,
+                )
+            )
+            lines.append(f"⚠ {len(gaps)} controller mapping gap(s)")
+            if gaps:
+                attention += 1
+        except StoreError:
+            pass
+    if controller_stale:
+        lines.append("✗ Controller/Ableton projections out of sync")
+        attention += 1
+    else:
+        lines.append("✓ Controller/Ableton projections synchronized")
 
     # Inventory identity
     lines.append("")

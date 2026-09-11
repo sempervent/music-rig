@@ -1,0 +1,84 @@
+# Durable Ableton Live targets for controller mapping.
+# Not a full Live Set dump — only stable references needed by mappings.
+# Exact active PFL jam tracks remain incompletely verified (Q-018 / RIG-038).
+# Evidence: VERIFIED | INTENDED | UNKNOWN
+
+tracks:
+  - id: drums
+    name: Drums
+    evidence: INTENDED
+    notes: padKONTROL / Launchpad X MIDI ch10 — from docs/ableton-track-map.md
+  - id: minikorg
+    name: miniKORG
+    evidence: INTENDED
+    notes: TASCAM 3/4
+  - id: mixer
+    name: MIXER
+    evidence: INTENDED
+    notes: Alesis main out → TASCAM 1/2
+  - id: kaoss
+    name: KAOSS
+    evidence: INTENDED
+    notes: KAOSS Replay → TASCAM 9/10
+  - id: acoustic-clean
+    name: ACOUSTIC CLEAN
+    evidence: INTENDED
+    notes: TASCAM 5
+  - id: bass-clean
+    name: BASS CLEAN
+    evidence: INTENDED
+    notes: TASCAM 6
+  - id: guitar-clean
+    name: GUITAR CLEAN
+    evidence: INTENDED
+    notes: TASCAM 7
+  - id: sr18
+    name: SR-18
+    evidence: INTENDED
+    notes: TASCAM 11/12
+  - id: kaoss-privia
+    name: KAOSS - Privia
+    evidence: INTENDED
+  - id: kaoss-kazoo
+    name: KAOSS - Kazoo
+    evidence: INTENDED
+  - id: kaoss-bass
+    name: KAOSS - Bass
+    evidence: INTENDED
+  - id: kaoss-guitar
+    name: KAOSS - Guitar
+    evidence: INTENDED
+
+sends:
+  - id: send-a
+    label: Send A
+    evidence: INTENDED
+  - id: send-b
+    label: Send B
+    evidence: INTENDED
+  - id: send-c
+    label: Send C
+    evidence: INTENDED
+    notes: ZeRO PFL SEND C design direction (RIG-036)
+  - id: send-d
+    label: Send D
+    evidence: INTENDED
+    notes: Launch Control 3 primary performance direction (RIG-034)
+
+actions:
+  - id: clip-record
+    label: Clip Record
+    evidence: INTENDED
+    notes: padKONTROL footswitch / M4L target (RIG-039)
+  - id: scene-launch
+    label: Scene Launch
+    evidence: INTENDED
+    notes: FCB bank-02 design direction (RIG-035)
+  - id: track-arm
+    label: Track Arm
+    evidence: INTENDED
+    notes: FCB bank-00 design direction (RIG-035)
+  - id: template-home
+    label: Template HOME
+    evidence: INTENDED
+    notes: ZeRO PAD 8 → HOME (RIG-036)
