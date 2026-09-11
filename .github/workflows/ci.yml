@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Sync dependencies
+        run: uv sync --locked --extra dev --extra docs
+
+      - name: Run unit tests
+        run: uv run pytest
+
+      - name: Run rig check
+        run: uv run rig check
+
+      - name: Check generated Markdown is synchronized
+        run: uv run rig render --check
+
+      - name: Print channel map
+        run: uv run python scripts/print_channel_map.py
+
+      - name: Build documentation site
+        run: uv run mkdocs build --strict --site-dir site
