@@ -5,8 +5,9 @@ from __future__ import annotations
 import subprocess
 from collections import Counter
 
-from music_rig.models import InboxStatus, TodoStatus, WishStatus
-from music_rig.store import ROOT, load_inbox, load_todo, load_wishlist
+from music_rig.models import ChangeStatus, InboxStatus, TodoStatus, WishStatus
+from music_rig.session_service import find_active
+from music_rig.store import ROOT, load_changes, load_inbox, load_todo, load_wishlist
 
 
 def git_summary() -> tuple[str | None, str | None]:
@@ -33,6 +34,8 @@ def build_status_text() -> str:
     todo = load_todo()
     wish = load_wishlist()
     inbox = load_inbox()
+    changes = load_changes()
+    active = find_active()
 
     status_counts = Counter(t.status for t in todo.tasks)
     ready_p0 = sum(
@@ -46,6 +49,7 @@ def build_status_text() -> str:
         if t.status == TodoStatus.READY and t.priority.value == "P1"
     )
     open_inbox = sum(1 for i in inbox.items if i.status == InboxStatus.OPEN)
+    open_changes = sum(1 for c in changes.items if c.status == ChangeStatus.OPEN)
 
     wish_p1 = [w for w in wish.items if w.priority and w.priority.value == "P1"]
     wish_p1_status = Counter(w.status for w in wish_p1)
@@ -59,7 +63,10 @@ def build_status_text() -> str:
         f"Ready P1           {ready_p1}",
         f"Blocked            {status_counts.get(TodoStatus.BLOCKED, 0)}",
         f"Waiting            {status_counts.get(TodoStatus.WAITING, 0)}",
+        "",
+        f"Active Session     {active.id if active else 'no'}",
         f"Inbox Open         {open_inbox}",
+        f"Open Changes       {open_changes}",
         "",
         "Wishlist P1",
     ]

@@ -7,11 +7,15 @@ from pathlib import Path
 
 from music_rig.models import TERMINAL_FOR_NEXT
 from music_rig.render import check_render_sync
+from music_rig.models import ChangeStatus
 from music_rig.store import (
+    CHANGES_PATH,
     EXISTING_YAML,
     INBOX_PATH,
     StoreError,
+    load_changes,
     load_inbox,
+    load_routing,
     load_todo,
     load_wishlist,
     parse_existing_yaml,
@@ -30,6 +34,7 @@ def run_checks(
     todo_path: Path | None = None,
     wishlist_path: Path | None = None,
     inbox_path: Path | None = None,
+    changes_path: Path | None = None,
     docs_todo: Path | None = None,
     docs_wishlist: Path | None = None,
 ) -> CheckResult:
@@ -57,6 +62,22 @@ def run_checks(
     except StoreError as Exc:
         errors.append(str(Exc))
 
+    try:
+        changes = load_changes(changes_path)
+        open_count = sum(
+            1 for item in changes.items if item.status == ChangeStatus.OPEN
+        )
+        if open_count:
+            warnings.append(
+                f"{open_count} unreconciled rig change(s) are OPEN."
+            )
+    except StoreError as exc:
+        errors.append(str(exc))
+
+    try:
+        load_routing()
+    except StoreError as exc:
+        errors.append(str(exc))
     if todo is not None and wishlist is not None:
         known = {t.id for t in todo.tasks}
         for item in wishlist.items:
@@ -97,7 +118,8 @@ def run_checks(
         except StoreError as exc:
             errors.append(str(exc))
 
-    # inbox file optional; if present ensure it parses (already done via load_inbox)
+    # optional structured files already validated above
     _ = INBOX_PATH
+    _ = CHANGES_PATH
 
     return CheckResult(ok=not errors, errors=errors, warnings=warnings)

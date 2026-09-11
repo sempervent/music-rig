@@ -6,21 +6,33 @@ from pathlib import Path
 
 import yaml
 
-from music_rig.models import InboxDocument, TodoDocument, WishlistDocument
+from music_rig.models import (
+    ChangesDocument,
+    InboxDocument,
+    RoutingDocument,
+    SessionLog,
+    TodoDocument,
+    WishlistDocument,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT / "data"
 TODO_PATH = DATA_DIR / "todo.yaml"
 WISHLIST_PATH = DATA_DIR / "wishlist.yaml"
 INBOX_PATH = DATA_DIR / "inbox.yaml"
+CHANGES_PATH = DATA_DIR / "changes.yaml"
+SESSIONS_DIR = DATA_DIR / "sessions"
+CHANNEL_MAP_PATH = DATA_DIR / "channel-map.yaml"
+PATCHBAYS_PATH = DATA_DIR / "patchbays.yaml"
+ROUTING_PATH = DATA_DIR / "routing.yaml"
 DOCS_TODO_PATH = ROOT / "docs" / "todo.md"
 DOCS_WISHLIST_PATH = ROOT / "docs" / "wishlist.md"
 
 EXISTING_YAML = (
-    DATA_DIR / "channel-map.yaml",
+    CHANNEL_MAP_PATH,
     DATA_DIR / "inventory.yaml",
-    DATA_DIR / "patchbays.yaml",
-    DATA_DIR / "routing.yaml",
+    PATCHBAYS_PATH,
+    ROUTING_PATH,
 )
 
 
@@ -104,14 +116,79 @@ def save_inbox(doc: InboxDocument, path: Path | None = None) -> None:
     _atomic_write(target, _dump_yaml(doc.model_dump(mode="json")))
 
 
+def load_changes(path: Path | None = None) -> ChangesDocument:
+    target = path or CHANGES_PATH
+    if not target.exists():
+        return ChangesDocument(items=[])
+    raw = _load_mapping(target, "changes")
+    try:
+        return ChangesDocument.model_validate(raw)
+    except Exception as exc:
+        raise StoreError(f"Changes schema validation failed: {exc}") from exc
+
+
+def save_changes(doc: ChangesDocument, path: Path | None = None) -> None:
+    target = path or CHANGES_PATH
+    ChangesDocument.model_validate(doc.model_dump())
+    _atomic_write(target, _dump_yaml(doc.model_dump(mode="json")))
+
+
+def load_routing(path: Path | None = None) -> RoutingDocument:
+    target = path or ROUTING_PATH
+    raw = _load_mapping(target, "routing")
+    try:
+        return RoutingDocument.model_validate(raw)
+    except Exception as exc:
+        raise StoreError(f"Routing schema validation failed: {exc}") from exc
+
+
+def session_path(session_id: str, sessions_dir: Path | None = None) -> Path:
+    return (sessions_dir or SESSIONS_DIR) / f"{session_id}.yaml"
+
+
+def load_session(session_id: str, sessions_dir: Path | None = None) -> SessionLog:
+    path = session_path(session_id, sessions_dir)
+    raw = _load_mapping(path, "session")
+    try:
+        return SessionLog.model_validate(raw)
+    except Exception as exc:
+        raise StoreError(f"Session schema validation failed: {exc}") from exc
+
+
+def save_session(session: SessionLog, sessions_dir: Path | None = None) -> Path:
+    SessionLog.model_validate(session.model_dump())
+    path = session_path(session.id, sessions_dir)
+    _atomic_write(path, _dump_yaml(session.model_dump(mode="json")))
+    return path
+
+
+def list_session_files(sessions_dir: Path | None = None) -> list[Path]:
+    directory = sessions_dir or SESSIONS_DIR
+    if not directory.exists():
+        return []
+    return sorted(directory.glob("SES-*.yaml"), reverse=True)
+
+
+def load_all_sessions(sessions_dir: Path | None = None) -> list[SessionLog]:
+    sessions: list[SessionLog] = []
+    for path in list_session_files(sessions_dir):
+        try:
+            sessions.append(load_session(path.stem, sessions_dir))
+        except StoreError:
+            raise
+    return sessions
+
+
 def write_documents(
     *,
     todo: TodoDocument | None = None,
     wishlist: WishlistDocument | None = None,
     inbox: InboxDocument | None = None,
+    changes: ChangesDocument | None = None,
     todo_path: Path | None = None,
     wishlist_path: Path | None = None,
     inbox_path: Path | None = None,
+    changes_path: Path | None = None,
 ) -> None:
     """Validate all provided docs, then write them. Fail before any write on error."""
     payloads: list[tuple[Path, str]] = []
@@ -132,6 +209,14 @@ def write_documents(
         InboxDocument.model_validate(inbox.model_dump())
         payloads.append(
             (inbox_path or INBOX_PATH, _dump_yaml(inbox.model_dump(mode="json")))
+        )
+    if changes is not None:
+        ChangesDocument.model_validate(changes.model_dump())
+        payloads.append(
+            (
+                changes_path or CHANGES_PATH,
+                _dump_yaml(changes.model_dump(mode="json")),
+            )
         )
     for path, text in payloads:
         _atomic_write(path, text)

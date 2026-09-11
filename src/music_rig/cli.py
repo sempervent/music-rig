@@ -9,8 +9,17 @@ from rich.console import Console
 from rich.table import Table
 
 from music_rig.checks import run_checks
-from music_rig import inbox_service, todo_service, wishlist_service
+from music_rig import (
+    change_service,
+    inbox_service,
+    session_service,
+    todo_service,
+    wishlist_service,
+)
+from music_rig.doctor import build_doctor_text
+from music_rig.inbox_service import default_clock
 from music_rig.models import (
+    ChangeStatus,
     InboxStatus,
     TodoPriority,
     TodoStatus,
@@ -20,6 +29,7 @@ from music_rig.models import (
     WishlistItem,
 )
 from music_rig.render import check_render_sync, render_docs
+from music_rig import rig_views
 from music_rig.status import build_status_text
 from music_rig.store import StoreError, load_inbox, load_todo, load_wishlist
 
@@ -28,7 +38,7 @@ err_console = Console(stderr=True)
 
 app = typer.Typer(
     name="rig",
-    help="Music-rig planning CLI. Canonical data lives in data/*.yaml.",
+    help="Music-rig planning and studio-ops CLI. Canonical data lives in data/*.yaml.",
     no_args_is_help=True,
 )
 todo_app = typer.Typer(help="Accepted work queue (data/todo.yaml).", no_args_is_help=True)
@@ -37,10 +47,16 @@ wish_app = typer.Typer(
 )
 next_app = typer.Typer(help="Next Session queue (max 3).", no_args_is_help=True)
 inbox_app = typer.Typer(help="Low-friction capture inbox.", no_args_is_help=True)
+session_app = typer.Typer(help="Studio session logging.", no_args_is_help=True)
+changes_app = typer.Typer(help="Structured change records.", no_args_is_help=True)
+path_app = typer.Typer(help="Read-only CURRENT named paths.", no_args_is_help=True)
 app.add_typer(todo_app, name="todo")
 app.add_typer(wish_app, name="wish")
 todo_app.add_typer(next_app, name="next")
 app.add_typer(inbox_app, name="inbox")
+app.add_typer(session_app, name="session")
+app.add_typer(changes_app, name="changes")
+app.add_typer(path_app, name="path")
 
 
 def _fail(message: str, code: int = 1) -> None:
@@ -719,7 +735,408 @@ def inbox_triage(
     _fail("Invalid choice.")
 
 
-# --- render / check ---
+# --- render / check / doctor / studio views ---
+
+
+@app.command("channels")
+def channels_cmd(
+    device: Optional[str] = typer.Option(None, "--device", help="tascam|alesis"),
+) -> None:
+    try:
+        console.print(rig_views.format_channels(device=device).rstrip())
+    except StoreError as exc:
+        _fail(str(exc))
+
+
+@app.command("patchbay")
+def patchbay_cmd(
+    target: Optional[str] = typer.Argument(
+        None, help="Patchbay id (e.g. PB-B), or 'list'"
+    ),
+    unknown: bool = typer.Option(False, "--unknown"),
+    all_jacks: bool = typer.Option(False, "--all"),
+) -> None:
+    """Read-only patchbay views from data/patchbays.yaml."""
+    if target is None or target.strip().lower() == "list":
+        console.print(rig_views.format_patchbay_list().rstrip())
+        return
+    try:
+        console.print(
+            rig_views.format_patchbay(
+                target, unknown_only=unknown, show_all_jacks=all_jacks
+            ).rstrip()
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+
+
+@path_app.command("list")
+def path_list_cmd() -> None:
+    try:
+        console.print(rig_views.format_path_list().rstrip())
+    except StoreError as exc:
+        _fail(str(exc))
+
+
+@path_app.command("show")
+def path_show_cmd(name: str) -> None:
+    try:
+        header, tree = rig_views.path_tree_for(name)
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(header)
+    console.print(tree)
+
+
+@app.command("change")
+def change_cmd(
+    summary: Optional[str] = typer.Argument(None),
+    category: Optional[str] = typer.Option(None, "--category", "-c"),
+    details: Optional[str] = typer.Option(None, "--details", "-d"),
+    area: Optional[list[str]] = typer.Option(None, "--area", "-a"),
+) -> None:
+    """Record that physical/logical reality may have changed (does not edit CURRENT)."""
+    try:
+        if summary is None:
+            summary = typer.prompt("What changed?")
+            category = category or typer.prompt("Category", default="OTHER")
+            areas_raw = typer.prompt("Affected area(s)", default="")
+            details = details if details is not None else typer.prompt("Details", default="")
+            areas = [a.strip() for a in areas_raw.split(",") if a.strip()]
+        else:
+            areas = list(area or [])
+            details = details or ""
+            category = category or "OTHER"
+        cat = change_service.parse_category(category)
+        record = change_service.create_change(
+            summary,
+            category=cat,
+            details=details or "",
+            affected_areas=areas,
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"Recorded [bold]{record.id}[/bold]")
+    if record.session_id:
+        console.print(f"Active session detected: {record.session_id}")
+        console.print(f"Change {record.id} linked to session.")
+    console.print("CURRENT documentation has not been modified.")
+
+
+@changes_app.command("list")
+def changes_list_cmd(all_items: bool = typer.Option(False, "--all")) -> None:
+    try:
+        items = change_service.list_changes(all_items=all_items)
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(
+        "[bold]RIG CHANGES[/bold]" if all_items else "[bold]OPEN RIG CHANGES[/bold]"
+    )
+    if not items:
+        console.print("(none)")
+        return
+    for item in items:
+        if all_items:
+            console.print(
+                f"{item.id}  {item.status.value:<10} {item.category.value:<14} {item.summary}"
+            )
+        else:
+            console.print(f"{item.id}  {item.category.value:<14} {item.summary}")
+
+
+@changes_app.command("show")
+def changes_show_cmd(chg_id: str) -> None:
+    try:
+        item = change_service.get_change(chg_id)
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"[bold]{item.id}[/bold]  {item.status.value}")
+    console.print(f"Created: {item.created_at.isoformat()}")
+    console.print(f"Category: {item.category.value}")
+    console.print(f"Summary: {item.summary}")
+    if item.details:
+        console.print(f"Details: {item.details}")
+    console.print(f"Session: {item.session_id or '—'}")
+    areas = ", ".join(item.affected_areas) if item.affected_areas else "—"
+    console.print(f"Affected: {areas}")
+
+
+@changes_app.command("applied")
+def changes_applied_cmd(
+    chg_id: str,
+    yes: bool = typer.Option(False, "--yes"),
+) -> None:
+    try:
+        item = change_service.get_change(chg_id)
+    except StoreError as exc:
+        _fail(str(exc))
+    if not yes:
+        console.print(
+            f"Mark {item.id} APPLIED only after CURRENT docs/data reflect the physical rig."
+        )
+        if not typer.confirm("Continue?", default=False):
+            raise typer.Abort()
+    try:
+        updated, changed = change_service.set_change_status(
+            chg_id, ChangeStatus.APPLIED
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+    if not changed:
+        console.print(f"{updated.id} already APPLIED")
+    else:
+        console.print(f"{updated.id} -> APPLIED")
+
+
+@changes_app.command("dismiss")
+def changes_dismiss_cmd(
+    chg_id: str,
+    yes: bool = typer.Option(False, "--yes"),
+) -> None:
+    try:
+        item = change_service.get_change(chg_id)
+    except StoreError as exc:
+        _fail(str(exc))
+    if not yes:
+        if not typer.confirm(f"Dismiss {item.id}?", default=False):
+            raise typer.Abort()
+    try:
+        updated, changed = change_service.set_change_status(
+            chg_id, ChangeStatus.DISMISSED
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+    if not changed:
+        console.print(f"{updated.id} already DISMISSED")
+    else:
+        console.print(f"{updated.id} -> DISMISSED")
+
+
+@session_app.command("start")
+def session_start_cmd(
+    focus: Optional[str] = typer.Option(None, "--focus"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    chosen = focus
+    try:
+        if chosen is None:
+            console.print("[bold]NEXT SESSION[/bold]")
+            console.print("")
+            tasks = todo_service.next_list()
+            options: list[str] = []
+            for i, task in enumerate(tasks, start=1):
+                console.print(f"{i}. {task.id}  {task.task}")
+                options.append(task.id)
+            free_n = len(options) + 1
+            console.print(f"{free_n}. No task — just play / freeform")
+            default = str(free_n)
+            choice = typer.prompt("Focus", default=default)
+            if choice.strip().isdigit():
+                idx = int(choice.strip())
+                if 1 <= idx <= len(options):
+                    chosen = options[idx - 1]
+                elif idx == free_n:
+                    chosen = typer.prompt("Focus text", default="Just play")
+                else:
+                    _fail("Invalid focus choice.")
+            else:
+                chosen = choice
+        session = session_service.start_session(chosen or "")
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"Started [bold]{session.id}[/bold]")
+    console.print(f"Focus: {session_service.focus_label(session.focus)}")
+    if session.focus.upper().startswith("RIG-"):
+        if typer.confirm(
+            f"Mark {session.focus.strip().upper()} IN PROGRESS?", default=False
+        ):
+            try:
+                session_service.start_task(
+                    session.focus, render=not no_render
+                )
+                console.print(f"{session.focus.strip().upper()} -> IN PROGRESS")
+            except StoreError as exc:
+                _fail(str(exc))
+
+
+@session_app.command("status")
+def session_status_cmd() -> None:
+    try:
+        session = session_service.require_active()
+    except StoreError as exc:
+        _fail(str(exc))
+    now = default_clock()
+    duration = session_service.format_duration(
+        session.started_at, session.ended_at, now=now
+    )
+    started_local = session.started_at.strftime("%I:%M %p").lstrip("0")
+    console.print("[bold]ACTIVE SESSION[/bold]")
+    console.print(session.id)
+    console.print("")
+    console.print(f"Started: {started_local}")
+    console.print(f"Duration: {duration}")
+    console.print(f"Focus: {session_service.focus_label(session.focus)}")
+    console.print("")
+    console.print("Events:")
+    if not session.events:
+        console.print("  (none)")
+    else:
+        for event in session.events:
+            stamp = event.timestamp.strftime("%H:%M")
+            console.print(f"  {stamp} {event.type.value:<12} {event.text}")
+
+
+@session_app.command("note")
+def session_note_cmd(text: str) -> None:
+    try:
+        session = session_service.add_note(text)
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"NOTE added to {session.id}")
+
+
+@session_app.command("discovery")
+def session_discovery_cmd(text: str) -> None:
+    try:
+        session = session_service.add_discovery(text)
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"DISCOVERY added to {session.id}")
+
+
+@session_app.command("start-task")
+def session_start_task_cmd(
+    todo_id: str,
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        session, task = session_service.start_task(todo_id, render=not no_render)
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"{task.id} -> IN PROGRESS")
+    console.print(f"TODO_STARTED on {session.id}")
+
+
+@session_app.command("complete-task")
+def session_complete_task_cmd(
+    todo_id: str,
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        session, task = session_service.complete_task(todo_id, render=not no_render)
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"{task.id} -> DONE")
+    console.print(f"TODO_COMPLETED on {session.id}")
+
+
+@session_app.command("capture")
+def session_capture_cmd(text: str) -> None:
+    try:
+        session, item = session_service.session_capture(text)
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"Captured {item.id}")
+    console.print(f"Added to active session {session.id}")
+
+
+@session_app.command("end")
+def session_end_cmd() -> None:
+    try:
+        session = session_service.require_active()
+    except StoreError as exc:
+        _fail(str(exc))
+    now = default_clock()
+    summary = session_service.summarize(session)
+    console.print("[bold]SESSION SUMMARY[/bold]")
+    console.print("")
+    console.print(
+        f"Duration: {session_service.format_duration(session.started_at, None, now=now)}"
+    )
+    console.print(f"Focus: {session.focus or '(none)'}")
+    console.print("")
+    console.print(f"Notes:        {summary['notes']}")
+    console.print(f"Discoveries:  {summary['discoveries']}")
+    console.print(f"TODOs done:   {summary['todos_done']}")
+    console.print(f"Captures:     {summary['captures']}")
+    console.print(f"Changes:      {summary['changes']}")
+    console.print("")
+    console.print("Open inbox from this session:")
+    caps = summary["capture_ids"]
+    if caps:
+        for cap in caps:
+            console.print(f"  {cap}")
+    else:
+        console.print("  (none)")
+    console.print("")
+    console.print("Unreconciled rig changes:")
+    chgs = summary["change_ids"]
+    if chgs:
+        for chg in chgs:
+            console.print(f"  {chg}")
+    else:
+        console.print("  (none)")
+    console.print("")
+    if not typer.confirm("Complete session?", default=True):
+        raise typer.Abort()
+    try:
+        ended = session_service.end_session()
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"{ended.id} -> COMPLETED")
+
+
+@session_app.command("abort")
+def session_abort_cmd(
+    yes: bool = typer.Option(False, "--yes"),
+) -> None:
+    try:
+        session = session_service.require_active()
+    except StoreError as exc:
+        _fail(str(exc))
+    if not yes:
+        if not typer.confirm(f"Abort {session.id}? Events are preserved.", default=False):
+            raise typer.Abort()
+    try:
+        aborted = session_service.abort_session()
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"{aborted.id} -> ABORTED")
+
+
+@session_app.command("list")
+def session_list_cmd(limit: int = typer.Option(10, "--limit")) -> None:
+    try:
+        sessions = session_service.list_sessions(limit=limit)
+    except StoreError as exc:
+        _fail(str(exc))
+    table = Table(title="Sessions")
+    table.add_column("ID")
+    table.add_column("Date")
+    table.add_column("Status")
+    table.add_column("Duration")
+    table.add_column("Focus")
+    table.add_column("Events")
+    now = default_clock()
+    for session in sessions:
+        duration = session_service.format_duration(
+            session.started_at, session.ended_at, now=now
+        )
+        table.add_row(
+            session.id,
+            session.started_at.date().isoformat(),
+            session.status.value,
+            duration,
+            (session.focus or "—")[:40],
+            str(len(session.events)),
+        )
+    console.print(table)
+
+
+@app.command("doctor")
+def doctor_cmd() -> None:
+    """Advisory maintenance overview (not a CI gate)."""
+    console.print(build_doctor_text().rstrip())
 
 
 @app.command("render")
