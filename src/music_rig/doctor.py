@@ -25,7 +25,7 @@ from music_rig.store import (
     load_routing,
     load_todo,
 )
-from music_rig import control_state
+from music_rig import control_state, performance_state
 
 
 def build_doctor_text(
@@ -54,6 +54,10 @@ def build_doctor_text(
     ableton_path: Path | None = None,
     docs_controllers: Path | None = None,
     docs_ableton: Path | None = None,
+    performance_path: Path | None = None,
+    surfaces_path: Path | None = None,
+    docs_performance: Path | None = None,
+    docs_live_recovery: Path | None = None,
 ) -> str:
     attention = 0
     lines = ["RIG DOCTOR", ""]
@@ -83,6 +87,10 @@ def build_doctor_text(
         ableton_path=ableton_path,
         docs_controllers=docs_controllers,
         docs_ableton=docs_ableton,
+        performance_path=performance_path,
+        surfaces_path=surfaces_path,
+        docs_performance=docs_performance,
+        docs_live_recovery=docs_live_recovery,
     )
     planning_errors = [
         e
@@ -334,6 +342,53 @@ def build_doctor_text(
         attention += 1
     else:
         lines.append("✓ Controller/Ableton projections synchronized")
+
+    lines.append("")
+    lines.append("Performance")
+    performance_errors = [
+        error
+        for error in checks.errors
+        if error.startswith("performance:")
+        or error.startswith("control-surfaces:")
+    ]
+    performance_stale = [
+        error
+        for error in checks.errors
+        if "performance.md" in error or "live-recovery.md" in error
+    ]
+    if performance_errors:
+        lines.append("✗ Performance orchestration invalid")
+        attention += 1
+    else:
+        try:
+            performance = performance_state.load_document(
+                performance_path,
+                controllers_path=controllers_path,
+                surfaces_path=surfaces_path,
+                ableton_path=ableton_path,
+                inventory_path=inventory_path,
+                midi_path=midi_path,
+            )
+            readiness = performance_state.evaluate_readiness(
+                performance,
+                controllers_path=controllers_path,
+                surfaces_path=surfaces_path,
+                ableton_path=ableton_path,
+                inventory_path=inventory_path,
+                midi_path=midi_path,
+            )
+            symbol = "✓" if readiness.result.value == "READY" else "⚠"
+            lines.append(f"{symbol} PFL JAM readiness: {readiness.result.value}")
+            if readiness.result.value != "READY":
+                attention += 1
+        except StoreError as exc:
+            lines.append(f"✗ Performance orchestration invalid: {exc}")
+            attention += 1
+    if performance_stale:
+        lines.append("✗ Performance projections out of sync")
+        attention += 1
+    else:
+        lines.append("✓ Performance projections synchronized")
 
     # Inventory identity
     lines.append("")

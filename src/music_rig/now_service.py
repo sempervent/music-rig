@@ -80,6 +80,7 @@ def recommend_now(
             reason="No infrastructure task selected (--play).",
             suggested_commands=[
                 'uv run rig session start --focus "Just play"',
+                "uv run rig performance mode pfl-jam",
             ],
         )
 
@@ -178,6 +179,7 @@ def recommend_now(
         reason="No actionable TODOs; play music instead of inventing chores.",
         suggested_commands=[
             'uv run rig session start --focus "Just play"',
+            "uv run rig performance mode pfl-jam",
         ],
         skipped_summary=skipped,
     )
@@ -190,6 +192,9 @@ def format_now(rec: NowRecommendation, *, extra_why: bool = False) -> str:
             lines.append("PLAY")
             lines.append("")
             lines.append("No infrastructure task selected.")
+            lines.append("")
+            lines.append("Performance mode: PFL JAM (`pfl-jam`)")
+            lines.append("Readiness is advisory and does not gate play.")
             lines.append("")
             lines.append("Start:")
             for cmd in rec.suggested_commands:

@@ -37,6 +37,30 @@
 | scene-launch | Scene Launch | INTENDED | FCB bank-02 design direction (RIG-035) |
 | track-arm | Track Arm | INTENDED | FCB bank-00 design direction (RIG-035) |
 | template-home | Template HOME | INTENDED | ZeRO PAD 8 → HOME (RIG-036) |
+
+## Templates
+
+| ID | Label | Tracks | Sends | Requirements | Evidence | Notes |
+|---|---|---:|---:|---|---|---|
+| pfl-jam | PFL JAM | 8 | 2 | hands-off-core, pfl-jam-record-ready | INTENDED | Structural expectations for a turn-on-and-play jam set. Exact live-set contents remain open (Q-018 / RIG-038). |
+
+### PFL JAM tracks
+
+| Track | Role | Active | Record ready |
+|---|---|---|---|
+| drums | midi-source | true | unknown |
+| minikorg | audio-source | true | unknown |
+| mixer | clean-bus | true | unknown |
+| kaoss | wet-source | true | unknown |
+| acoustic-clean | clean-source | true | unknown |
+| bass-clean | clean-source | true | unknown |
+| guitar-clean | clean-source | true | unknown |
+| sr18 | audio-source | true | unknown |
+
+| Send | Role | Notes |
+|---|---|---|
+| send-c | performance-send | ZeRO PFL SEND C direction |
+| send-d | performance-send | Launch Control 3 direction |
 <!-- rig:ableton:end -->
 
 ## Clip naming convention
