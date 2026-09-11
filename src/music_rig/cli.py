@@ -11,12 +11,16 @@ from rich.table import Table
 from music_rig.checks import run_checks
 from music_rig import (
     change_service,
+    channel_state,
+    current_service,
     inbox_service,
+    patchbay_state,
     question_service,
     session_service,
     todo_service,
     wishlist_service,
 )
+from music_rig.current_projections import format_current_preview
 from music_rig.doctor import build_doctor_text
 from music_rig.inbox_service import default_clock
 from music_rig.models import (
@@ -66,6 +70,18 @@ reconcile_app = typer.Typer(
     no_args_is_help=False,
 )
 path_app = typer.Typer(help="Read-only CURRENT named paths.", no_args_is_help=True)
+current_app = typer.Typer(
+    help="Modify authoritative CURRENT state (typed, previewed).",
+    no_args_is_help=True,
+)
+current_pb_app = typer.Typer(
+    help="CURRENT patchbay mutations (data/patchbays.yaml).",
+    no_args_is_help=True,
+)
+current_ch_app = typer.Typer(
+    help="CURRENT channel-map mutations (data/channel-map.yaml).",
+    no_args_is_help=True,
+)
 app.add_typer(todo_app, name="todo")
 app.add_typer(wish_app, name="wish")
 todo_app.add_typer(next_app, name="next")
@@ -75,6 +91,9 @@ app.add_typer(changes_app, name="changes")
 app.add_typer(question_app, name="question")
 app.add_typer(reconcile_app, name="reconcile")
 app.add_typer(path_app, name="path")
+app.add_typer(current_app, name="current")
+current_app.add_typer(current_pb_app, name="patchbay")
+current_app.add_typer(current_ch_app, name="channels")
 
 
 def _fail(message: str, code: int = 1) -> None:
@@ -1155,6 +1174,358 @@ def session_list_cmd(limit: int = typer.Option(10, "--limit")) -> None:
 def doctor_cmd() -> None:
     """Advisory maintenance overview (not a CI gate)."""
     console.print(build_doctor_text().rstrip())
+
+
+def _confirm_current(preview, *, yes: bool, dry_run: bool) -> bool:
+    console.print(format_current_preview(preview).rstrip())
+    if dry_run:
+        console.print("[dim]Dry-run: nothing written.[/dim]")
+        return False
+    if not preview.changed:
+        console.print(preview.message)
+        return False
+    if yes:
+        return True
+    return typer.confirm("Apply?", default=False)
+
+
+def _maybe_resolve_evidence(
+    *,
+    question_id: Optional[str],
+    change_id: Optional[str],
+    answer_hint: str,
+    yes: bool,
+) -> tuple[bool, bool, str]:
+    resolve_q = False
+    apply_chg = False
+    answer = answer_hint
+    if question_id:
+        try:
+            q = question_service.get_question(question_id)
+            console.print("")
+            console.print(f"Related Question: {q.id} — {q.question}")
+            console.print(f"Current status: {q.status.value}")
+        except StoreError as exc:
+            _fail(str(exc))
+        if yes:
+            resolve_q = False
+        else:
+            resolve_q = typer.confirm(
+                f'Resolve {question_id.strip().upper()} with answer "{answer_hint}"?',
+                default=False,
+            )
+            if resolve_q and not answer_hint:
+                answer = typer.prompt("Answer")
+    if change_id:
+        try:
+            chg = change_service.get_change(change_id)
+            console.print("")
+            console.print(f"Related Change: {chg.id} — {chg.summary}")
+            console.print(f"Current status: {chg.status.value}")
+        except StoreError as exc:
+            _fail(str(exc))
+        # Prefer default No: freeform CHG text cannot be auto-trusted
+        if yes:
+            apply_chg = False
+        else:
+            apply_chg = typer.confirm(
+                f"Mark {change_id.strip().upper()} APPLIED?", default=False
+            )
+    return resolve_q, apply_chg, answer
+
+
+@current_pb_app.command("show")
+def current_pb_show(
+    bay_id: str,
+    unknown: bool = typer.Option(False, "--unknown"),
+) -> None:
+    """Alias for read-only `rig patchbay` (reuses the same view)."""
+    try:
+        console.print(
+            rig_views.format_patchbay(bay_id, unknown_only=unknown).rstrip()
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+
+
+@current_pb_app.command("set-mode")
+def current_pb_set_mode(
+    bay_id: str,
+    jack: str = typer.Argument(..., help="Upper jack N or pair N/M (e.g. 1 or 1/25)"),
+    mode: str = typer.Argument(..., help="normal|half-normal|thru|unknown"),
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    question: Optional[str] = typer.Option(None, "--question"),
+    change: Optional[str] = typer.Option(None, "--change"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        preview, data = patchbay_state.propose_set_mode(bay_id, jack, mode)
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(format_current_preview(preview).rstrip())
+    if dry_run:
+        try:
+            current_service.commit_patchbay(
+                data,
+                preview,
+                dry_run=True,
+                render=False,
+                question_id=question,
+                change_id=change,
+            )
+        except StoreError as exc:
+            _fail(str(exc))
+        console.print("[dim]Dry-run: nothing written.[/dim]")
+        console.print(preview.message)
+        raise typer.Exit(0)
+    if not preview.changed:
+        console.print(preview.message)
+        raise typer.Exit(0)
+    if not yes and not typer.confirm("Apply?", default=False):
+        raise typer.Abort()
+    resolve_q, apply_chg, answer = _maybe_resolve_evidence(
+        question_id=question,
+        change_id=change,
+        answer_hint=mode.strip().lower().replace("_", "-"),
+        yes=yes,
+    )
+    try:
+        result = current_service.commit_patchbay(
+            data,
+            preview,
+            dry_run=False,
+            render=not no_render,
+            question_id=question,
+            change_id=change,
+            resolve_q=resolve_q,
+            apply_chg=apply_chg,
+            answer=answer,
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"[green]Applied:[/green] {result.message}")
+
+
+@current_pb_app.command("set-model")
+def current_pb_set_model(
+    bay_id: str,
+    model: str,
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    question: Optional[str] = typer.Option(None, "--question"),
+    change: Optional[str] = typer.Option(None, "--change"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        preview, data = patchbay_state.propose_set_model(bay_id, model)
+    except StoreError as exc:
+        _fail(str(exc))
+    if not _confirm_current(preview, yes=yes, dry_run=dry_run):
+        if dry_run or not preview.changed:
+            if dry_run:
+                console.print(preview.message)
+            raise typer.Exit(0)
+        raise typer.Abort()
+    resolve_q, apply_chg, answer = _maybe_resolve_evidence(
+        question_id=question,
+        change_id=change,
+        answer_hint=model.strip(),
+        yes=yes,
+    )
+    try:
+        result = current_service.commit_patchbay(
+            data,
+            preview,
+            render=not no_render,
+            question_id=question,
+            change_id=change,
+            resolve_q=resolve_q,
+            apply_chg=apply_chg,
+            answer=answer,
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"[green]Applied:[/green] {result.message}")
+
+
+@current_pb_app.command("verify")
+def current_pb_verify(
+    bay_id: str,
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    """Interactively verify modes for represented pairs; apply as one transaction."""
+    try:
+        pairs = patchbay_state.list_pairs(bay_id)
+    except StoreError as exc:
+        _fail(str(exc))
+    if not pairs:
+        console.print(f"{bay_id.upper()}: no represented pairs.")
+        raise typer.Exit(0)
+    updates: list[tuple[str, str]] = []
+    mode_choices = {
+        "1": "normal",
+        "2": "half-normal",
+        "3": "thru",
+        "4": "unknown",
+    }
+    for pair in pairs:
+        lower = pair["lower_n"] if pair["lower_n"] is not None else "?"
+        console.print("")
+        console.print(f"{bay_id.upper()} pair {pair['upper_n']}/{lower}")
+        console.print(
+            f"{pair['upper_conn'] or '—'} -> {pair['lower_conn'] or '—'}"
+        )
+        console.print(f"Current mode: {str(pair['mode']).upper()}")
+        console.print("Mode:")
+        console.print("  [1] normal")
+        console.print("  [2] half-normal")
+        console.print("  [3] thru")
+        console.print("  [4] unknown")
+        console.print("  [s] skip")
+        choice = typer.prompt("Choice", default="s").strip().lower()
+        if choice in {"s", "skip", ""}:
+            continue
+        if choice not in mode_choices:
+            _fail(f"Invalid choice {choice!r}")
+        updates.append((str(pair["upper_n"]), mode_choices[choice]))
+
+    if not updates:
+        console.print("No mode changes selected.")
+        raise typer.Exit(0)
+    try:
+        preview, data = patchbay_state.propose_set_modes_batch(bay_id, updates)
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print("")
+    console.print("[bold]PATCHBAY VERIFICATION SUMMARY[/bold]")
+    console.print("")
+    # Show batch before/after compactly
+    before_modes = preview.before.get("modes") or {}
+    after_modes = preview.after.get("modes") or {}
+    changed_n = 0
+    for key in after_modes:
+        b = before_modes.get(key)
+        a = after_modes.get(key)
+        if b != a:
+            changed_n += 1
+            console.print(f"{key}  {str(b).upper()} -> {str(a).upper()}")
+        else:
+            console.print(f"{key}  unchanged")
+    console.print("")
+    console.print("This modifies authoritative CURRENT state.")
+    if dry_run:
+        console.print("[dim]Dry-run: nothing written.[/dim]")
+        raise typer.Exit(0)
+    if not yes and not typer.confirm(
+        f"Apply {changed_n} CURRENT updates?", default=False
+    ):
+        raise typer.Abort()
+    try:
+        result = current_service.commit_patchbay(
+            data, preview, render=not no_render
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"[green]Applied:[/green] {result.message}")
+
+
+@current_ch_app.command("show")
+def current_ch_show(
+    device: Optional[str] = typer.Option(None, "--device", help="tascam|alesis"),
+) -> None:
+    """Alias for read-only `rig channels`."""
+    try:
+        console.print(rig_views.format_channels(device=device).rstrip())
+    except StoreError as exc:
+        _fail(str(exc))
+
+
+@current_ch_app.command("set-source")
+def current_ch_set_source(
+    device: str,
+    channel: str,
+    source: str,
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    question: Optional[str] = typer.Option(None, "--question"),
+    change: Optional[str] = typer.Option(None, "--change"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        preview, data = channel_state.propose_set_source(device, channel, source)
+    except StoreError as exc:
+        _fail(str(exc))
+    if not _confirm_current(preview, yes=yes, dry_run=dry_run):
+        if dry_run or not preview.changed:
+            if dry_run:
+                console.print(preview.message)
+            raise typer.Exit(0)
+        raise typer.Abort()
+    resolve_q, apply_chg, answer = _maybe_resolve_evidence(
+        question_id=question,
+        change_id=change,
+        answer_hint=source.strip(),
+        yes=yes,
+    )
+    try:
+        result = current_service.commit_channel(
+            data,
+            preview,
+            render=not no_render,
+            question_id=question,
+            change_id=change,
+            resolve_q=resolve_q,
+            apply_chg=apply_chg,
+            answer=answer,
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"[green]Applied:[/green] {result.message}")
+
+
+@current_ch_app.command("clear-source")
+def current_ch_clear_source(
+    device: str,
+    channel: str,
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    question: Optional[str] = typer.Option(None, "--question"),
+    change: Optional[str] = typer.Option(None, "--change"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        preview, data = channel_state.clear_source(device, channel)
+    except StoreError as exc:
+        _fail(str(exc))
+    if not _confirm_current(preview, yes=yes, dry_run=dry_run):
+        if dry_run or not preview.changed:
+            if dry_run:
+                console.print(preview.message)
+            raise typer.Exit(0)
+        raise typer.Abort()
+    resolve_q, apply_chg, answer = _maybe_resolve_evidence(
+        question_id=question,
+        change_id=change,
+        answer_hint="UNASSIGNED",
+        yes=yes,
+    )
+    try:
+        result = current_service.commit_channel(
+            data,
+            preview,
+            render=not no_render,
+            question_id=question,
+            change_id=change,
+            resolve_q=resolve_q,
+            apply_chg=apply_chg,
+            answer=answer,
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"[green]Applied:[/green] {result.message}")
 
 
 @app.command("now")

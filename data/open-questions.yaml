@@ -82,6 +82,9 @@ questions:
     answer: ""
     notes: ""
     resolved_at: null
+    target:
+      domain: patchbay.mode
+      bay: PB-B
 
   - id: Q-009
     question: What are the rear-panel assignments for PB-A, PB-C, and PB-D?

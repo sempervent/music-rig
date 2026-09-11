@@ -7,10 +7,13 @@ from pathlib import Path
 
 from music_rig.models import TERMINAL_FOR_NEXT, ChangeStatus, QuestionStatus
 from music_rig.render import check_render_sync
+from music_rig import channel_state, patchbay_state
 from music_rig.store import (
     CHANGES_PATH,
+    CHANNEL_MAP_PATH,
     EXISTING_YAML,
     INBOX_PATH,
+    PATCHBAYS_PATH,
     QUESTIONS_PATH,
     StoreError,
     load_changes,
@@ -93,6 +96,20 @@ def run_checks(
     except StoreError as exc:
         errors.append(str(exc))
 
+    try:
+        pb = patchbay_state.load_raw()
+        for err in patchbay_state.validate_patchbays_doc(pb):
+            errors.append(f"patchbays: {err}")
+    except StoreError as exc:
+        errors.append(str(exc))
+
+    try:
+        ch = channel_state.load_raw()
+        for err in channel_state.validate_channel_map(ch):
+            errors.append(f"channel-map: {err}")
+    except StoreError as exc:
+        errors.append(str(exc))
+
     if todo is not None and wishlist is not None:
         known = {t.id for t in todo.tasks}
         for item in wishlist.items:
@@ -168,5 +185,7 @@ def run_checks(
     _ = INBOX_PATH
     _ = CHANGES_PATH
     _ = QUESTIONS_PATH
+    _ = PATCHBAYS_PATH
+    _ = CHANNEL_MAP_PATH
 
     return CheckResult(ok=not errors, errors=errors, warnings=warnings)

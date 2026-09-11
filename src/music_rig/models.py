@@ -334,6 +334,16 @@ class QuestionStatus(str, Enum):
     DEFERRED = "DEFERRED"
 
 
+class QuestionTarget(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    domain: str  # patchbay.mode | patchbay.model | channel.source
+    bay: str | None = None
+    pair: str | None = None
+    device: str | None = None
+    channel: str | None = None
+
+
 class OpenQuestion(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -346,6 +356,7 @@ class OpenQuestion(BaseModel):
     answer: str = ""
     notes: str = ""
     resolved_at: datetime | None = None
+    target: QuestionTarget | None = None
 
     @field_validator("related_todos", "related_changes")
     @classmethod
@@ -364,6 +375,25 @@ class OpenQuestion(BaseModel):
         if self.status == QuestionStatus.OPEN and self.resolved_at is not None:
             raise ValueError(f"{self.id} OPEN must not have resolved_at")
         return self
+
+
+class PatchbayMode(str, Enum):
+    NORMAL = "normal"
+    HALF_NORMAL = "half-normal"
+    THRU = "thru"
+    UNKNOWN = "unknown"
+
+
+class CurrentPreview(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    domain: str
+    target: str
+    before: dict
+    after: dict
+    changed: bool
+    affected_files: list[str] = Field(default_factory=list)
+    message: str = ""
 
 
 class OpenQuestionsDocument(BaseModel):
