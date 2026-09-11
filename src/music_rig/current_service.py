@@ -22,13 +22,14 @@ from music_rig.store import (
     CHANNEL_MAP_PATH,
     PATCHBAYS_PATH,
     QUESTIONS_PATH,
+    ROUTING_PATH,
     StoreError,
     _dump_yaml,
     load_changes,
     load_questions,
     write_text_files,
 )
-from music_rig import channel_state, patchbay_state
+from music_rig import channel_state, patchbay_state, routing_state
 
 Clock = Callable[[], datetime]
 
@@ -304,6 +305,51 @@ def commit_channel(
         raise StoreError("Channel map validation failed: " + "; ".join(errors))
     existing = target.read_text(encoding="utf-8") if target.exists() else None
     text = channel_state.dump_with_header(proposed_data, existing_text=existing)
+    return _commit(
+        preview=preview,
+        primary_path=target,
+        primary_text=text,
+        dry_run=dry_run,
+        render=render,
+        question_id=question_id,
+        change_id=change_id,
+        resolve_q=resolve_q,
+        apply_chg=apply_chg,
+        answer=answer,
+        clock=clock,
+        questions_path=questions_path,
+        changes_path=changes_path,
+        docs_todo=docs_todo,
+        docs_wishlist=docs_wishlist,
+        docs_questions=docs_questions,
+    )
+
+
+def commit_routing(
+    proposed_data: dict,
+    preview: CurrentPreview,
+    *,
+    dry_run: bool = False,
+    render: bool = True,
+    question_id: str | None = None,
+    change_id: str | None = None,
+    resolve_q: bool = False,
+    apply_chg: bool = False,
+    answer: str = "",
+    clock: Clock = default_clock,
+    routing_path: Path | None = None,
+    questions_path: Path | None = None,
+    changes_path: Path | None = None,
+    docs_todo=None,
+    docs_wishlist=None,
+    docs_questions=None,
+) -> CurrentPreview:
+    target = routing_path or ROUTING_PATH
+    errors = routing_state.validate_routing_doc(proposed_data)
+    if errors:
+        raise StoreError("Routing validation failed: " + "; ".join(errors))
+    existing = target.read_text(encoding="utf-8") if target.exists() else None
+    text = routing_state.dump_with_header(proposed_data, existing_text=existing)
     return _commit(
         preview=preview,
         primary_path=target,

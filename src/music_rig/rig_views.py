@@ -258,6 +258,8 @@ def format_path_list(*, routing_path: Path | None = None) -> str:
 
 
 def path_tree_for(name: str, *, routing_path: Path | None = None) -> tuple[str, Tree]:
+    from music_rig import routing_state
+
     doc = load_routing(routing_path)
     key = name.strip().lower()
     path = doc.named_paths.get(key)
@@ -265,8 +267,9 @@ def path_tree_for(name: str, *, routing_path: Path | None = None) -> tuple[str, 
         available = ", ".join(sorted(doc.named_paths)) or "(none)"
         raise StoreError(f"Unknown path {name!r}. Available: {available}")
     header = f"{key} — {path.label} [{path.status}]"
-    tree = Tree(path.tree.label)
-    for child in path.tree.children:
+    display = routing_state.path_to_display_tree(path)
+    tree = Tree(display.label)
+    for child in display.children:
         _add_tree_nodes(tree, child)
     return header, tree
 

@@ -18,19 +18,28 @@ from music_rig.current_projections import (
     render_tascam_mermaid,
     render_tascam_section,
 )
-from music_rig import channel_state, patchbay_state
+from music_rig.routing_projections import (
+    render_aux_send_loop_mermaid,
+    render_current_routing_section,
+    render_pedal_chains_section,
+)
+from music_rig import channel_state, patchbay_state, routing_state
 from music_rig.store import (
     CHANNEL_MAP_PATH,
+    DIAGRAM_AUX_LOOP_PATH,
     DIAGRAM_PATCHBAYS_PATH,
     DIAGRAM_TASCAM_PATH,
     DOCS_ALESIS_PATH,
     DOCS_PATCHBAYS_PATH,
+    DOCS_PEDAL_CHAINS_PATH,
     DOCS_QUESTIONS_PATH,
+    DOCS_ROUTING_PATH,
     DOCS_TASCAM_PATH,
     DOCS_TODO_PATH,
     DOCS_WISHLIST_PATH,
     PATCHBAYS_PATH,
     QUESTIONS_PATH,
+    ROUTING_PATH,
     TODO_PATH,
     WISHLIST_PATH,
     StoreError,
@@ -51,6 +60,10 @@ TASCAM_START = "<!-- rig:tascam:start -->"
 TASCAM_END = "<!-- rig:tascam:end -->"
 ALESIS_START = "<!-- rig:alesis:start -->"
 ALESIS_END = "<!-- rig:alesis:end -->"
+ROUTING_START = "<!-- rig:routing:start -->"
+ROUTING_END = "<!-- rig:routing:end -->"
+PEDAL_CHAINS_START = "<!-- rig:pedal-chains:start -->"
+PEDAL_CHAINS_END = "<!-- rig:pedal-chains:end -->"
 
 TODO_BANNER = (
     "<!-- GENERATED FROM data/todo.yaml BY `uv run rig render`. "
@@ -320,6 +333,18 @@ def apply_alesis_render(markdown: str, data: dict) -> str:
     )
 
 
+def apply_routing_render(markdown: str, data: dict) -> str:
+    return _replace_region(
+        markdown, ROUTING_START, ROUTING_END, render_current_routing_section(data)
+    )
+
+
+def apply_pedal_chains_render(markdown: str, data: dict) -> str:
+    return _replace_region(
+        markdown, PEDAL_CHAINS_START, PEDAL_CHAINS_END, render_pedal_chains_section(data)
+    )
+
+
 def _write_if_changed(
     path: Path,
     new_text: str,
@@ -350,8 +375,12 @@ def render_docs(
     docs_patchbays: Path | None = None,
     docs_tascam: Path | None = None,
     docs_alesis: Path | None = None,
+    docs_routing: Path | None = None,
+    docs_pedal_chains: Path | None = None,
     diagram_patchbays: Path | None = None,
     diagram_tascam: Path | None = None,
+    diagram_aux_loop: Path | None = None,
+    routing_path: Path | None = None,
     write: bool = True,
 ) -> tuple[bool, list[str]]:
     """Render generated sections. Returns (changed, messages)."""
@@ -362,6 +391,7 @@ def render_docs(
     using_custom_ch = (
         channel_map_path is not None and channel_map_path != CHANNEL_MAP_PATH
     )
+    using_custom_rt = routing_path is not None and routing_path != ROUTING_PATH
     if using_custom_todo and docs_todo is None:
         raise StoreError(
             "docs_todo path is required when rendering with a custom todo_path"
@@ -381,6 +411,11 @@ def render_docs(
     if using_custom_ch and (docs_tascam is None or docs_alesis is None):
         raise StoreError(
             "docs_tascam and docs_alesis are required when rendering with a custom channel_map_path"
+        )
+    if using_custom_rt and (docs_routing is None or docs_pedal_chains is None):
+        raise StoreError(
+            "docs_routing and docs_pedal_chains are required when rendering "
+            "with a custom routing_path"
         )
 
     todo = load_todo(todo_path)
@@ -418,17 +453,22 @@ def render_docs(
         (using_custom_todo or using_custom_wish or using_custom_q)
         and not using_custom_pb
         and not using_custom_ch
+        and not using_custom_rt
     )
     if planning_fixture_only:
         return changed, messages
 
     patchbays = patchbay_state.load_raw(patchbays_path)
     channels = channel_state.load_raw(channel_map_path)
+    routing = routing_state.load_raw(routing_path)
     pb_md_path = docs_patchbays or DOCS_PATCHBAYS_PATH
     tascam_md_path = docs_tascam or DOCS_TASCAM_PATH
     alesis_md_path = docs_alesis or DOCS_ALESIS_PATH
+    routing_md_path = docs_routing or DOCS_ROUTING_PATH
+    pedal_md_path = docs_pedal_chains or DOCS_PEDAL_CHAINS_PATH
     pb_mmd_path = diagram_patchbays or DIAGRAM_PATCHBAYS_PATH
     tascam_mmd_path = diagram_tascam or DIAGRAM_TASCAM_PATH
+    aux_mmd_path = diagram_aux_loop or DIAGRAM_AUX_LOOP_PATH
 
     current_pairs = [
         (
@@ -445,6 +485,16 @@ def render_docs(
             alesis_md_path,
             apply_alesis_render(alesis_md_path.read_text(encoding="utf-8"), channels),
             "docs/alesis-mixer-map.md",
+        ),
+        (
+            routing_md_path,
+            apply_routing_render(routing_md_path.read_text(encoding="utf-8"), routing),
+            "docs/current-routing.md",
+        ),
+        (
+            pedal_md_path,
+            apply_pedal_chains_render(pedal_md_path.read_text(encoding="utf-8"), routing),
+            "docs/pedal-chains.md",
         ),
     ]
     for path, new_text, display in current_pairs:
@@ -473,6 +523,16 @@ def render_docs(
             messages=messages,
         ):
             changed = True
+    if not using_custom_rt or diagram_aux_loop is not None:
+        aux_mmd = render_aux_send_loop_mermaid(routing)
+        if _write_if_changed(
+            aux_mmd_path,
+            aux_mmd,
+            display_name="diagrams/aux-send-loop.mmd",
+            write=write,
+            messages=messages,
+        ):
+            changed = True
 
     return changed, messages
 
@@ -484,14 +544,18 @@ def check_render_sync(
     questions_path: Path | None = None,
     patchbays_path: Path | None = None,
     channel_map_path: Path | None = None,
+    routing_path: Path | None = None,
     docs_todo: Path | None = None,
     docs_wishlist: Path | None = None,
     docs_questions: Path | None = None,
     docs_patchbays: Path | None = None,
     docs_tascam: Path | None = None,
     docs_alesis: Path | None = None,
+    docs_routing: Path | None = None,
+    docs_pedal_chains: Path | None = None,
     diagram_patchbays: Path | None = None,
     diagram_tascam: Path | None = None,
+    diagram_aux_loop: Path | None = None,
 ) -> list[str]:
     """Return list of stale doc paths. Empty if synchronized."""
     _, messages = render_docs(
@@ -500,14 +564,18 @@ def check_render_sync(
         questions_path=questions_path,
         patchbays_path=patchbays_path,
         channel_map_path=channel_map_path,
+        routing_path=routing_path,
         docs_todo=docs_todo,
         docs_wishlist=docs_wishlist,
         docs_questions=docs_questions,
         docs_patchbays=docs_patchbays,
         docs_tascam=docs_tascam,
         docs_alesis=docs_alesis,
+        docs_routing=docs_routing,
+        docs_pedal_chains=docs_pedal_chains,
         diagram_patchbays=diagram_patchbays,
         diagram_tascam=diagram_tascam,
+        diagram_aux_loop=diagram_aux_loop,
         write=False,
     )
     return messages

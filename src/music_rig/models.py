@@ -337,11 +337,14 @@ class QuestionStatus(str, Enum):
 class QuestionTarget(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    domain: str  # patchbay.mode | patchbay.model | channel.source
+    domain: str  # patchbay.mode | patchbay.model | channel.source | routing.verify
     bay: str | None = None
     pair: str | None = None
     device: str | None = None
     channel: str | None = None
+    path: str | None = None
+    branch: str | None = None
+    node: str | None = None
 
 
 class OpenQuestion(BaseModel):
@@ -418,7 +421,7 @@ class OpenQuestionsDocument(BaseModel):
 
 
 class PathTreeNode(BaseModel):
-    """Read model for named_paths trees in routing.yaml."""
+    """Display tree derived from named_paths branches."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -429,13 +432,47 @@ class PathTreeNode(BaseModel):
 PathTreeNode.model_rebuild()
 
 
+class RoutingNode(BaseModel):
+    """A single node in a CURRENT routing branch sequence."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1)
+    label: str = Field(min_length=1)
+    mode: str | None = None
+    note: str | None = None
+    signal: str | None = None  # optional mono/stereo annotation; read-only in Stage 6
+
+
+class RoutingBranch(BaseModel):
+    """Ordered node sequence within a named path (main or attached)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    label: str = Field(min_length=1)
+    nodes: list[RoutingNode] = Field(default_factory=list)
+    attach: str | None = None  # parent node id when not main
+    position: str = "before"  # before|after continue along main/parent chain
+
+
 class NamedPath(BaseModel):
+    """Structured CURRENT named path (canonical under data/routing.yaml named_paths)."""
+
     model_config = ConfigDict(extra="forbid")
 
     label: str = Field(min_length=1)
     status: str = "CURRENT"
     route_ref: str | None = None
-    tree: PathTreeNode
+    notes: str | None = None
+    branches: dict[str, RoutingBranch] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _require_main(self) -> NamedPath:
+        if "main" not in self.branches:
+            raise ValueError("named path must include a 'main' branch")
+        if self.branches["main"].attach is not None:
+            raise ValueError("main branch must not set attach")
+        return self
 
 
 class RoutingDocument(BaseModel):

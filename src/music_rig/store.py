@@ -33,8 +33,11 @@ DOCS_QUESTIONS_PATH = ROOT / "docs" / "open-questions.md"
 DOCS_PATCHBAYS_PATH = ROOT / "docs" / "patchbays.md"
 DOCS_TASCAM_PATH = ROOT / "docs" / "tascam-channel-map.md"
 DOCS_ALESIS_PATH = ROOT / "docs" / "alesis-mixer-map.md"
+DOCS_ROUTING_PATH = ROOT / "docs" / "current-routing.md"
+DOCS_PEDAL_CHAINS_PATH = ROOT / "docs" / "pedal-chains.md"
 DIAGRAM_PATCHBAYS_PATH = ROOT / "diagrams" / "patchbays.mmd"
 DIAGRAM_TASCAM_PATH = ROOT / "diagrams" / "tascam-channel-map.mmd"
+DIAGRAM_AUX_LOOP_PATH = ROOT / "diagrams" / "aux-send-loop.mmd"
 
 EXISTING_YAML = (
     CHANNEL_MAP_PATH,
