@@ -54,15 +54,21 @@ def studio(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     changes.write_text("items: []\n", encoding="utf-8")
     inbox = tmp_path / "inbox.yaml"
     inbox.write_text("items: []\n", encoding="utf-8")
+    questions = tmp_path / "open-questions.yaml"
+    questions.write_text("questions: []\n", encoding="utf-8")
     todo = tmp_path / "todo.yaml"
     wish = tmp_path / "wishlist.yaml"
     docs_todo = tmp_path / "todo.md"
     docs_wish = tmp_path / "wishlist.md"
+    docs_q = tmp_path / "open-questions.md"
     docs_todo.write_text(
         "x\n<!-- rig:todo:start -->\n<!-- rig:todo:end -->\n", encoding="utf-8"
     )
     docs_wish.write_text(
         "x\n<!-- rig:wishlist:start -->\n<!-- rig:wishlist:end -->\n", encoding="utf-8"
+    )
+    docs_q.write_text(
+        "x\n<!-- rig:questions:start -->\n<!-- rig:questions:end -->\n", encoding="utf-8"
     )
     todo_doc = TodoDocument.model_validate(
         {
@@ -98,8 +104,10 @@ def studio(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     render_docs(
         todo_path=todo,
         wishlist_path=wish,
+        questions_path=questions,
         docs_todo=docs_todo,
         docs_wishlist=docs_wish,
+        docs_questions=docs_q,
         write=True,
     )
 
@@ -243,8 +251,10 @@ def studio(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(store, "INBOX_PATH", inbox)
     monkeypatch.setattr(store, "TODO_PATH", todo)
     monkeypatch.setattr(store, "WISHLIST_PATH", wish)
+    monkeypatch.setattr(store, "QUESTIONS_PATH", questions)
     monkeypatch.setattr(store, "DOCS_TODO_PATH", docs_todo)
     monkeypatch.setattr(store, "DOCS_WISHLIST_PATH", docs_wish)
+    monkeypatch.setattr(store, "DOCS_QUESTIONS_PATH", docs_q)
     monkeypatch.setattr(store, "CHANNEL_MAP_PATH", channel_map)
     monkeypatch.setattr(store, "PATCHBAYS_PATH", patchbays)
     monkeypatch.setattr(store, "ROUTING_PATH", routing)
@@ -261,7 +271,9 @@ def studio(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         "clock": clock,
         "docs_todo": docs_todo,
         "docs_wish": docs_wish,
+        "docs_q": docs_q,
         "wish": wish,
+        "questions": questions,
     }
 
 
@@ -396,7 +408,7 @@ def test_change_failed_write_does_not_corrupt(studio, monkeypatch):
     def boom(*_a, **_k):
         raise OSError("disk full")
 
-    monkeypatch.setattr("music_rig.store._atomic_write", boom)
+    monkeypatch.setattr("music_rig.change_service.write_documents", boom)
     with pytest.raises(StoreError):
         change_service.create_change(
             "x",
@@ -451,10 +463,12 @@ def test_doctor_and_status(studio, monkeypatch):
         wishlist_path=studio["wish"],
         inbox_path=studio["inbox"],
         changes_path=studio["changes"],
+        questions_path=studio["questions"],
         sessions_dir=studio["sessions"],
         patchbays_path=studio["patchbays"],
         docs_todo=studio["docs_todo"],
         docs_wishlist=studio["docs_wish"],
+        docs_questions=studio["docs_q"],
     )
     assert "RIG DOCTOR" in text
     assert "OPEN change" not in text or "No OPEN change" in text
@@ -477,10 +491,12 @@ def test_doctor_and_status(studio, monkeypatch):
         wishlist_path=studio["wish"],
         inbox_path=studio["inbox"],
         changes_path=studio["changes"],
+        questions_path=studio["questions"],
         sessions_dir=studio["sessions"],
         patchbays_path=studio["patchbays"],
         docs_todo=studio["docs_todo"],
         docs_wishlist=studio["docs_wish"],
+        docs_questions=studio["docs_q"],
     )
     assert "OPEN change" in text2
     assert "OPEN inbox" in text2
@@ -494,10 +510,12 @@ def test_doctor_and_status(studio, monkeypatch):
         wishlist_path=studio["wish"],
         inbox_path=studio["inbox"],
         changes_path=studio["changes"],
+        questions_path=studio["questions"],
         sessions_dir=studio["sessions"],
         patchbays_path=studio["patchbays"],
         docs_todo=studio["docs_todo"],
         docs_wishlist=studio["docs_wish"],
+        docs_questions=studio["docs_q"],
     )
     assert "Git status unavailable" in text3
 
@@ -507,10 +525,12 @@ def test_doctor_and_status(studio, monkeypatch):
         wishlist_path=studio["wish"],
         inbox_path=studio["inbox"],
         changes_path=studio["changes"],
+        questions_path=studio["questions"],
         sessions_dir=studio["sessions"],
         patchbays_path=studio["patchbays"],
         docs_todo=studio["docs_todo"],
         docs_wishlist=studio["docs_wish"],
+        docs_questions=studio["docs_q"],
     )
     assert studio["changes"].read_text(encoding="utf-8") == before
 
@@ -522,8 +542,10 @@ def test_check_warns_open_changes(studio):
     render_docs(
         todo_path=studio["todo"],
         wishlist_path=studio["wish"],
+        questions_path=studio.get("questions"),
         docs_todo=studio["docs_todo"],
         docs_wishlist=studio["docs_wish"],
+        docs_questions=studio.get("docs_q"),
         write=True,
     )
     change_service.create_change(
@@ -537,8 +559,10 @@ def test_check_warns_open_changes(studio):
         wishlist_path=studio["wish"],
         inbox_path=studio["inbox"],
         changes_path=studio["changes"],
+        questions_path=studio.get("questions"),
         docs_todo=studio["docs_todo"],
         docs_wishlist=studio["docs_wish"],
+        docs_questions=studio.get("docs_q"),
     )
     assert result.ok
     assert any("OPEN" in w for w in result.warnings)

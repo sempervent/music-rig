@@ -1,0 +1,204 @@
+# Canonical Open Questions — unresolved factual uncertainties about the rig.
+# Not tasks (see data/todo.yaml). Not wishlist ideas (see data/wishlist.yaml).
+# Question = unknown fact. Resolving a question records an answer; it does NOT
+# automatically rewrite CURRENT routing/docs.
+questions:
+  - id: Q-001
+    question: Where does the non-clean leg of each A/B/Y splitter go (acoustic, bass, electric)?
+    area: Routing
+    status: OPEN
+    related_todos: [RIG-003]
+    related_changes: []
+    answer: ""
+    notes: ""
+    resolved_at: null
+
+  - id: Q-002
+    question: Does acoustic have an Alesis channel assignment, or only the TASCAM 5 clean path?
+    area: Routing
+    status: OPEN
+    related_todos: [RIG-008]
+    related_changes: []
+    answer: ""
+    notes: ""
+    resolved_at: null
+
+  - id: Q-003
+    question: What exact jack(s) receive CH-1 stereo back into the Alesis?
+    area: Routing
+    status: OPEN
+    related_todos: [RIG-009]
+    related_changes: []
+    answer: ""
+    notes: ""
+    resolved_at: null
+
+  - id: Q-004
+    question: Does physical KAOSS monitor/capture match documented Monitor Out → KAOSS → TASCAM 9/10?
+    area: Routing
+    status: OPEN
+    related_todos: [RIG-010]
+    related_changes: []
+    answer: ""
+    notes: ""
+    resolved_at: null
+
+  - id: Q-005
+    question: Should the PYLE-PRO dual DI live near the Privia, near the JOYO output, or near clean instrument taps?
+    area: Routing
+    status: OPEN
+    related_todos: [RIG-024]
+    related_changes: []
+    answer: ""
+    notes: ""
+    resolved_at: null
+
+  - id: Q-006
+    question: Should LS-2 also remain a bass split/blend tool outside its CURRENT SPACE role?
+    area: Routing
+    status: OPEN
+    related_todos: [RIG-025]
+    related_changes: []
+    answer: ""
+    notes: ""
+    resolved_at: null
+
+  - id: Q-007
+    question: Which physical unit is PB-A / PB-B / PB-C / PB-D (ART P48 vs Behringer PX3000)?
+    area: Patchbay
+    status: OPEN
+    related_todos: [RIG-004]
+    related_changes: []
+    answer: ""
+    notes: ""
+    resolved_at: null
+
+  - id: Q-008
+    question: What normalization mode (normal / half-normal / thru) is each populated PB-B pair set to?
+    area: Patchbay
+    status: OPEN
+    related_todos: [RIG-002]
+    related_changes: []
+    answer: ""
+    notes: ""
+    resolved_at: null
+
+  - id: Q-009
+    question: What are the rear-panel assignments for PB-A, PB-C, and PB-D?
+    area: Patchbay
+    status: OPEN
+    related_todos: [RIG-005, RIG-040]
+    related_changes: []
+    answer: ""
+    notes: Assignments remain UNKNOWN until inspected.
+    resolved_at: null
+
+  - id: Q-010
+    question: What (if anything) should feed PB-B upper 9–12 into lower 33–36?
+    area: Patchbay
+    status: OPEN
+    related_todos: [RIG-006]
+    related_changes: []
+    answer: ""
+    notes: ""
+    resolved_at: null
+
+  - id: Q-011
+    question: Do the physical DIRTY and SPACE boards match docs/pedal-chains.md?
+    area: Pedals / power
+    status: OPEN
+    related_todos: [RIG-001]
+    related_changes: []
+    answer: ""
+    notes: ""
+    resolved_at: null
+
+  - id: Q-012
+    question: Where are Flamma Mod and PH-2 right now (disconnected, stored, elsewhere)?
+    area: Pedals / power
+    status: OPEN
+    related_todos: [RIG-011]
+    related_changes: []
+    answer: ""
+    notes: ""
+    resolved_at: null
+
+  - id: Q-013
+    question: What is each CURRENT pedal’s voltage, current draw, and power-supply assignment?
+    area: Pedals / power
+    status: OPEN
+    related_todos: [RIG-047]
+    related_changes: []
+    answer: ""
+    notes: ""
+    resolved_at: null
+
+  - id: Q-014
+    question: Is Ableton definitely the master clock in practice, or do KAOSS/SL-2 sometimes lead?
+    area: MIDI
+    status: OPEN
+    related_todos: [RIG-031]
+    related_changes: []
+    answer: ""
+    notes: ""
+    resolved_at: null
+
+  - id: Q-015
+    question: What is the verified physical MIDI topology using U6MIDI Pro + Thru5 WC?
+    area: MIDI
+    status: OPEN
+    related_todos: [RIG-037]
+    related_changes: []
+    answer: ""
+    notes: ""
+    resolved_at: null
+
+  - id: Q-016
+    question: What exact FCB1010 switch map is assigned in banks 00/01/02?
+    area: MIDI
+    status: OPEN
+    related_todos: [RIG-035]
+    related_changes: []
+    answer: ""
+    notes: ""
+    resolved_at: null
+
+  - id: Q-017
+    question: Which ReMOTE ZeRO SL templates are actually loaded on the device?
+    area: MIDI
+    status: OPEN
+    related_todos: [RIG-036]
+    related_changes: []
+    answer: ""
+    notes: ""
+    resolved_at: null
+
+  - id: Q-018
+    question: What are the exact active tracks in the current PFL jam Ableton set?
+    area: Performance / video
+    status: OPEN
+    related_todos: [RIG-034, RIG-038]
+    related_changes: []
+    answer: ""
+    notes: ""
+    resolved_at: null
+
+  - id: Q-019
+    question: What OBS camera angles are already covered by owned webcams?
+    area: Performance / video
+    status: OPEN
+    related_todos: [RIG-042]
+    related_changes: []
+    answer: ""
+    notes: ""
+    resolved_at: null
+
+  - id: Q-020
+    question: What is the default one-player loop-building order (RC-1 vs KAOSS vs future RC-600)?
+    area: Performance / video
+    status: OPEN
+    related_todos: [RIG-038]
+    related_changes: []
+    answer: ""
+    notes: Also related to Wishlist playbook IDEA; jam template work tracked under RIG-038.
+    resolved_at: null

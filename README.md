@@ -100,22 +100,39 @@ Clean paths use preamp → A/B/Y before the confirmed TASCAM clean legs (5/6/7).
 Canonical planning and studio-ops data:
 
 ```text
-data/todo.yaml       = canonical TODO data
-data/wishlist.yaml   = canonical wishlist data
-data/inbox.yaml      = uncategorized capture inbox
-data/changes.yaml    = physical/logical change captures (not auto-CURRENT)
-data/sessions/       = studio session logs (one YAML file per session)
-docs/todo.md         = human-facing rendered representation
-docs/wishlist.md     = human-facing rendered representation
+data/todo.yaml            = canonical TODO data
+data/wishlist.yaml        = canonical wishlist data
+data/inbox.yaml           = uncategorized capture inbox
+data/changes.yaml         = physical/logical change captures (not auto-CURRENT)
+data/open-questions.yaml  = unresolved factual questions (canonical)
+data/sessions/            = studio session logs (one YAML file per session)
+docs/todo.md              = human-facing rendered representation
+docs/wishlist.md          = human-facing rendered representation
+docs/open-questions.md    = human-facing questions (generated section)
 ```
 
 Do not manually edit the generated marker sections in the Markdown files.
-Inbox captures, session discoveries, and OPEN changes are not CURRENT routing truth until reconciled into docs/data.
+Inbox captures, session discoveries, OPEN changes, and OPEN questions are not CURRENT routing truth until reconciled into docs/data.
 
 ```bash
 uv sync --extra dev --extra docs
 uv run rig --help
 uv run rig status
+
+# What should I do?
+uv run rig now
+uv run rig now --play
+
+# Unknown facts
+uv run rig question list
+uv run rig question show Q-008
+uv run rig question resolve Q-008
+uv run rig question todo Q-008
+
+# What still needs reconciliation?
+uv run rig reconcile
+uv run rig reconcile change CHG-001
+uv run rig reconcile question Q-008
 
 # Begin working
 uv run rig session start
@@ -144,19 +161,8 @@ uv run rig session end
 uv run rig doctor
 
 uv run rig todo list
-uv run rig todo show RIG-001
-uv run rig todo start RIG-001
-uv run rig todo done RIG-001
-uv run rig todo next list
-uv run rig todo next set RIG-002 RIG-038 RIG-046
-
 uv run rig wish list
-uv run rig wish show "BOSS RC-600"
-uv run rig wish promote "PFL Eurorack v1"
-
 uv run rig capture "Something weird happened"
-uv run rig inbox list
-uv run rig inbox triage CAP-001
 
 uv run rig render
 uv run rig render --check
@@ -164,8 +170,9 @@ uv run rig check
 ```
 
 Mutation commands write YAML and re-render Markdown unless `--no-render` is passed.
-`rig change` records drift; it does not rewrite CURRENT routing.
-`rig doctor` is advisory (human-facing); `rig check` remains the CI gate.
+`rig change` / `rig question resolve` record evidence; they do not rewrite CURRENT routing.
+`rig now` is deterministic and explainable (no LLM).
+`rig doctor` is advisory; `rig check` remains the CI gate.
 No CLI command commits or pushes Git.
 
 ## Documentation CI/CD

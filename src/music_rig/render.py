@@ -4,13 +4,22 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from music_rig.models import TodoDocument, TodoStatus, WishlistDocument
+from music_rig.models import (
+    OpenQuestionsDocument,
+    QuestionStatus,
+    TodoDocument,
+    TodoStatus,
+    WishlistDocument,
+)
 from music_rig.store import (
+    DOCS_QUESTIONS_PATH,
     DOCS_TODO_PATH,
     DOCS_WISHLIST_PATH,
+    QUESTIONS_PATH,
     TODO_PATH,
     WISHLIST_PATH,
     StoreError,
+    load_questions,
     load_todo,
     load_wishlist,
 )
@@ -19,6 +28,8 @@ TODO_START = "<!-- rig:todo:start -->"
 TODO_END = "<!-- rig:todo:end -->"
 WISH_START = "<!-- rig:wishlist:start -->"
 WISH_END = "<!-- rig:wishlist:end -->"
+QUESTIONS_START = "<!-- rig:questions:start -->"
+QUESTIONS_END = "<!-- rig:questions:end -->"
 
 TODO_BANNER = (
     "<!-- GENERATED FROM data/todo.yaml BY `uv run rig render`. "
@@ -26,6 +37,10 @@ TODO_BANNER = (
 )
 WISH_BANNER = (
     "<!-- GENERATED FROM data/wishlist.yaml BY `uv run rig render`. "
+    "DO NOT EDIT THIS SECTION DIRECTLY. -->"
+)
+QUESTIONS_BANNER = (
+    "<!-- GENERATED FROM data/open-questions.yaml BY `uv run rig render`. "
     "DO NOT EDIT THIS SECTION DIRECTLY. -->"
 )
 
@@ -178,6 +193,66 @@ def render_wishlist_section(doc: WishlistDocument) -> str:
     return "\n".join(lines)
 
 
+def render_questions_section(doc: OpenQuestionsDocument) -> str:
+    lines: list[str] = [QUESTIONS_BANNER, ""]
+    open_items = [q for q in doc.questions if q.status == QuestionStatus.OPEN]
+    deferred = [q for q in doc.questions if q.status == QuestionStatus.DEFERRED]
+    resolved = [q for q in doc.questions if q.status == QuestionStatus.RESOLVED]
+
+    def _table(items: list, title: str) -> None:
+        lines.append(f"## {title}")
+        lines.append("")
+        lines.append("| ID | Area | Question | Related TODOs | Related Changes |")
+        lines.append("|---|---|---|---|---|")
+        if not items:
+            lines.append("| — | — | — | — | — |")
+        else:
+            for q in items:
+                lines.append(
+                    "| {id} | {area} | {question} | {todos} | {chgs} |".format(
+                        id=q.id,
+                        area=_cell(q.area),
+                        question=_cell(q.question),
+                        todos=_cell(", ".join(q.related_todos)),
+                        chgs=_cell(", ".join(q.related_changes)),
+                    )
+                )
+        lines.append("")
+
+    _table(open_items, "Open")
+    _table(deferred, "Deferred")
+    _table(resolved, "Resolved")
+
+    answered = [
+        q
+        for q in doc.questions
+        if q.answer.strip() or q.notes.strip()
+    ]
+    if answered:
+        lines.append("## Answers and notes")
+        lines.append("")
+        for q in answered:
+            lines.append(f"### {q.id} — {q.status.value}")
+            lines.append("")
+            lines.append(q.question)
+            lines.append("")
+            if q.answer.strip():
+                lines.append(f"**Answer:** {q.answer.strip()}")
+                lines.append("")
+            if q.notes.strip():
+                lines.append(f"**Notes:** {q.notes.strip()}")
+                lines.append("")
+            if q.resolved_at is not None:
+                lines.append(f"**Resolved at:** {q.resolved_at.isoformat()}")
+                lines.append("")
+
+    lines.append("## ID allocation")
+    lines.append("")
+    lines.append(f"Next free ID: **{doc.next_id()}**.")
+    lines.append("")
+    return "\n".join(lines)
+
+
 def _replace_region(text: str, start: str, end: str, body: str) -> str:
     if start not in text or end not in text:
         raise StoreError(
@@ -200,12 +275,20 @@ def apply_wishlist_render(markdown: str, doc: WishlistDocument) -> str:
     )
 
 
+def apply_questions_render(markdown: str, doc: OpenQuestionsDocument) -> str:
+    return _replace_region(
+        markdown, QUESTIONS_START, QUESTIONS_END, render_questions_section(doc)
+    )
+
+
 def render_docs(
     *,
     todo_path: Path | None = None,
     wishlist_path: Path | None = None,
+    questions_path: Path | None = None,
     docs_todo: Path | None = None,
     docs_wishlist: Path | None = None,
+    docs_questions: Path | None = None,
     write: bool = True,
 ) -> tuple[bool, list[str]]:
     """Render generated sections. Returns (changed, messages).
@@ -215,6 +298,7 @@ def render_docs(
     """
     using_custom_todo = todo_path is not None and todo_path != TODO_PATH
     using_custom_wish = wishlist_path is not None and wishlist_path != WISHLIST_PATH
+    using_custom_q = questions_path is not None and questions_path != QUESTIONS_PATH
     if using_custom_todo and docs_todo is None:
         raise StoreError(
             "docs_todo path is required when rendering with a custom todo_path"
@@ -223,16 +307,24 @@ def render_docs(
         raise StoreError(
             "docs_wishlist path is required when rendering with a custom wishlist_path"
         )
+    if using_custom_q and docs_questions is None:
+        raise StoreError(
+            "docs_questions path is required when rendering with a custom questions_path"
+        )
 
     todo = load_todo(todo_path)
     wishlist = load_wishlist(wishlist_path)
+    questions = load_questions(questions_path)
     todo_md_path = docs_todo or DOCS_TODO_PATH
     wish_md_path = docs_wishlist or DOCS_WISHLIST_PATH
+    q_md_path = docs_questions or DOCS_QUESTIONS_PATH
 
     todo_src = todo_md_path.read_text(encoding="utf-8")
     wish_src = wish_md_path.read_text(encoding="utf-8")
+    q_src = q_md_path.read_text(encoding="utf-8")
     todo_new = apply_todo_render(todo_src, todo)
     wish_new = apply_wishlist_render(wish_src, wishlist)
+    q_new = apply_questions_render(q_src, questions)
 
     messages: list[str] = []
     changed = False
@@ -246,6 +338,11 @@ def render_docs(
         messages.append("docs/wishlist.md")
         if write:
             wish_md_path.write_text(wish_new, encoding="utf-8")
+    if q_new != q_src:
+        changed = True
+        messages.append("docs/open-questions.md")
+        if write:
+            q_md_path.write_text(q_new, encoding="utf-8")
     return changed, messages
 
 
@@ -253,14 +350,18 @@ def check_render_sync(
     *,
     todo_path: Path | None = None,
     wishlist_path: Path | None = None,
+    questions_path: Path | None = None,
     docs_todo: Path | None = None,
     docs_wishlist: Path | None = None,
+    docs_questions: Path | None = None,
 ) -> list[str]:
     """Return list of stale doc paths (as display names). Empty if synchronized."""
     todo = load_todo(todo_path)
     wishlist = load_wishlist(wishlist_path)
+    questions = load_questions(questions_path)
     todo_md_path = docs_todo or DOCS_TODO_PATH
     wish_md_path = docs_wishlist or DOCS_WISHLIST_PATH
+    q_md_path = docs_questions or DOCS_QUESTIONS_PATH
 
     stale: list[str] = []
     todo_src = todo_md_path.read_text(encoding="utf-8")
@@ -269,4 +370,7 @@ def check_render_sync(
     wish_src = wish_md_path.read_text(encoding="utf-8")
     if apply_wishlist_render(wish_src, wishlist) != wish_src:
         stale.append("docs/wishlist.md")
+    q_src = q_md_path.read_text(encoding="utf-8")
+    if apply_questions_render(q_src, questions) != q_src:
+        stale.append("docs/open-questions.md")
     return stale

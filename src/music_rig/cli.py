@@ -12,6 +12,7 @@ from music_rig.checks import run_checks
 from music_rig import (
     change_service,
     inbox_service,
+    question_service,
     session_service,
     todo_service,
     wishlist_service,
@@ -27,6 +28,12 @@ from music_rig.models import (
     WishPriority,
     WishStatus,
     WishlistItem,
+)
+from music_rig.now_service import format_now, recommend_now
+from music_rig.reconcile import (
+    build_reconcile_summary,
+    format_reconcile_change,
+    format_reconcile_question,
 )
 from music_rig.render import check_render_sync, render_docs
 from music_rig import rig_views
@@ -49,6 +56,15 @@ next_app = typer.Typer(help="Next Session queue (max 3).", no_args_is_help=True)
 inbox_app = typer.Typer(help="Low-friction capture inbox.", no_args_is_help=True)
 session_app = typer.Typer(help="Studio session logging.", no_args_is_help=True)
 changes_app = typer.Typer(help="Structured change records.", no_args_is_help=True)
+question_app = typer.Typer(
+    help="Unresolved factual questions (data/open-questions.yaml).",
+    no_args_is_help=True,
+)
+reconcile_app = typer.Typer(
+    help="Guided reconciliation of OPEN changes/questions.",
+    invoke_without_command=True,
+    no_args_is_help=False,
+)
 path_app = typer.Typer(help="Read-only CURRENT named paths.", no_args_is_help=True)
 app.add_typer(todo_app, name="todo")
 app.add_typer(wish_app, name="wish")
@@ -56,6 +72,8 @@ todo_app.add_typer(next_app, name="next")
 app.add_typer(inbox_app, name="inbox")
 app.add_typer(session_app, name="session")
 app.add_typer(changes_app, name="changes")
+app.add_typer(question_app, name="question")
+app.add_typer(reconcile_app, name="reconcile")
 app.add_typer(path_app, name="path")
 
 
@@ -1137,6 +1155,244 @@ def session_list_cmd(limit: int = typer.Option(10, "--limit")) -> None:
 def doctor_cmd() -> None:
     """Advisory maintenance overview (not a CI gate)."""
     console.print(build_doctor_text().rstrip())
+
+
+@app.command("now")
+def now_cmd(
+    play: bool = typer.Option(False, "--play", help="Recommend freeform play session"),
+    why: bool = typer.Option(False, "--why", help="Show skipped-task context"),
+) -> None:
+    """Deterministic next-action recommendation from repository state."""
+    try:
+        rec = recommend_now(play=play)
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(format_now(rec, extra_why=why).rstrip())
+
+
+@reconcile_app.callback(invoke_without_command=True)
+def reconcile_main(ctx: typer.Context) -> None:
+    if ctx.invoked_subcommand is not None:
+        return
+    try:
+        console.print(build_reconcile_summary().rstrip())
+    except StoreError as exc:
+        _fail(str(exc))
+
+
+@reconcile_app.command("change")
+def reconcile_change_cmd(chg_id: str) -> None:
+    try:
+        console.print(format_reconcile_change(chg_id).rstrip())
+    except StoreError as exc:
+        _fail(str(exc))
+
+
+@reconcile_app.command("question")
+def reconcile_question_cmd(question_id: str) -> None:
+    try:
+        console.print(format_reconcile_question(question_id).rstrip())
+    except StoreError as exc:
+        _fail(str(exc))
+
+
+@question_app.command("list")
+def question_list_cmd(
+    all_items: bool = typer.Option(False, "--all"),
+    area: Optional[str] = typer.Option(None, "--area"),
+) -> None:
+    try:
+        items = question_service.list_questions(all_items=all_items, area=area)
+    except StoreError as exc:
+        _fail(str(exc))
+    title = "QUESTIONS" if all_items else "OPEN QUESTIONS"
+    console.print(f"[bold]{title}[/bold]")
+    if not items:
+        console.print("(none)")
+        return
+    for q in items:
+        status = f"{q.status.value}  " if all_items else ""
+        console.print(f"{q.id}  {status}{q.area:<18} {q.question}")
+
+
+@question_app.command("show")
+def question_show_cmd(question_id: str) -> None:
+    try:
+        q = question_service.get_question(question_id)
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"[bold]{q.id}[/bold]")
+    console.print("")
+    console.print("Question:")
+    console.print(q.question)
+    console.print("")
+    console.print(f"Area: {q.area}")
+    console.print(f"Status: {q.status.value}")
+    console.print("")
+    console.print("Related TODOs:")
+    if q.related_todos:
+        for tid in q.related_todos:
+            console.print(f"  {tid}")
+    else:
+        console.print("  —")
+    console.print("")
+    console.print("Related Changes:")
+    if q.related_changes:
+        for cid in q.related_changes:
+            console.print(f"  {cid}")
+    else:
+        console.print("  —")
+    console.print("")
+    console.print("Answer:")
+    console.print(f"  {q.answer.strip() or '—'}")
+    console.print("")
+    console.print("Notes:")
+    console.print(f"  {q.notes.strip() or '—'}")
+    if q.resolved_at is not None:
+        console.print("")
+        console.print(f"Resolved at: {q.resolved_at.isoformat()}")
+
+
+@question_app.command("add")
+def question_add_cmd(
+    question: Optional[str] = typer.Option(None, "--question", "-q"),
+    area: Optional[str] = typer.Option(None, "--area", "-a"),
+    todo: Optional[list[str]] = typer.Option(None, "--todo", "-t"),
+    notes: Optional[str] = typer.Option(None, "--notes", "-n"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        if question is None:
+            question = typer.prompt("Question")
+            area = area or typer.prompt("Area", default="Routing")
+            todos_raw = typer.prompt("Related TODOs (comma separated)", default="")
+            notes = notes if notes is not None else typer.prompt("Notes", default="")
+            todos = [p.strip() for p in todos_raw.replace(";", ",").split(",") if p.strip()]
+        else:
+            area = area or "Uncategorized"
+            notes = notes or ""
+            todos = list(todo or [])
+        item = question_service.add_question(
+            question,
+            area=area,
+            related_todos=todos,
+            notes=notes or "",
+            render=not no_render,
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"Created [bold]{item.id}[/bold]")
+
+
+@question_app.command("resolve")
+def question_resolve_cmd(
+    question_id: str,
+    answer: Optional[str] = typer.Option(None, "--answer"),
+    change: Optional[str] = typer.Option(None, "--change", help="Related CHG id"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        if answer is None:
+            answer = typer.prompt("Answer")
+        if change is None and typer.confirm("Link a related CHG record?", default=False):
+            change = typer.prompt("Related CHG record")
+        updated = question_service.resolve_question(
+            question_id,
+            answer,
+            related_change=change,
+            render=not no_render,
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"{updated.id} resolved.")
+    console.print("")
+    console.print(
+        "If this answer changes documented CURRENT state,\n"
+        "reconcile the affected rig data before considering the work complete."
+    )
+
+
+@question_app.command("defer")
+def question_defer_cmd(
+    question_id: str,
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        updated = question_service.defer_question(question_id, render=not no_render)
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"{updated.id} -> DEFERRED")
+
+
+@question_app.command("reopen")
+def question_reopen_cmd(
+    question_id: str,
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        updated = question_service.reopen_question(question_id, render=not no_render)
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"{updated.id} -> OPEN")
+
+
+@question_app.command("todo")
+def question_todo_cmd(
+    question_id: str,
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        q = question_service.get_question(question_id)
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"[bold]{q.id}[/bold]")
+    console.print(q.question)
+    console.print("")
+    new_task = _prompt_todo_fields(
+        default_task=q.question[:80],
+        default_area=q.area,
+        default_priority="P1",
+        default_dod=f"Answer {q.id} and update CURRENT docs if needed",
+        default_notes=f"Created from {q.id}",
+    )
+    try:
+        updated, task = question_service.create_todo_for_question(
+            question_id, new_task, render=not no_render
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"Created {task.id}; linked on {updated.id}")
+    console.print(f"{updated.id} status unchanged ({updated.status.value})")
+
+
+@question_app.command("link-todo")
+def question_link_todo_cmd(
+    question_id: str,
+    todo_id: str,
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        updated = question_service.link_todo(
+            question_id, todo_id, render=not no_render
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"Linked {todo_id.strip().upper()} -> {updated.id}")
+
+
+@question_app.command("link-change")
+def question_link_change_cmd(
+    question_id: str,
+    change_id: str,
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        updated = question_service.link_change(
+            question_id, change_id, render=not no_render
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"Linked {change_id.strip().upper()} <-> {updated.id}")
 
 
 @app.command("render")

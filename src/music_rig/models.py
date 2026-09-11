@@ -13,10 +13,12 @@ RIG_ID_RE = re.compile(r"^RIG-\d{3}$")
 CAP_ID_RE = re.compile(r"^CAP-\d{3}$")
 CHG_ID_RE = re.compile(r"^CHG-\d{3}$")
 SES_ID_RE = re.compile(r"^SES-\d{8}-\d{6}$")
+Q_ID_RE = re.compile(r"^Q-\d{3}$")
 RigId = Annotated[str, Field(pattern=r"^RIG-\d{3}$")]
 CapId = Annotated[str, Field(pattern=r"^CAP-\d{3}$")]
 ChgId = Annotated[str, Field(pattern=r"^CHG-\d{3}$")]
 SesId = Annotated[str, Field(pattern=r"^SES-\d{8}-\d{6}$")]
+QuestionId = Annotated[str, Field(pattern=r"^Q-\d{3}$")]
 
 TERMINAL_FOR_NEXT = frozenset({"DONE", "CANCELLED", "DEFERRED"})
 
@@ -295,6 +297,14 @@ class ChangeRecord(BaseModel):
     status: ChangeStatus = ChangeStatus.OPEN
     session_id: SesId | None = None
     affected_areas: list[str] = Field(default_factory=list)
+    related_questions: list[QuestionId] = Field(default_factory=list)
+
+    @field_validator("related_questions")
+    @classmethod
+    def _unique_q_refs(cls, value: list[str]) -> list[str]:
+        if len(value) != len(set(value)):
+            raise ValueError("related_questions must not contain duplicates")
+        return value
 
 
 class ChangesDocument(BaseModel):
@@ -316,6 +326,65 @@ class ChangesDocument(BaseModel):
         numbers = [int(item.id.split("-")[1]) for item in self.items]
         nxt = (max(numbers) + 1) if numbers else 1
         return f"CHG-{nxt:03d}"
+
+
+class QuestionStatus(str, Enum):
+    OPEN = "OPEN"
+    RESOLVED = "RESOLVED"
+    DEFERRED = "DEFERRED"
+
+
+class OpenQuestion(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: QuestionId
+    question: str = Field(min_length=1)
+    area: str = Field(min_length=1)
+    status: QuestionStatus = QuestionStatus.OPEN
+    related_todos: list[RigId] = Field(default_factory=list)
+    related_changes: list[ChgId] = Field(default_factory=list)
+    answer: str = ""
+    notes: str = ""
+    resolved_at: datetime | None = None
+
+    @field_validator("related_todos", "related_changes")
+    @classmethod
+    def _unique_refs(cls, value: list[str]) -> list[str]:
+        if len(value) != len(set(value)):
+            raise ValueError("reference lists must not contain duplicates")
+        return value
+
+    @model_validator(mode="after")
+    def _status_rules(self) -> OpenQuestion:
+        if self.status == QuestionStatus.RESOLVED:
+            if not self.answer.strip():
+                raise ValueError(f"{self.id} RESOLVED requires a non-empty answer")
+            if self.resolved_at is None:
+                raise ValueError(f"{self.id} RESOLVED requires resolved_at")
+        if self.status == QuestionStatus.OPEN and self.resolved_at is not None:
+            raise ValueError(f"{self.id} OPEN must not have resolved_at")
+        return self
+
+
+class OpenQuestionsDocument(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    questions: list[OpenQuestion] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _unique_ids(self) -> OpenQuestionsDocument:
+        ids = [q.id for q in self.questions]
+        if len(ids) != len(set(ids)):
+            raise ValueError("question Q IDs must be unique")
+        return self
+
+    def question_map(self) -> dict[str, OpenQuestion]:
+        return {q.id: q for q in self.questions}
+
+    def next_id(self) -> str:
+        numbers = [int(q.id.split("-")[1]) for q in self.questions]
+        nxt = (max(numbers) + 1) if numbers else 1
+        return f"Q-{nxt:03d}"
 
 
 class PathTreeNode(BaseModel):
@@ -346,3 +415,27 @@ class RoutingDocument(BaseModel):
 
     routes: dict[str, dict] = Field(default_factory=dict)
     named_paths: dict[str, NamedPath] = Field(default_factory=dict)
+
+
+class NowKind(str, Enum):
+    ACTIVE_SESSION = "ACTIVE_SESSION"
+    IN_PROGRESS = "IN_PROGRESS"
+    NEXT_SESSION = "NEXT_SESSION"
+    READY = "READY"
+    PLAY = "PLAY"
+
+
+class NowRecommendation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: NowKind
+    primary_reference: str
+    title: str
+    reason: str
+    suggested_commands: list[str] = Field(default_factory=list)
+    definition_of_done: str = ""
+    priority: str = ""
+    skipped_summary: list[str] = Field(default_factory=list)
+    recent_event: str = ""
+    duration: str = ""
+    focus: str = ""
