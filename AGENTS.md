@@ -29,6 +29,9 @@ Use the repository itself as the source of remembered state, not chat memory or 
 | MIDI clock | [docs/midi-clock.md](docs/midi-clock.md) | Generated clock/channel/Ableton overview plus controller notes |
 | Controller maps | [data/controllers.yaml](data/controllers.yaml) / [docs/controller-mappings.md](docs/controller-mappings.md) | Canonical mapping evidence and generated tables |
 | Ableton targets | [data/ableton.yaml](data/ableton.yaml) / [docs/ableton-track-map.md](docs/ableton-track-map.md) | Durable track/send/action targets; not a Live Set dump |
+| Performance | [data/performance.yaml](data/performance.yaml) / [docs/performance.md](docs/performance.md) | PFL modes, actions, bindings, recovery contracts |
+| Backups | [data/backups.yaml](data/backups.yaml) / [docs/backups.md](docs/backups.md) | Backup / archive plan (locators only; no absolute paths) |
+| Automation | [docs/automation-readiness.md](docs/automation-readiness.md) | Honest capability registry; simulate never executes |
 | Diagrams | [diagrams/](diagrams/) | Visual projections of the same authoritative state |
 | Todo (canonical) | [data/todo.yaml](data/todo.yaml) | Structured accepted work — edit this, not generated Markdown sections |
 | Todo (rendered) | [docs/todo.md](docs/todo.md) | Human-facing TODO view; generated section owned by `uv run rig render` |
@@ -93,6 +96,11 @@ uv run rig midi channels
 uv run rig midi clock
 uv run rig controls summary
 uv run rig ableton targets
+uv run rig performance summary
+uv run rig performance preflight
+uv run rig automation capabilities
+uv run rig snapshot create
+uv run rig backup plan
 
 # Physical reality changed (does not edit CURRENT docs)
 uv run rig change "Moved TR-2 after PH-3" --category PEDAL_CHAIN
@@ -148,6 +156,15 @@ uv run rig check
   - `PARTIAL`: required paths retain INTENDED/UNKNOWN evidence, imperfect bindings, unknown/true keyboard requirements for EMERGENCY recovery, or lack VERIFIED bindings.
   - `READY`: every required action has an AVAILABLE binding and all critical/emergency paths are VERIFIED.
 - Do not bind BROKEN controls or upgrade INTENDED performance evidence to VERIFIED without direct verification.
+- Preservation / Stage 11 rules:
+  - Machine-local paths live only in gitignored `.rig.local.yaml` (see `.rig.local.example.yaml`).
+  - Never commit `.rig.local.yaml`, `.rig/` snapshots/backups, or absolute user paths in canonical `data/*.yaml`.
+  - `rig snapshot` copies top-level `data/*.yaml` only; it is not CURRENT physical truth and is not a git substitute.
+  - `rig backup create` embeds a snapshot and copies configured FILE/DIRECTORY items; MANUAL_EXPORT stays operator-driven.
+  - `rig performance simulate` / `preflight` must never connect to OBS, Ableton, MIDI, Stream Deck, send keys, or execute effects.
+  - Do not invent fake automation adapters that return success for unimplemented families.
+  - Broad `--snapshot-before` integration is deferred; use `uv run rig snapshot create` manually.
+  - Absence of local config is advisory, not a CI failure.
 - Mutation commands write YAML and re-render docs unless `--no-render` is passed.
 - No CLI mutation command commits or pushes Git.
 - Prefer the CLI/service layer for planning mutations when practical.

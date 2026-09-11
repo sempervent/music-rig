@@ -199,6 +199,9 @@ def format_now(rec: NowRecommendation, *, extra_why: bool = False) -> str:
             lines.append("Start:")
             for cmd in rec.suggested_commands:
                 lines.append(f"  {cmd}")
+            lines.append("")
+            lines.append("Optional setup check:")
+            lines.append("  uv run rig performance preflight")
             return "\n".join(lines) + "\n"
 
     if rec.kind == NowKind.ACTIVE_SESSION:

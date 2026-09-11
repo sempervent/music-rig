@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Optional
 
 import typer
@@ -16,6 +17,8 @@ from music_rig import (
     control_state,
     control_surface_state,
     ableton_state,
+    automation,
+    backup_state,
     inbox_service,
     inventory_state,
     midi_state,
@@ -25,12 +28,14 @@ from music_rig import (
     question_service,
     routing_state,
     session_service,
+    snapshot_service,
     todo_service,
     wishlist_service,
 )
 from music_rig.current_projections import format_current_preview
 from music_rig.doctor import build_doctor_text
 from music_rig.inbox_service import default_clock
+from music_rig.local_config import load_local_config
 from music_rig.models import (
     ChangeStatus,
     GearCondition,
@@ -108,6 +113,15 @@ ableton_app = typer.Typer(help="Durable Ableton mapping targets.", no_args_is_he
 performance_app = typer.Typer(
     help="PFL performance orchestration and readiness.", no_args_is_help=True
 )
+snapshot_app = typer.Typer(
+    help="Canonical YAML repository snapshots.", no_args_is_help=True
+)
+backup_app = typer.Typer(
+    help="Backup plan and archive packages.", no_args_is_help=True
+)
+automation_app = typer.Typer(
+    help="Automation capability registry.", no_args_is_help=True
+)
 current_app = typer.Typer(
     help="Modify authoritative CURRENT state (typed, previewed).",
     no_args_is_help=True,
@@ -153,6 +167,9 @@ app.add_typer(midi_app, name="midi")
 app.add_typer(controls_app, name="controls")
 app.add_typer(ableton_app, name="ableton")
 app.add_typer(performance_app, name="performance")
+app.add_typer(snapshot_app, name="snapshot")
+app.add_typer(backup_app, name="backup")
+app.add_typer(automation_app, name="automation")
 app.add_typer(current_app, name="current")
 current_app.add_typer(current_pb_app, name="patchbay")
 current_app.add_typer(current_ch_app, name="channels")
@@ -3148,6 +3165,262 @@ def performance_gaps() -> None:
     if not gaps and not conflicts:
         table.add_row("—", "none")
     console.print(table)
+
+
+@performance_app.command("plan")
+def performance_plan_cmd(action_id: str) -> None:
+    doc = _performance_doc()
+    try:
+        action = automation.get_action(doc, action_id)
+    except StoreError as exc:
+        _fail(str(exc))
+    plan = automation.compile_action_plan(action)
+    console.print(f"[bold]PLAN[/bold]  {plan.action_id}  ({plan.overall.value})")
+    table = Table()
+    for label in ("#", "Kind", "Ref", "Adapter", "State", "Detail"):
+        table.add_column(label)
+    for step in plan.steps:
+        ref = step.effect.effect_id or step.effect.action_ref or "—"
+        table.add_row(
+            str(step.index),
+            step.effect.kind.value,
+            ref,
+            step.adapter.value,
+            step.state.value,
+            step.detail,
+        )
+    console.print(table)
+
+
+@performance_app.command("simulate")
+def performance_simulate_cmd(action_id: str) -> None:
+    doc = _performance_doc()
+    try:
+        action = automation.get_action(doc, action_id)
+    except StoreError as exc:
+        _fail(str(exc))
+    report = automation.simulate_action(action)
+    console.print(f"[bold]{report.banner}[/bold]")
+    console.print("")
+    console.print(f"Action: {report.action_id}")
+    console.print(f"Result: {report.result.value}")
+    for note in report.notes:
+        console.print(f"- {note}")
+    console.print("")
+    table = Table(title="Simulated steps (not executed)")
+    for label in ("#", "Kind", "Adapter", "State"):
+        table.add_column(label)
+    for step in report.plan.steps:
+        table.add_row(
+            str(step.index),
+            step.effect.kind.value,
+            step.adapter.value,
+            step.state.value,
+        )
+    console.print(table)
+
+
+@performance_app.command("preflight")
+def performance_preflight_cmd(
+    mode: str = typer.Option("pfl-jam", "--mode", help="Performance mode id"),
+) -> None:
+    try:
+        report = automation.preflight(mode=mode)
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(
+        f"[bold]PREFLIGHT[/bold]  mode={report.mode}  worst={report.worst.value}"
+    )
+    console.print("Advisory only — never blocks play; no files modified.")
+    console.print("")
+    by_section: dict[str, list] = {}
+    for finding in report.findings:
+        by_section.setdefault(finding.section, []).append(finding)
+    for section, findings in by_section.items():
+        console.print(f"[bold]{section}[/bold]")
+        for finding in findings:
+            console.print(f"  {finding.severity.value}: {finding.message}")
+        console.print("")
+
+
+@snapshot_app.command("create")
+def snapshot_create_cmd(
+    output: Optional[Path] = typer.Option(
+        None, "--output", help="Parent directory for SNAP-* folders"
+    ),
+) -> None:
+    try:
+        manifest = snapshot_service.create_snapshot(output_dir=output)
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"[bold]SNAPSHOT[/bold]  {manifest.snapshot_id}")
+    console.print(f"Created:   {manifest.created_at}")
+    console.print(f"Commit:    {manifest.git_commit or '—'}")
+    console.print(f"Branch:    {manifest.git_branch or '—'}")
+    tree = (
+        "clean"
+        if manifest.working_tree_clean
+        else "dirty"
+        if manifest.working_tree_clean is not None
+        else "—"
+    )
+    console.print(f"Tree:      {tree}")
+    console.print(f"Files:     {len(manifest.canonical_files)}")
+    sync = manifest.generated_docs_synchronized
+    console.print(
+        f"Docs sync: {'yes' if sync else 'no' if sync is False else 'unknown'}"
+    )
+
+
+@snapshot_app.command("list")
+def snapshot_list_cmd() -> None:
+    items = snapshot_service.list_snapshots()
+    if not items:
+        console.print("(none)")
+        return
+    table = Table(title="SNAPSHOTS")
+    for label in ("ID", "Created", "Commit", "Files"):
+        table.add_column(label)
+    for item in items:
+        table.add_row(
+            item.snapshot_id,
+            item.created_at,
+            item.git_commit or "—",
+            str(len(item.canonical_files)),
+        )
+    console.print(table)
+
+
+@snapshot_app.command("show")
+def snapshot_show_cmd(snapshot_id: str) -> None:
+    try:
+        manifest = snapshot_service.show_snapshot(snapshot_id)
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"[bold]{manifest.snapshot_id}[/bold]")
+    console.print(f"Created: {manifest.created_at}")
+    console.print(f"Commit:  {manifest.git_commit or '—'}")
+    console.print(f"Branch:  {manifest.git_branch or '—'}")
+    console.print(f"Version: {manifest.tool_version}")
+    console.print("")
+    for record in manifest.canonical_files:
+        console.print(f"  {record.path}  {record.sha256[:12]}…")
+
+
+@snapshot_app.command("diff")
+def snapshot_diff_cmd(left_id: str, right_id: str) -> None:
+    try:
+        diff = snapshot_service.diff_snapshots(left_id, right_id)
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"[bold]DIFF[/bold]  {diff['left']} → {diff['right']}")
+    if not any((diff["only_left"], diff["only_right"], diff["changed"])):
+        console.print("(identical)")
+        return
+    if diff["changed"]:
+        console.print("Changed:")
+        for path in diff["changed"]:
+            console.print(f"  {path}")
+    if diff["only_left"]:
+        console.print(f"Only in {diff['left']}:")
+        for path in diff["only_left"]:
+            console.print(f"  {path}")
+    if diff["only_right"]:
+        console.print(f"Only in {diff['right']}:")
+        for path in diff["only_right"]:
+            console.print(f"  {path}")
+
+
+@snapshot_app.command("verify")
+def snapshot_verify_cmd(snapshot_id: str) -> None:
+    try:
+        ok, problems = snapshot_service.verify_snapshot(snapshot_id)
+    except StoreError as exc:
+        _fail(str(exc))
+    if ok:
+        console.print(f"[green]OK[/green]  {snapshot_id}")
+        raise typer.Exit(0)
+    console.print(f"[red]FAIL[/red]  {snapshot_id}")
+    for problem in problems:
+        console.print(f"  {problem}")
+    raise typer.Exit(1)
+
+
+@backup_app.command("plan")
+def backup_plan_cmd() -> None:
+    try:
+        items = backup_state.plan_items()
+    except StoreError as exc:
+        _fail(str(exc))
+    table = Table(title="BACKUP PLAN")
+    for label in ("ID", "Kind", "Importance", "Locator", "Evidence"):
+        table.add_column(label)
+    for item in items:
+        table.add_row(
+            item.id,
+            item.kind.value,
+            item.importance.value,
+            item.locator_key or "—",
+            item.evidence.value,
+        )
+    console.print(table)
+
+
+@backup_app.command("status")
+def backup_status_cmd() -> None:
+    try:
+        statuses = backup_state.status_items()
+    except StoreError as exc:
+        _fail(str(exc))
+    local = load_local_config()
+    console.print(f"Local config: {'present' if local is not None else 'absent'}")
+    table = Table(title="BACKUP STATUS")
+    for label in ("ID", "Kind", "Importance", "Status", "Detail"):
+        table.add_column(label)
+    for status in statuses:
+        table.add_row(
+            status.item.id,
+            status.item.kind.value,
+            status.item.importance.value,
+            status.readiness.value,
+            status.detail or "—",
+        )
+    console.print(table)
+
+
+@backup_app.command("create")
+def backup_create_cmd(
+    output: Optional[Path] = typer.Option(
+        None, "--output", help="Parent directory for BACKUP-* packages"
+    ),
+) -> None:
+    try:
+        report = backup_state.create_backup_package(output=output)
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"[bold]BACKUP[/bold]  {report.backup_id}  {report.result.value}")
+    console.print(f"Output:   {report.output_dir}")
+    console.print(f"Snapshot: {report.snapshot_id or '—'}")
+    for outcome in report.outcomes:
+        console.print(f"  {outcome.item_id}: {outcome.status} — {outcome.detail}")
+    if report.result == backup_state.BackupPackageResult.FAILED:
+        raise typer.Exit(1)
+    raise typer.Exit(0)
+
+
+@automation_app.command("capabilities")
+def automation_capabilities_cmd() -> None:
+    table = Table(title="AUTOMATION CAPABILITIES")
+    table.add_column("Adapter")
+    table.add_column("Status")
+    for family, status in automation.list_capabilities():
+        table.add_row(family.value, status.value)
+    console.print(table)
+    console.print("")
+    console.print(
+        "OBS / Ableton / MIDI / macOS adapters are NOT_IMPLEMENTED — "
+        "no fake success adapters."
+    )
 
 
 def _commit_performance_preview(

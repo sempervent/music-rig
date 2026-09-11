@@ -1,0 +1,11 @@
+# Copy to `.rig.local.yaml` (gitignored) and fill machine-local paths.
+# Never commit absolute paths or secrets into canonical data/*.yaml.
+# Null means "not configured on this machine."
+
+paths:
+  backup_root: null
+  pfl_jam_ableton_set: null
+  obs_export: null
+  stream_deck_export: null
+  kaoss_backup: null
+  controller_mappings_export: null

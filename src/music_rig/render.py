@@ -35,6 +35,10 @@ from music_rig.performance_projections import (
     render_live_recovery_doc,
     render_performance_doc,
 )
+from music_rig.backup_projections import (
+    render_automation_readiness_doc,
+    render_backups_doc,
+)
 from music_rig import (
     ableton_state,
     channel_state,
@@ -48,6 +52,7 @@ from music_rig import (
 )
 from music_rig.store import (
     ABLETON_PATH,
+    BACKUPS_PATH,
     CHANNEL_MAP_PATH,
     CONTROLLERS_PATH,
     CONTROL_SURFACES_PATH,
@@ -57,6 +62,8 @@ from music_rig.store import (
     DIAGRAM_MIDI_TOPOLOGY_PATH,
     DOCS_ALESIS_PATH,
     DOCS_ABLETON_PATH,
+    DOCS_AUTOMATION_PATH,
+    DOCS_BACKUPS_PATH,
     DOCS_LIVE_RECOVERY_PATH,
     DOCS_PERFORMANCE_PATH,
     DOCS_CONTROLLERS_PATH,
@@ -475,6 +482,9 @@ def render_docs(
     surfaces_path: Path | None = None,
     docs_performance: Path | None = None,
     docs_live_recovery: Path | None = None,
+    backups_path: Path | None = None,
+    docs_backups: Path | None = None,
+    docs_automation: Path | None = None,
     write: bool = True,
 ) -> tuple[bool, list[str]]:
     """Render generated sections. Returns (changed, messages)."""
@@ -500,6 +510,7 @@ def render_docs(
     using_custom_surfaces = (
         surfaces_path is not None and surfaces_path != CONTROL_SURFACES_PATH
     )
+    using_custom_backups = backups_path is not None and backups_path != BACKUPS_PATH
     if using_custom_todo and docs_todo is None:
         raise StoreError(
             "docs_todo path is required when rendering with a custom todo_path"
@@ -553,6 +564,10 @@ def render_docs(
             "docs_performance and docs_live_recovery are required with custom "
             "performance/surface paths"
         )
+    if using_custom_backups and docs_backups is None:
+        raise StoreError(
+            "docs_backups is required when rendering with a custom backups_path"
+        )
 
     todo = load_todo(todo_path)
     wishlist = load_wishlist(wishlist_path)
@@ -595,6 +610,7 @@ def render_docs(
         and not using_custom_ableton
         and not using_custom_performance
         and not using_custom_surfaces
+        and not using_custom_backups
     )
     if planning_fixture_only:
         return changed, messages
@@ -612,6 +628,7 @@ def render_docs(
             using_custom_ableton,
             using_custom_performance,
             using_custom_surfaces,
+            using_custom_backups,
         )
     )
     if not custom_inputs or inventory_path is not None or docs_inventory is not None:
@@ -741,6 +758,42 @@ def render_docs(
             ):
                 changed = True
 
+    if (
+        not custom_inputs
+        or backups_path is not None
+        or docs_backups is not None
+        or docs_automation is not None
+    ):
+        from music_rig import backup_state
+
+        backups = backup_state.load_document(backups_path)
+        performance_for_auto = performance_state.load_document(
+            performance_path,
+            controllers_path=controllers_path,
+            surfaces_path=surfaces_path,
+            ableton_path=ableton_path,
+            inventory_path=inventory_path,
+            midi_path=midi_path,
+        )
+        backups_md_path = docs_backups or DOCS_BACKUPS_PATH
+        automation_md_path = docs_automation or DOCS_AUTOMATION_PATH
+        for path, new_text, display in (
+            (
+                backups_md_path,
+                render_backups_doc(backups),
+                "docs/backups.md",
+            ),
+            (
+                automation_md_path,
+                render_automation_readiness_doc(performance_for_auto),
+                "docs/automation-readiness.md",
+            ),
+        ):
+            if _write_if_changed(
+                path, new_text, display_name=display, write=write, messages=messages
+            ):
+                changed = True
+
     patchbays = patchbay_state.load_raw(patchbays_path)
     channels = channel_state.load_raw(channel_map_path)
     routing = routing_state.load_raw(routing_path)
@@ -853,6 +906,9 @@ def check_render_sync(
     surfaces_path: Path | None = None,
     docs_performance: Path | None = None,
     docs_live_recovery: Path | None = None,
+    backups_path: Path | None = None,
+    docs_backups: Path | None = None,
+    docs_automation: Path | None = None,
 ) -> list[str]:
     """Return list of stale doc paths. Empty if synchronized."""
     _, messages = render_docs(
@@ -887,6 +943,9 @@ def check_render_sync(
         surfaces_path=surfaces_path,
         docs_performance=docs_performance,
         docs_live_recovery=docs_live_recovery,
+        backups_path=backups_path,
+        docs_backups=docs_backups,
+        docs_automation=docs_automation,
         write=False,
     )
     return messages

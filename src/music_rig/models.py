@@ -1004,6 +1004,111 @@ class ReadinessResult(str, Enum):
     NOT_READY = "NOT_READY"
 
 
+class BackupCategory(str, Enum):
+    ABLETON = "Ableton"
+    CONTROLLERS = "Controllers"
+    OBS = "OBS"
+    STREAM_DECK = "Stream Deck"
+    KAOSS_REPLAY = "KAOSS Replay"
+    REPOSITORY = "Repository"
+    SAMPLES = "Samples"
+    PROJECTS = "Projects"
+
+
+class BackupKind(str, Enum):
+    REPOSITORY_STATE = "REPOSITORY_STATE"
+    FILE_COPY = "FILE_COPY"
+    DIRECTORY_COPY = "DIRECTORY_COPY"
+    MANUAL_EXPORT = "MANUAL_EXPORT"
+    UNKNOWN = "UNKNOWN"
+
+
+class BackupImportance(str, Enum):
+    CRITICAL = "CRITICAL"
+    IMPORTANT = "IMPORTANT"
+    OPTIONAL = "OPTIONAL"
+
+
+BACKUP_LOCATOR_KEYS = frozenset(
+    {
+        "repository-state",
+        "backup_root",
+        "pfl_jam_ableton_set",
+        "obs_export",
+        "stream_deck_export",
+        "kaoss_backup",
+        "controller_mappings_export",
+    }
+)
+LOCAL_PATH_KEYS = frozenset(
+    {
+        "backup_root",
+        "pfl_jam_ableton_set",
+        "obs_export",
+        "stream_deck_export",
+        "kaoss_backup",
+        "controller_mappings_export",
+    }
+)
+
+
+class BackupItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1)
+    label: str = Field(min_length=1)
+    category: BackupCategory
+    kind: BackupKind
+    importance: BackupImportance
+    evidence: MidiEvidenceStatus
+    locator_key: str | None = None
+    manual_instructions: str = ""
+    related_todos: list[RigId] = Field(default_factory=list)
+    notes: str = ""
+
+    @field_validator("locator_key")
+    @classmethod
+    def _known_locator(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if value not in BACKUP_LOCATOR_KEYS:
+            raise ValueError(f"unknown backup locator_key {value!r}")
+        return value
+
+
+class BackupsDocument(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[BackupItem] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _unique_ids(self) -> BackupsDocument:
+        ids = [item.id for item in self.items]
+        if len(ids) != len(set(ids)):
+            raise ValueError("backup item IDs must be unique")
+        return self
+
+    def item_map(self) -> dict[str, BackupItem]:
+        return {item.id: item for item in self.items}
+
+
+class LocalPathsConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    backup_root: str | None = None
+    pfl_jam_ableton_set: str | None = None
+    obs_export: str | None = None
+    stream_deck_export: str | None = None
+    kaoss_backup: str | None = None
+    controller_mappings_export: str | None = None
+
+
+class LocalConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    paths: LocalPathsConfig = Field(default_factory=LocalPathsConfig)
+
+
 class MidiTransport(str, Enum):
     DIN = "DIN"
     USB = "USB"

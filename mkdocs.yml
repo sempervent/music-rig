@@ -26,6 +26,8 @@ nav:
   - Controller Mappings: controller-mappings.md
   - Performance: performance.md
   - Live Recovery: live-recovery.md
+  - Backups: backups.md
+  - Automation readiness: automation-readiness.md
   - MIDI Topology: midi-topology.md
   - MIDI Clock: midi-clock.md
   - Reamp and DI: reamp-and-di.md

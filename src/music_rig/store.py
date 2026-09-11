@@ -8,6 +8,7 @@ import yaml
 
 from music_rig.models import (
     AbletonDocument,
+    BackupsDocument,
     ChangesDocument,
     ControlSurfacesDocument,
     ControllersDocument,
@@ -39,6 +40,7 @@ CONTROLLERS_PATH = DATA_DIR / "controllers.yaml"
 ABLETON_PATH = DATA_DIR / "ableton.yaml"
 PERFORMANCE_PATH = DATA_DIR / "performance.yaml"
 CONTROL_SURFACES_PATH = DATA_DIR / "control-surfaces.yaml"
+BACKUPS_PATH = DATA_DIR / "backups.yaml"
 DOCS_TODO_PATH = ROOT / "docs" / "todo.md"
 DOCS_WISHLIST_PATH = ROOT / "docs" / "wishlist.md"
 DOCS_QUESTIONS_PATH = ROOT / "docs" / "open-questions.md"
@@ -54,6 +56,8 @@ DOCS_CONTROLLERS_PATH = ROOT / "docs" / "controller-mappings.md"
 DOCS_ABLETON_PATH = ROOT / "docs" / "ableton-track-map.md"
 DOCS_PERFORMANCE_PATH = ROOT / "docs" / "performance.md"
 DOCS_LIVE_RECOVERY_PATH = ROOT / "docs" / "live-recovery.md"
+DOCS_BACKUPS_PATH = ROOT / "docs" / "backups.md"
+DOCS_AUTOMATION_PATH = ROOT / "docs" / "automation-readiness.md"
 DIAGRAM_PATCHBAYS_PATH = ROOT / "diagrams" / "patchbays.mmd"
 DIAGRAM_TASCAM_PATH = ROOT / "diagrams" / "tascam-channel-map.mmd"
 DIAGRAM_AUX_LOOP_PATH = ROOT / "diagrams" / "aux-send-loop.mmd"
@@ -69,6 +73,7 @@ EXISTING_YAML = (
     ABLETON_PATH,
     PERFORMANCE_PATH,
     CONTROL_SURFACES_PATH,
+    BACKUPS_PATH,
 )
 
 
@@ -301,6 +306,15 @@ def save_control_surfaces(
     target = path or CONTROL_SURFACES_PATH
     ControlSurfacesDocument.model_validate(doc.model_dump())
     _atomic_write(target, _dump_yaml(doc.model_dump(mode="json", exclude_none=True)))
+
+
+def load_backups(path: Path | None = None) -> BackupsDocument:
+    target = path or BACKUPS_PATH
+    raw = _load_mapping(target, "backups")
+    try:
+        return BackupsDocument.model_validate(raw)
+    except Exception as exc:
+        raise StoreError(f"Backups schema validation failed: {exc}") from exc
 
 
 def session_path(session_id: str, sessions_dir: Path | None = None) -> Path:
