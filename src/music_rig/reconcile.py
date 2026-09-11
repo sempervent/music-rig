@@ -239,10 +239,34 @@ def format_reconcile_question(
     lines.append("")
     lines.append("Suggested action:")
     if q.status == QuestionStatus.OPEN:
-        lines.append("  inspect the physical rig")
-        lines.append(f"  then: uv run rig question resolve {q.id}")
-        if q.related_todos:
-            lines.append(f"  or continue: uv run rig todo show {q.related_todos[0]}")
+        target = getattr(q, "target", None)
+        if target is not None and target.domain == "patchbay.mode" and target.bay:
+            lines.append(f"  This question maps to CURRENT field: {target.bay} mode")
+            lines.append("  Verify physically, then run:")
+            if target.pair:
+                lines.append(
+                    f"    uv run rig current patchbay set-mode {target.bay} "
+                    f"{target.pair} <mode> --question {q.id}"
+                )
+            else:
+                lines.append(
+                    f"    uv run rig current patchbay verify {target.bay}"
+                )
+                lines.append(
+                    f"    # or: uv run rig current patchbay set-mode {target.bay} "
+                    f"<jack> <mode> --question {q.id}"
+                )
+        elif target is not None and target.domain == "patchbay.model" and target.bay:
+            lines.append(f"  This question maps to CURRENT field: {target.bay} model")
+            lines.append(
+                f"    uv run rig current patchbay set-model {target.bay} "
+                f'"<model>" --question {q.id}'
+            )
+        else:
+            lines.append("  inspect the physical rig")
+            lines.append(f"  then: uv run rig question resolve {q.id}")
+            if q.related_todos:
+                lines.append(f"  or continue: uv run rig todo show {q.related_todos[0]}")
     elif q.status == QuestionStatus.RESOLVED:
         lines.append(
             "  if the answer changes CURRENT docs, reconcile those files,"

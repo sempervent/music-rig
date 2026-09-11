@@ -145,6 +145,23 @@ uv run rig patchbay PB-B
 uv run rig path list
 uv run rig path show space
 
+# Evidence vs CURRENT truth
+# I noticed something:        rig capture / rig change
+# I verified CURRENT truth:   rig current ...
+# What is unresolved:         rig reconcile
+# Maintenance advice:         rig doctor
+
+# Verify PB-B physically (transactional)
+uv run rig current patchbay verify PB-B
+
+# Record one exact mode (preview first)
+uv run rig current patchbay set-mode PB-B 1 half-normal --dry-run
+uv run rig current patchbay set-mode PB-B 1 half-normal --question Q-008
+
+# Channel source assignment
+uv run rig current channels set-source tascam 8 "Spare DI"
+uv run rig current channels clear-source tascam 8
+
 # While working
 uv run rig session note "PH-3 confirmed before TR-2"
 uv run rig session discovery "RE-2 quiet on separate power"
@@ -171,6 +188,7 @@ uv run rig check
 
 Mutation commands write YAML and re-render Markdown unless `--no-render` is passed.
 `rig change` / `rig question resolve` record evidence; they do not rewrite CURRENT routing.
+`rig current …` modifies authoritative CURRENT state (typed, previewed, confirm by default).
 `rig now` is deterministic and explainable (no LLM).
 `rig doctor` is advisory; `rig check` remains the CI gate.
 No CLI command commits or pushes Git.

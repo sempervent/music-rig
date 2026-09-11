@@ -138,6 +138,20 @@ Before treating CURRENT docs as unquestionably authoritative:
 Do not automatically apply captured changes.
 Do not elevate discoveries to CURRENT facts without reconciliation.
 
+Do not hand-edit generated CURRENT sections (`docs/patchbays.md`, channel maps, generated diagrams).
+
+Canonical structured CURRENT sources include:
+- `data/patchbays.yaml`
+- `data/channel-map.yaml`
+
+For supported CURRENT mutations, prefer `uv run rig current …` / the service layer.
+
+OPEN Changes and Question answers are evidence.
+They do not become CURRENT until reconciled.
+
+Never infer a CURRENT update from freeform text.
+Always preview; use `--dry-run` when unsure.
+
 ### Planning layers (do not collapse)
 
 | Layer | Means | Does not mean |

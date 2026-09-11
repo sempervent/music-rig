@@ -164,6 +164,7 @@ def resolve_question(
         answer=cleaned,
         notes=current.notes,
         resolved_at=clock(),
+        target=current.target,
     )
     new_qdoc = OpenQuestionsDocument(
         questions=[updated if q.id == key else q for q in qdoc.questions]
@@ -250,6 +251,7 @@ def reopen_question(
         answer=current.answer,
         notes=notes,
         resolved_at=None,
+        target=current.target,
     )
     new_qdoc = OpenQuestionsDocument(
         questions=[updated if q.id == key else q for q in qdoc.questions]

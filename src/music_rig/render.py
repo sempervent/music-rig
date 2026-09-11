@@ -11,10 +11,25 @@ from music_rig.models import (
     TodoStatus,
     WishlistDocument,
 )
+from music_rig.current_projections import (
+    render_alesis_section,
+    render_patchbays_mermaid,
+    render_patchbays_section,
+    render_tascam_mermaid,
+    render_tascam_section,
+)
+from music_rig import channel_state, patchbay_state
 from music_rig.store import (
+    CHANNEL_MAP_PATH,
+    DIAGRAM_PATCHBAYS_PATH,
+    DIAGRAM_TASCAM_PATH,
+    DOCS_ALESIS_PATH,
+    DOCS_PATCHBAYS_PATH,
     DOCS_QUESTIONS_PATH,
+    DOCS_TASCAM_PATH,
     DOCS_TODO_PATH,
     DOCS_WISHLIST_PATH,
+    PATCHBAYS_PATH,
     QUESTIONS_PATH,
     TODO_PATH,
     WISHLIST_PATH,
@@ -30,6 +45,12 @@ WISH_START = "<!-- rig:wishlist:start -->"
 WISH_END = "<!-- rig:wishlist:end -->"
 QUESTIONS_START = "<!-- rig:questions:start -->"
 QUESTIONS_END = "<!-- rig:questions:end -->"
+PATCHBAYS_START = "<!-- rig:patchbays:start -->"
+PATCHBAYS_END = "<!-- rig:patchbays:end -->"
+TASCAM_START = "<!-- rig:tascam:start -->"
+TASCAM_END = "<!-- rig:tascam:end -->"
+ALESIS_START = "<!-- rig:alesis:start -->"
+ALESIS_END = "<!-- rig:alesis:end -->"
 
 TODO_BANNER = (
     "<!-- GENERATED FROM data/todo.yaml BY `uv run rig render`. "
@@ -281,24 +302,66 @@ def apply_questions_render(markdown: str, doc: OpenQuestionsDocument) -> str:
     )
 
 
+def apply_patchbays_render(markdown: str, data: dict) -> str:
+    return _replace_region(
+        markdown, PATCHBAYS_START, PATCHBAYS_END, render_patchbays_section(data)
+    )
+
+
+def apply_tascam_render(markdown: str, data: dict) -> str:
+    return _replace_region(
+        markdown, TASCAM_START, TASCAM_END, render_tascam_section(data)
+    )
+
+
+def apply_alesis_render(markdown: str, data: dict) -> str:
+    return _replace_region(
+        markdown, ALESIS_START, ALESIS_END, render_alesis_section(data)
+    )
+
+
+def _write_if_changed(
+    path: Path,
+    new_text: str,
+    *,
+    display_name: str,
+    write: bool,
+    messages: list[str],
+) -> bool:
+    old = path.read_text(encoding="utf-8") if path.exists() else ""
+    if new_text == old:
+        return False
+    messages.append(display_name)
+    if write:
+        path.write_text(new_text, encoding="utf-8")
+    return True
+
+
 def render_docs(
     *,
     todo_path: Path | None = None,
     wishlist_path: Path | None = None,
     questions_path: Path | None = None,
+    patchbays_path: Path | None = None,
+    channel_map_path: Path | None = None,
     docs_todo: Path | None = None,
     docs_wishlist: Path | None = None,
     docs_questions: Path | None = None,
+    docs_patchbays: Path | None = None,
+    docs_tascam: Path | None = None,
+    docs_alesis: Path | None = None,
+    diagram_patchbays: Path | None = None,
+    diagram_tascam: Path | None = None,
     write: bool = True,
 ) -> tuple[bool, list[str]]:
-    """Render generated sections. Returns (changed, messages).
-
-    When custom data paths are supplied without matching docs paths, rendering
-    is skipped for safety so fixture data cannot overwrite production docs.
-    """
+    """Render generated sections. Returns (changed, messages)."""
     using_custom_todo = todo_path is not None and todo_path != TODO_PATH
     using_custom_wish = wishlist_path is not None and wishlist_path != WISHLIST_PATH
     using_custom_q = questions_path is not None and questions_path != QUESTIONS_PATH
+    using_custom_pb = patchbays_path is not None and patchbays_path != PATCHBAYS_PATH
+    using_custom_ch = (
+        channel_map_path is not None and channel_map_path != CHANNEL_MAP_PATH
+    )
     if using_custom_todo and docs_todo is None:
         raise StoreError(
             "docs_todo path is required when rendering with a custom todo_path"
@@ -311,38 +374,106 @@ def render_docs(
         raise StoreError(
             "docs_questions path is required when rendering with a custom questions_path"
         )
+    if using_custom_pb and docs_patchbays is None:
+        raise StoreError(
+            "docs_patchbays path is required when rendering with a custom patchbays_path"
+        )
+    if using_custom_ch and (docs_tascam is None or docs_alesis is None):
+        raise StoreError(
+            "docs_tascam and docs_alesis are required when rendering with a custom channel_map_path"
+        )
 
     todo = load_todo(todo_path)
     wishlist = load_wishlist(wishlist_path)
     questions = load_questions(questions_path)
+
     todo_md_path = docs_todo or DOCS_TODO_PATH
     wish_md_path = docs_wishlist or DOCS_WISHLIST_PATH
     q_md_path = docs_questions or DOCS_QUESTIONS_PATH
 
-    todo_src = todo_md_path.read_text(encoding="utf-8")
-    wish_src = wish_md_path.read_text(encoding="utf-8")
-    q_src = q_md_path.read_text(encoding="utf-8")
-    todo_new = apply_todo_render(todo_src, todo)
-    wish_new = apply_wishlist_render(wish_src, wishlist)
-    q_new = apply_questions_render(q_src, questions)
-
     messages: list[str] = []
     changed = False
-    if todo_new != todo_src:
-        changed = True
-        messages.append("docs/todo.md")
-        if write:
-            todo_md_path.write_text(todo_new, encoding="utf-8")
-    if wish_new != wish_src:
-        changed = True
-        messages.append("docs/wishlist.md")
-        if write:
-            wish_md_path.write_text(wish_new, encoding="utf-8")
-    if q_new != q_src:
-        changed = True
-        messages.append("docs/open-questions.md")
-        if write:
-            q_md_path.write_text(q_new, encoding="utf-8")
+
+    pairs = [
+        (todo_md_path, apply_todo_render(todo_md_path.read_text(encoding="utf-8"), todo), "docs/todo.md"),
+        (
+            wish_md_path,
+            apply_wishlist_render(wish_md_path.read_text(encoding="utf-8"), wishlist),
+            "docs/wishlist.md",
+        ),
+        (
+            q_md_path,
+            apply_questions_render(q_md_path.read_text(encoding="utf-8"), questions),
+            "docs/open-questions.md",
+        ),
+    ]
+    for path, new_text, display in pairs:
+        if _write_if_changed(
+            path, new_text, display_name=display, write=write, messages=messages
+        ):
+            changed = True
+
+    # Skip CURRENT projections when only planning fixtures are in play.
+    planning_fixture_only = (
+        (using_custom_todo or using_custom_wish or using_custom_q)
+        and not using_custom_pb
+        and not using_custom_ch
+    )
+    if planning_fixture_only:
+        return changed, messages
+
+    patchbays = patchbay_state.load_raw(patchbays_path)
+    channels = channel_state.load_raw(channel_map_path)
+    pb_md_path = docs_patchbays or DOCS_PATCHBAYS_PATH
+    tascam_md_path = docs_tascam or DOCS_TASCAM_PATH
+    alesis_md_path = docs_alesis or DOCS_ALESIS_PATH
+    pb_mmd_path = diagram_patchbays or DIAGRAM_PATCHBAYS_PATH
+    tascam_mmd_path = diagram_tascam or DIAGRAM_TASCAM_PATH
+
+    current_pairs = [
+        (
+            pb_md_path,
+            apply_patchbays_render(pb_md_path.read_text(encoding="utf-8"), patchbays),
+            "docs/patchbays.md",
+        ),
+        (
+            tascam_md_path,
+            apply_tascam_render(tascam_md_path.read_text(encoding="utf-8"), channels),
+            "docs/tascam-channel-map.md",
+        ),
+        (
+            alesis_md_path,
+            apply_alesis_render(alesis_md_path.read_text(encoding="utf-8"), channels),
+            "docs/alesis-mixer-map.md",
+        ),
+    ]
+    for path, new_text, display in current_pairs:
+        if _write_if_changed(
+            path, new_text, display_name=display, write=write, messages=messages
+        ):
+            changed = True
+
+    if not using_custom_pb or diagram_patchbays is not None:
+        pb_mmd = render_patchbays_mermaid(patchbays)
+        if _write_if_changed(
+            pb_mmd_path,
+            pb_mmd,
+            display_name="diagrams/patchbays.mmd",
+            write=write,
+            messages=messages,
+        ):
+            changed = True
+    if not using_custom_ch or diagram_tascam is not None:
+        t_mmd = render_tascam_mermaid(channels)
+        if _write_if_changed(
+            tascam_mmd_path,
+            t_mmd,
+            display_name="diagrams/tascam-channel-map.mmd",
+            write=write,
+            messages=messages,
+        ):
+            changed = True
+
     return changed, messages
 
 
@@ -351,26 +482,32 @@ def check_render_sync(
     todo_path: Path | None = None,
     wishlist_path: Path | None = None,
     questions_path: Path | None = None,
+    patchbays_path: Path | None = None,
+    channel_map_path: Path | None = None,
     docs_todo: Path | None = None,
     docs_wishlist: Path | None = None,
     docs_questions: Path | None = None,
+    docs_patchbays: Path | None = None,
+    docs_tascam: Path | None = None,
+    docs_alesis: Path | None = None,
+    diagram_patchbays: Path | None = None,
+    diagram_tascam: Path | None = None,
 ) -> list[str]:
-    """Return list of stale doc paths (as display names). Empty if synchronized."""
-    todo = load_todo(todo_path)
-    wishlist = load_wishlist(wishlist_path)
-    questions = load_questions(questions_path)
-    todo_md_path = docs_todo or DOCS_TODO_PATH
-    wish_md_path = docs_wishlist or DOCS_WISHLIST_PATH
-    q_md_path = docs_questions or DOCS_QUESTIONS_PATH
-
-    stale: list[str] = []
-    todo_src = todo_md_path.read_text(encoding="utf-8")
-    if apply_todo_render(todo_src, todo) != todo_src:
-        stale.append("docs/todo.md")
-    wish_src = wish_md_path.read_text(encoding="utf-8")
-    if apply_wishlist_render(wish_src, wishlist) != wish_src:
-        stale.append("docs/wishlist.md")
-    q_src = q_md_path.read_text(encoding="utf-8")
-    if apply_questions_render(q_src, questions) != q_src:
-        stale.append("docs/open-questions.md")
-    return stale
+    """Return list of stale doc paths. Empty if synchronized."""
+    _, messages = render_docs(
+        todo_path=todo_path,
+        wishlist_path=wishlist_path,
+        questions_path=questions_path,
+        patchbays_path=patchbays_path,
+        channel_map_path=channel_map_path,
+        docs_todo=docs_todo,
+        docs_wishlist=docs_wishlist,
+        docs_questions=docs_questions,
+        docs_patchbays=docs_patchbays,
+        docs_tascam=docs_tascam,
+        docs_alesis=docs_alesis,
+        diagram_patchbays=diagram_patchbays,
+        diagram_tascam=diagram_tascam,
+        write=False,
+    )
+    return messages

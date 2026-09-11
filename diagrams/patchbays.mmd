@@ -1,45 +1,39 @@
+%% GENERATED FROM data/patchbays.yaml BY `uv run rig render`.
+%% DO NOT EDIT DIRECTLY.
 flowchart TB
-  subgraph PBB[PB-B documented connectivity]
+  PBA["PB-A: undocumented"]
+  subgraph PBB[PB-B represented connectivity]
     direction TB
-
-    subgraph Sources[Upper row sources]
-      U1[1 miniKORG L/MONO]
-      U2[2 miniKORG R]
-      U3[3 SR-18 MAIN L]
-      U4[4 SR-18 MAIN R]
-      U7[7 Privia L/MONO]
-      U8[8 Privia R]
-      U9[9 UNASSIGNED]
-      U10[10 UNASSIGNED]
-      U11[11 UNASSIGNED]
-      U12[12 UNASSIGNED]
-    end
-
-    subgraph Destinations[Lower row destinations]
-      L25[25 TASCAM 3]
-      L26[26 TASCAM 4]
-      L27[27 TASCAM 11]
-      L28[28 TASCAM 12]
-      L31[31 Alesis CH 5/L]
-      L32[32 Alesis CH 6/R]
-      L33[33 Alesis CH 7/L]
-      L34[34 Alesis CH 8/R]
-      L35[35 miniKORG AUDIO IN 1]
-      L36[36 miniKORG AUDIO IN 2]
-    end
-
-    U1 -.->|mode unknown| L25
-    U2 -.->|mode unknown| L26
-    U3 -.->|mode unknown| L27
-    U4 -.->|mode unknown| L28
-    U7 -.->|mode unknown| L31
-    U8 -.->|mode unknown| L32
-    U9 -.->|no source| L33
-    U10 -.->|no source| L34
-    U11 -.->|no source| L35
-    U12 -.->|no source| L36
+    PBBU1["1 miniKORG L/MONO"]
+    PBBL25["25 TASCAM input 3"]
+    PBBU1 -.->|mode unknown| PBBL25
+    PBBU2["2 miniKORG R"]
+    PBBL26["26 TASCAM input 4"]
+    PBBU2 -.->|mode unknown| PBBL26
+    PBBU3["3 SR-18 MAIN L"]
+    PBBL27["27 TASCAM input 11"]
+    PBBU3 -.->|mode unknown| PBBL27
+    PBBU4["4 SR-18 MAIN R"]
+    PBBL28["28 TASCAM input 12"]
+    PBBU4 -.->|mode unknown| PBBL28
+    PBBU7["7 Privia L/MONO"]
+    PBBL31["31 Alesis CH 5/L"]
+    PBBU7 -.->|mode unknown| PBBL31
+    PBBU8["8 Privia R"]
+    PBBL32["32 Alesis CH 6/R"]
+    PBBU8 -.->|mode unknown| PBBL32
+    PBBU9["9 UNASSIGNED"]
+    PBBL33["33 Alesis CH 7/L"]
+    PBBU9 -.->|no source| PBBL33
+    PBBU10["10 UNASSIGNED"]
+    PBBL34["34 Alesis CH 8/R"]
+    PBBU10 -.->|no source| PBBL34
+    PBBU11["11 UNASSIGNED"]
+    PBBL35["35 miniKORG AUDIO IN 1"]
+    PBBU11 -.->|no source| PBBL35
+    PBBU12["12 UNASSIGNED"]
+    PBBL36["36 miniKORG AUDIO IN 2"]
+    PBBU12 -.->|no source| PBBL36
   end
-
-  PBA[PB-A: undocumented]
-  PBC[PB-C: undocumented]
-  PBD[PB-D: undocumented]
+  PBC["PB-C: undocumented"]
+  PBD["PB-D: undocumented"]

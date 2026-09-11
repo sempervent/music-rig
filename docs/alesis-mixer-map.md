@@ -1,14 +1,29 @@
 # Alesis Mixer Map
 
-| Channel | Source | AUX SEND Use | Notes |
-|---:|---|---|---|
-| 1 | Bass | Yes | Sends bass into RC-1 / pedal loop |
-| 2 | Guitar | Yes | Sends guitar into RC-1 / pedal loop |
-| 3 | UNASSIGNED | TBD | — |
-| 4 | Electric kazoo | Yes | Weird noise channel; document gain staging |
-| 5/6 | Privia | Yes | Stereo piano; PB-B upper 7/8 → lower 31/32 (Alesis CH 5/L, 6/R) |
-| 7/8 | UNASSIGNED sources | TBD | PB-B lower 33/34 connect to CH 7/L and 8/R; no documented upper sources |
-| Main Out | TASCAM 1/2 | — | Clean stereo capture |
-| Monitor Out | KAOSS Replay | — | KAOSS feed |
-| AUX SEND | Wet loop input | — | Feeds RC-1 → Cry Baby → JOYO → CH-1 |
-| Stereo Return / Line Return | Wet loop return | — | Receives CH-1 stereo out |
+Canonical CURRENT assignments: `data/channel-map.yaml`.
+
+Edit with `uv run rig current channels set-source alesis …`.
+
+<!-- rig:alesis:start -->
+<!-- GENERATED FROM data/channel-map.yaml BY `uv run rig render`. DO NOT EDIT THIS SECTION DIRECTLY. -->
+
+| Channel | Source | AUX SEND | Status |
+|---|---|---|---|
+| 1 | Bass | Yes | CURRENT |
+| 2 | Guitar | Yes | CURRENT |
+| 3 | UNASSIGNED | No | UNASSIGNED |
+| 4 | Electric kazoo | Yes | CURRENT |
+| 5_6 | Privia | Yes | CURRENT |
+| 7_8 | UNASSIGNED | No | UNASSIGNED |
+<!-- rig:alesis:end -->
+
+## Bus / send notes
+
+| Path | Role |
+|---|---|
+| Main Out | Clean stereo capture → TASCAM 1/2 |
+| Monitor Out | KAOSS Replay feed → TASCAM 9/10 |
+| AUX SEND | Wet loop input → RC-1 → Cry Baby → JOYO → CH-1 |
+| Stereo Return / Line Return | Wet loop return from CH-1 stereo out |
+
+PB-B lower 31–34 connect toward Alesis CH 5–8; upper sources for 33–34 remain unassigned in CURRENT patchbay data.

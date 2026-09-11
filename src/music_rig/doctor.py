@@ -7,7 +7,7 @@ from pathlib import Path
 from music_rig.checks import run_checks
 from music_rig.models import ChangeStatus, InboxStatus, QuestionStatus
 from music_rig.reconcile import reconciliation_advisories
-from music_rig.rig_views import load_patchbays, patchbay_unknown_mode_stats
+from music_rig.rig_views import patchbay_unknown_mode_stats
 from music_rig.session_service import find_active
 from music_rig.status import git_summary
 from music_rig.store import (
@@ -145,10 +145,12 @@ def build_doctor_text(
 
     # Current-data gaps
     lines.append("")
-    lines.append("Current-data gaps")
+    lines.append("Current-state maintenance")
     try:
+        from music_rig import patchbay_state
+
+        data = patchbay_state.load_raw(patchbays_path)
         stats = patchbay_unknown_mode_stats(patchbays_path=patchbays_path)
-        data = load_patchbays(patchbays_path)
         model_unknown = [
             name
             for name, bay in (data.get("patchbays") or {}).items()
@@ -156,18 +158,25 @@ def build_doctor_text(
         ]
         if stats:
             for name, count in stats:
-                lines.append(f"⚠ {name} has {count} UNKNOWN normalization mode(s)")
+                lines.append(f"⚠ {name}: {count} represented pair(s) still have mode UNKNOWN")
                 attention += 1
         else:
             lines.append("✓ No populated UNKNOWN patchbay modes")
-        if model_unknown:
-            lines.append("⚠ PB model → letter mapping incomplete")
+        for name in model_unknown:
+            lines.append(f"⚠ {name}: hardware model UNKNOWN")
             attention += 1
-        else:
+        if not model_unknown:
             lines.append("✓ Patchbay hardware models documented")
     except StoreError as exc:
         lines.append(f"✗ Patchbay data invalid: {exc}")
         attention += 1
+
+    pb_stale = [e for e in checks.errors if "patchbays.md" in e or "tascam-channel-map" in e or "alesis-mixer-map" in e or "patchbays.mmd" in e or "tascam-channel-map.mmd" in e]
+    if pb_stale:
+        lines.append("✗ CURRENT projection docs out of sync")
+        attention += 1
+    else:
+        lines.append("✓ Channel-map and patchbay docs synchronized")
 
     # Repository
     lines.append("")

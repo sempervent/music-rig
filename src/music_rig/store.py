@@ -30,6 +30,11 @@ ROUTING_PATH = DATA_DIR / "routing.yaml"
 DOCS_TODO_PATH = ROOT / "docs" / "todo.md"
 DOCS_WISHLIST_PATH = ROOT / "docs" / "wishlist.md"
 DOCS_QUESTIONS_PATH = ROOT / "docs" / "open-questions.md"
+DOCS_PATCHBAYS_PATH = ROOT / "docs" / "patchbays.md"
+DOCS_TASCAM_PATH = ROOT / "docs" / "tascam-channel-map.md"
+DOCS_ALESIS_PATH = ROOT / "docs" / "alesis-mixer-map.md"
+DIAGRAM_PATCHBAYS_PATH = ROOT / "diagrams" / "patchbays.mmd"
+DIAGRAM_TASCAM_PATH = ROOT / "diagrams" / "tascam-channel-map.mmd"
 
 EXISTING_YAML = (
     CHANNEL_MAP_PATH,
@@ -53,11 +58,29 @@ def _dump_yaml(data: dict) -> str:
     )
 
 
+def write_text_files(payloads: list[tuple[Path, str]]) -> None:
+    """Stage all temps then replace. Clean up temps on failure."""
+    if not payloads:
+        return
+    staged: list[tuple[Path, Path]] = []
+    try:
+        for path, text in payloads:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_suffix(path.suffix + ".tmp")
+            tmp.write_text(text, encoding="utf-8")
+            staged.append((tmp, path))
+        for tmp, path in staged:
+            tmp.replace(path)
+            staged = [(t, p) for t, p in staged if t != tmp]
+    except Exception:
+        for tmp, _path in staged:
+            if tmp.exists():
+                tmp.unlink()
+        raise
+
+
 def _atomic_write(path: Path, text: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(text, encoding="utf-8")
-    tmp.replace(path)
+    write_text_files([(path, text)])
 
 
 def _load_mapping(path: Path, label: str) -> dict:
@@ -246,22 +269,7 @@ def write_documents(
                 _dump_yaml(questions.model_dump(mode="json")),
             )
         )
-    # Stage all temps first, then replace — avoid partial multi-file writes.
-    staged: list[tuple[Path, Path]] = []
-    try:
-        for path, text in payloads:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            tmp = path.with_suffix(path.suffix + ".tmp")
-            tmp.write_text(text, encoding="utf-8")
-            staged.append((tmp, path))
-        for tmp, path in staged:
-            tmp.replace(path)
-            staged = [(t, p) for t, p in staged if t != tmp]
-    except Exception:
-        for tmp, _path in staged:
-            if tmp.exists():
-                tmp.unlink()
-        raise
+    write_text_files(payloads)
 
 
 def parse_existing_yaml(path: Path) -> object:
