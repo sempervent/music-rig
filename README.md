@@ -182,6 +182,8 @@ uv run rig current gear retire flamma-mod
 
 # Cross the explicit wishlist → inventory acquisition boundary
 uv run rig current gear acquire "BOSS RC-600"
+# `rig current gear acquire` does not purchase equipment.
+# It records that equipment has already been acquired and updates repository state.
 
 # While working
 uv run rig session note "PH-3 confirmed before TR-2"
