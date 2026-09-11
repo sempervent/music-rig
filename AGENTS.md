@@ -25,9 +25,26 @@ Use the repository itself as the source of remembered state, not chat memory or 
 | Pedals | [docs/pedal-chains.md](docs/pedal-chains.md) | Exact CURRENT active pedal topology |
 | Inventory | [docs/inventory.md](docs/inventory.md) / [data/inventory.yaml](data/inventory.yaml) | Equipment ownership and role — not necessarily current signal-path membership |
 | Diagrams | [diagrams/](diagrams/) | Visual projections of the same authoritative state |
-| Todo | [docs/todo.md](docs/todo.md) | Accepted actionable work only |
-| Wishlist | [docs/wishlist.md](docs/wishlist.md) | Speculative / evaluative desires — not commitments |
-| Open questions | [docs/open-questions.md](docs/open-questions.md) | Unresolved facts — not tasks |
+| Todo (canonical) | [data/todo.yaml](data/todo.yaml) | Structured accepted work — edit this, not generated Markdown sections |
+| Todo (rendered) | [docs/todo.md](docs/todo.md) | Human-facing TODO view; generated section owned by `uv run rig render` |
+| Wishlist (canonical) | [data/wishlist.yaml](data/wishlist.yaml) | Structured speculative desires |
+| Wishlist (rendered) | [docs/wishlist.md](docs/wishlist.md) | Human-facing wishlist view; generated section owned by `uv run rig render` |
+| Open questions | [docs/open-questions.md](docs/open-questions.md) | Unresolved facts — not tasks (still Markdown-only in Stage 1) |
+
+### Planning CLI
+
+```bash
+uv sync --extra dev --extra docs
+uv run rig todo list
+uv run rig wish list
+uv run rig render
+uv run rig render --check
+uv run rig check
+```
+
+- Do **not** hand-edit content between `<!-- rig:todo:start -->` / `<!-- rig:todo:end -->` or wishlist markers.
+- Open questions remain human-maintained Markdown for now.
+- `rig todo add` / `rig wish add` write YAML and re-render docs unless `--no-render` is passed.
 
 ### Planning layers (do not collapse)
 

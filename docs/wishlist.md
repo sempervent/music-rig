@@ -15,6 +15,8 @@ TODO item  (see docs/todo.md)
 Do not treat rows below as approved work. Accepted work lives only in [Todo](todo.md).
 Unresolved **facts** live in [Open Questions](open-questions.md).
 
+Canonical structured source: `data/wishlist.yaml`. Edit via `uv run rig wish ...` or YAML, then `uv run rig render`.
+
 Evaluation order: quality → reproducibility → creative novelty → PFL usefulness → cost → learning value → speed.
 Prefer finished music and playability over gear accumulation.
 
@@ -43,6 +45,9 @@ Prices: use documented snapshots where present; otherwise **UNKNOWN** (do not in
 | P2 | Useful but not urgent |
 | P3 | Curiosity / future |
 
+<!-- rig:wishlist:start -->
+<!-- GENERATED FROM data/wishlist.yaml BY `uv run rig render`. DO NOT EDIT THIS SECTION DIRECTLY. -->
+
 ## Master table
 
 | Item | Category | Problem / Capability | Priority | Status | Duplication | Cost | Friction | Likely Music Impact | Notes |
@@ -64,27 +69,9 @@ Prices: use documented snapshots where present; otherwise **UNKNOWN** (do not in
 | Expression mapping (EV-30 → SL-2 / PH-3) | Controllers / workflow | Hands-free params with **owned** EV-30 | P2 | IDEA | N/A (owned) | Time | Patching | Medium | Not a purchase. |
 | Default loop-building order playbook | Workflow | RC-1 vs KAOSS vs future RC-600 order | P2 | IDEA | N/A | Time | Process | High | Promote into jam-template / recovery TODOs as decisions land. |
 
-No items are marked **BUY NOW** or **REJECTED**.
-
-## Relationship to TODO
-
-| Wishlist outcome | What happens |
-|---|---|
-| Stay IDEA / RESEARCH / BUY LATER / DEFERRED | Remains here only |
-| Decision: buy or implement | Create a TODO with Definition of Done |
-| Capability already owned | Mark REDUNDANT; document/operate owned gear via TODO |
-
-Example:
-
-```text
-Wishlist: BOSS RC-600 — BUY LATER
-   ↓ (after acquisition)
-TODO: RIG-032 — Design and implement RC-600 integration (was WAITING)
-```
-
 ## Detail notes
 
-### BOSS RC-600 (established direction)
+### BOSS RC-600
 
 Desired role: multi-track foot looping, sophisticated overdub/transition control, Ableton integration without replacing Ableton, solo-performance operation. RC-1 remains for simple pre-effects phrase capture.
 
@@ -104,7 +91,23 @@ Keep as a legitimate candidate. Evaluate against TE-2, RE-2, DD-8, SL-2, KAOSS, 
 
 Previously listed as top looper buy. Reclassified: RESEARCH / lower priority vs foot-first RC-600 direction. Separate desk-oriented use case would need explicit justification.
 
-### MIDI topology (owned — not a purchase)
+### Expanded isolated pedal power
+
+Active RESEARCH pending power audit (RIG-047). Problem statement: power the CURRENT pedal population with adequate isolation/headroom while reducing hum/noise.
+
+### Stereo line-to-pedal / reamp / isolation solution
+
+Historical ProRMP on AUX SEND required maxed sends and was too quiet. Capability gap remains RESEARCH (RIG-048), not a product SKU.
+
+### Additional reliable 1080p OBS webcam angle
+
+Only if audit shows missing angles. Account for USB bandwidth and MacBook Air two-port limits.
+
+### Arturia MicroFreak
+
+Interesting; **DEFERRED** behind Eurorack exploration.
+
+### Generic MIDI thru / splitter / router
 
 Owned:
 
@@ -112,22 +115,25 @@ Owned:
 - CME MIDI Thru5 WC — hardware thru distribution
 
 Generic “buy MIDI thru/splitter” is **REDUNDANT**. Finish documentation and verification instead (RIG-037).
+<!-- rig:wishlist:end -->
 
-### Isolated pedal power
+No items are marked **BUY NOW** or **REJECTED**.
 
-Active RESEARCH pending power audit (RIG-047). Problem statement: power the CURRENT pedal population with adequate isolation/headroom while reducing hum/noise.
+## Relationship to TODO
 
-### Stereo line-to-pedal / isolation
+| Wishlist outcome | What happens |
+|---|---|
+| Stay IDEA / RESEARCH / BUY LATER / DEFERRED | Remains here only |
+| Decision: buy or implement | Create a TODO with Definition of Done |
+| Capability already owned | Mark REDUNDANT; document/operate owned gear via TODO |
 
-Historical ProRMP on AUX SEND required maxed sends and was too quiet. Capability gap remains RESEARCH (RIG-048), not a product SKU.
+Example:
 
-### Additional OBS camera
-
-Only if audit shows missing angles. Account for USB bandwidth and MacBook Air two-port limits.
-
-### MicroFreak
-
-Interesting; **DEFERRED** behind Eurorack exploration.
+```text
+Wishlist: BOSS RC-600 — BUY LATER
+   ↓ (after acquisition)
+TODO: RIG-032 — Design and implement RC-600 integration (was WAITING)
+```
 
 ## Priority change conditions
 

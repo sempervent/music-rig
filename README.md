@@ -84,8 +84,8 @@ Clean paths use preamp → A/B/Y before the confirmed TASCAM clean legs (5/6/7).
 - [Current routing](docs/current-routing.md)
 - [Inventory](docs/inventory.md)
 - [Patchbays](docs/patchbays.md)
-- [Todo](docs/todo.md) — accepted work only
-- [Wishlist](docs/wishlist.md) — speculative / evaluative, not commitments
+- [Todo](docs/todo.md) — accepted work only (canonical: `data/todo.yaml`)
+- [Wishlist](docs/wishlist.md) — speculative / evaluative, not commitments (canonical: `data/wishlist.yaml`)
 - [TASCAM channel map](docs/tascam-channel-map.md)
 - [Alesis mixer map](docs/alesis-mixer-map.md)
 - [Pedal chains](docs/pedal-chains.md)
@@ -95,28 +95,55 @@ Clean paths use preamp → A/B/Y before the confirmed TASCAM clean legs (5/6/7).
 - [Troubleshooting log](docs/troubleshooting.md)
 - [Open questions](docs/open-questions.md) — unresolved facts
 
+## Planning CLI (`rig`)
+
+Canonical planning data:
+
+```text
+data/todo.yaml       = canonical TODO data
+data/wishlist.yaml   = canonical wishlist data
+docs/todo.md         = human-facing rendered representation
+docs/wishlist.md     = human-facing rendered representation
+```
+
+Do not manually edit the generated marker sections in the Markdown files.
+
+```bash
+uv sync --extra dev --extra docs
+uv run rig --help
+
+uv run rig todo list
+uv run rig todo show RIG-001
+uv run rig todo add
+
+uv run rig wish list
+uv run rig wish show "BOSS RC-600"
+uv run rig wish add
+
+uv run rig render
+uv run rig render --check
+uv run rig check
+```
+
+`rig todo add` and `rig wish add` write YAML and then re-render Markdown unless `--no-render` is passed.
+
 ## Documentation CI/CD
 
-- Pull requests that change documentation-related files run `mkdocs build --strict`.
-- Pushes to `main` and manual workflow runs build the site and deploy it to GitHub Pages.
+- CI runs pytest, `rig check`, `rig render --check`, channel-map print, and `mkdocs build --strict`.
+- Pushes to `main` also deploy the MkDocs site to GitHub Pages.
 - Local validation:
 
 ```bash
-python -m pip install -r requirements-docs.txt
-mkdocs build --strict
+uv sync --locked --extra dev --extra docs
+uv run pytest
+uv run rig check
+uv run rig render --check
+uv run python scripts/print_channel_map.py
+uv run mkdocs build --strict
 ```
 
 - Local preview:
 
 ```bash
-mkdocs serve
-```
-
-## Local docs preview
-
-This repo is MkDocs-ready:
-
-```bash
-python -m pip install -r requirements-docs.txt
-mkdocs serve
+uv run mkdocs serve
 ```

@@ -1,0 +1,567 @@
+next_session:
+- RIG-001
+- RIG-002
+- RIG-003
+tasks:
+- id: RIG-001
+  task: Physically verify DIRTY chain order and SPACE topology (SY-1 SEND PH-3→TR-2; LS-2
+    loops; A+B MIX↔BYPASS)
+  area: Pedals
+  priority: P0
+  status: NEXT
+  depends_on: []
+  depends_hint: null
+  definition_of_done: '`docs/pedal-chains.md` matches the physical board; any mismatch updated
+    in pedal docs, diagrams, and inventory active lists'
+  notes: Do not invent fixes; document what is actually wired
+  waiting_on: null
+  next_session_why: Unlocks confident playing; catches doc drift immediately
+- id: RIG-002
+  task: Inspect and record normal / half-normal / thru for every populated PB-B pair
+  area: Patchbay
+  priority: P0
+  status: NEXT
+  depends_on: []
+  depends_hint: null
+  definition_of_done: Every populated pair in `data/patchbays.yaml` and `docs/patchbays.md`
+    has `mode` set to normal, half-normal, or thru
+  notes: Upper 9–12 / lower 33–36 included if physically checkable
+  waiting_on: null
+  next_session_why: Highest-value patchbay unknown; quick rack check
+- id: RIG-003
+  task: Trace and document non-clean A/B/Y destinations for acoustic, bass, electric
+  area: Routing
+  priority: P0
+  status: NEXT
+  depends_on: []
+  depends_hint: null
+  definition_of_done: Each instrument’s other splitter leg is recorded in `docs/current-routing.md`
+    + `data/routing.yaml`, or explicitly marked UNKNOWN with reason
+  notes: Resolves open-questions routing fact
+  waiting_on: null
+  next_session_why: Completes clean-path story without buying anything
+- id: RIG-004
+  task: Map ART P48 / Behringer PX3000 units to PB-A/B/C/D letters
+  area: Patchbay
+  priority: P1
+  status: READY
+  depends_on: []
+  depends_hint: null
+  definition_of_done: '`data/patchbays.yaml` and `docs/patchbays.md` list hardware_model per
+    bay'
+  notes: Visual/serial inspection at rack
+  waiting_on: null
+  next_session_why: null
+- id: RIG-005
+  task: Decide roles for PB-A, PB-C, PB-D (remain open vs assigned roles)
+  area: Patchbay
+  priority: P1
+  status: READY
+  depends_on:
+  - RIG-004
+  depends_hint: helpful
+  definition_of_done: Each bay has a documented role or explicit “leave undocumented/open
+    for now” decision in `docs/patchbays.md`
+  notes: Decision, not speculative wiring
+  waiting_on: null
+  next_session_why: null
+- id: RIG-006
+  task: Identify intended sources for PB-B lower 33–36 (or confirm intentionally unused)
+  area: Patchbay
+  priority: P1
+  status: READY
+  depends_on: []
+  depends_hint: null
+  definition_of_done: Upper 9–12 plan or “intentionally unassigned” recorded in patchbay docs/YAML
+  notes: Do not invent sources
+  waiting_on: null
+  next_session_why: null
+- id: RIG-007
+  task: Verify `assets/pedal-flow.jpeg` against CURRENT topology; update, archive, or remove
+  area: Docs
+  priority: P2
+  status: READY
+  depends_on:
+  - RIG-001
+  depends_hint: null
+  definition_of_done: Image matches CURRENT or is moved/labeled HISTORICAL/removed with a
+    note in docs
+  notes: Untracked asset; treat carefully
+  waiting_on: null
+  next_session_why: null
+- id: RIG-008
+  task: Determine acoustic instrument Alesis mixer assignment if any
+  area: Routing
+  priority: P1
+  status: READY
+  depends_on:
+  - RIG-003
+  depends_hint: helpful
+  definition_of_done: Alesis map + channel-map YAML updated, or documented as TASCAM-only
+  notes: Open question fact
+  waiting_on: null
+  next_session_why: null
+- id: RIG-009
+  task: Verify physical CH-1 stereo return jack(s) into Alesis
+  area: Routing
+  priority: P1
+  status: READY
+  depends_on: []
+  depends_hint: null
+  definition_of_done: Exact return path recorded in `docs/current-routing.md` and `docs/alesis-mixer-map.md`
+  notes: Stereo return vs specific line channel
+  waiting_on: null
+  next_session_why: null
+- id: RIG-010
+  task: Physically verify KAOSS Replay monitor/capture path vs docs
+  area: Routing
+  priority: P1
+  status: READY
+  depends_on: []
+  depends_hint: null
+  definition_of_done: Monitor Out → KAOSS → TASCAM 9/10 confirmed or docs corrected
+  notes: Separate from AUX SEND
+  waiting_on: null
+  next_session_why: null
+- id: RIG-011
+  task: Confirm Flamma Mod and PH-2 physical location (disconnected / stored / elsewhere)
+  area: Pedals
+  priority: P2
+  status: READY
+  depends_on:
+  - RIG-001
+  depends_hint: null
+  definition_of_done: Inventory notes state location; still not listed as CURRENT path unless
+    rewired and documented
+  notes: Owned ≠ in chain
+  waiting_on: null
+  next_session_why: null
+- id: RIG-012
+  task: Label major cables (clean legs, AUX SEND loop, KAOSS, PB-B critical pairs)
+  area: Studio ops
+  priority: P1
+  status: READY
+  depends_on: []
+  depends_hint: null
+  definition_of_done: Critical paths have readable labels; optional legend added under docs
+    or patchbays
+  notes: Prefer heat-shrink / tape that survives
+  waiting_on: null
+  next_session_why: null
+- id: RIG-013
+  task: Label patchbay front rows for populated PB-B jacks
+  area: Patchbay
+  priority: P1
+  status: READY
+  depends_on:
+  - RIG-002
+  depends_hint: helpful
+  definition_of_done: Front labels match `docs/patchbays.md` jack map
+  notes: ''
+  waiting_on: null
+  next_session_why: null
+- id: RIG-014
+  task: Write startup / shutdown checklist
+  area: Studio ops
+  priority: P1
+  status: READY
+  depends_on: []
+  depends_hint: null
+  definition_of_done: Doc covers power-up/down order, Mac/USB, Ableton, interface, mixer,
+    MIDI sanity, audio sanity, emergency shutdown
+  notes: Link from index
+  waiting_on: null
+  next_session_why: null
+- id: RIG-015
+  task: Define and run known-good baseline smoke test
+  area: Studio ops
+  priority: P0
+  status: READY
+  depends_on:
+  - RIG-001
+  depends_hint: helpful
+  definition_of_done: Checklist + dated pass/fail proving clean captures, AUX loop, and KAOSS
+    path; distinguishes “broken” from “booted differently”
+  notes: ''
+  waiting_on: null
+  next_session_why: null
+- id: RIG-016
+  task: Capture a dated full-rig reference configuration snapshot
+  area: Docs
+  priority: P1
+  status: READY
+  depends_on:
+  - RIG-001
+  - RIG-002
+  depends_hint: null
+  definition_of_done: Dated note or commit references that routing/YAML/docs match the physical
+    rack that day
+  notes: Photo optional
+  waiting_on: null
+  next_session_why: null
+- id: RIG-017
+  task: Back up controller mappings (Launchpad, Launch Control 3, padKONTROL, FCB, ZeRO SL,
+    Stream Deck+)
+  area: Studio ops
+  priority: P2
+  status: READY
+  depends_on: []
+  depends_hint: null
+  definition_of_done: Backup location documented; files recoverable
+  notes: Prefer external/archive path noted in docs, not large binaries in git
+  waiting_on: null
+  next_session_why: null
+- id: RIG-018
+  task: Back up Ableton PFL jam template / set
+  area: Studio ops
+  priority: P1
+  status: READY
+  depends_on:
+  - RIG-038
+  depends_hint: helpful
+  definition_of_done: Template location + version/date documented; restore tested once
+  notes: ''
+  waiting_on: null
+  next_session_why: null
+- id: RIG-019
+  task: Document recovery from a bad live-looping state
+  area: Studio ops
+  priority: P1
+  status: READY
+  depends_on: []
+  depends_hint: null
+  definition_of_done: 'Short recovery steps: clear RC-1, wrong clip, runaway feedback, stuck
+    MIDI, KAOSS mistake, wrong scene, mute/solo accidents, pedal noise, emergency stop — prefer
+    without keyboard/mouse'
+  notes: Expanded by RIG-044
+  waiting_on: null
+  next_session_why: null
+- id: RIG-020
+  task: Bench-test Big Muff with known-good cables and power
+  area: Pedals
+  priority: P2
+  status: WAITING
+  depends_on: []
+  depends_hint: null
+  definition_of_done: Big Muff produces audio with known-good cables and power, or is documented
+    failed/removed from inventory.
+  notes: Bench-test only.
+  waiting_on: Bench time + known-good PSU/cables available
+  next_session_why: null
+- id: RIG-021
+  task: Isolate RE-2 / Space Echo noise (one-pedal-at-a-time)
+  area: Pedals
+  priority: P1
+  status: WAITING
+  depends_on: []
+  depends_hint: null
+  definition_of_done: RE-2 / Space Echo noise isolated to a cause with one-variable changes;
+    next action recorded.
+  notes: Quiet session; optional spare isolated supply for A/B after RIG-047.
+  waiting_on: Quiet session; optional spare isolated supply for A/B after RIG-047
+  next_session_why: null
+- id: RIG-022
+  task: Complete FCB1010 MIDI OUT → TASCAM MIDI IN direct test
+  area: MIDI
+  priority: P1
+  status: WAITING
+  depends_on: []
+  depends_hint: null
+  definition_of_done: FCB1010 MIDI OUT → TASCAM MIDI IN direct test completed with MIDI monitor
+    observations recorded.
+  notes: Prerequisite for retiring FCB1010 on workflow grounds.
+  waiting_on: MIDI cable + MIDI monitor app session
+  next_session_why: null
+- id: RIG-023
+  task: Decide whether MIDI Captain remains WAITING or becomes a buy decision
+  area: Controllers
+  priority: P2
+  status: WAITING
+  depends_on:
+  - RIG-022
+  - RIG-030
+  - RIG-035
+  depends_hint: null
+  definition_of_done: MIDI Captain wishlist status updated to BUY LATER, DEFERRED, or REJECTED
+    based on FCB1010 + mapping plan outcomes.
+  notes: Depends on RIG-022, RIG-035, RIG-030.
+  waiting_on: Outcome of RIG-022 + RIG-035 + RIG-030
+  next_session_why: null
+- id: RIG-024
+  task: Test PYLE-PRO PDC22 placement options (Privia / JOYO / clean taps)
+  area: Routing
+  priority: P2
+  status: READY
+  depends_on: []
+  depends_hint: null
+  definition_of_done: Recommendation written in reamp-and-di.md; open question updated
+  notes: Not a purchase
+  waiting_on: null
+  next_session_why: null
+- id: RIG-025
+  task: Decide whether LS-2 has any bass split/blend role outside SPACE
+  area: Pedals
+  priority: P2
+  status: DEFERRED
+  depends_on:
+  - RIG-001
+  depends_hint: null
+  definition_of_done: 'Decision recorded: SPACE-only vs additional bass role'
+  notes: Currently CURRENT in SPACE
+  waiting_on: null
+  next_session_why: null
+- id: RIG-030
+  task: Write a minimal MIDI mapping plan (Ableton + foot control targets)
+  area: MIDI
+  priority: P2
+  status: READY
+  depends_on: []
+  depends_hint: null
+  definition_of_done: One-page mapping plan in midi-clock.md or linked doc
+  notes: Feeds RIG-035 / RIG-036 / RIG-037
+  waiting_on: null
+  next_session_why: null
+- id: RIG-031
+  task: Confirm Ableton as default master clock in practice
+  area: MIDI
+  priority: P2
+  status: READY
+  depends_on: []
+  depends_hint: null
+  definition_of_done: midi-clock.md states verified CURRENT behavior, not only intent
+  notes: ''
+  waiting_on: null
+  next_session_why: null
+- id: RIG-032
+  task: Design and implement RC-600 integration
+  area: Live looping
+  priority: P1
+  status: WAITING
+  depends_on: []
+  depends_hint: null
+  definition_of_done: Documents audio path, patchbay access, MIDI clock, Ableton relationship,
+    foot-control roles, RC-1 post-integration role, emergency-stop/recovery, and CURRENT docs
+    are updated after physical install — no speculative CURRENT wiring beforehand.
+  notes: WAITING on RC-600 acquisition (wishlist BUY LATER).
+  waiting_on: RC-600 acquisition (wishlist BUY LATER)
+  next_session_why: null
+- id: RIG-033
+  task: Define PFL Eurorack v1 requirements and integration boundary
+  area: Modular
+  priority: P1
+  status: READY
+  depends_on: []
+  depends_hint: null
+  definition_of_done: 'Written brief answers: what Eurorack adds vs Ableton/Reason/pedals;
+    MIDI/CV; audio I/O; rack size; performance vs generative roles; sync; recording path;
+    budget boundary; MVP first case; what NOT to duplicate'
+  notes: Research/design only — not purchase authorization
+  waiting_on: null
+  next_session_why: null
+- id: RIG-034
+  task: Map Launch Control 3 for Ableton performance sends (esp. Send D)
+  area: Controllers
+  priority: P1
+  status: READY
+  depends_on:
+  - RIG-038
+  depends_hint: helpful
+  definition_of_done: Exact active tracks listed; Send D mapped coherently; remaining encoders/buttons
+    assigned; Custom Mode vs Ableton mode documented; config backed up
+  notes: Do not invent track names that conflict with ableton-track-map.md — verify live set
+    first
+  waiting_on: null
+  next_session_why: null
+- id: RIG-035
+  task: Finalize FCB1010 configuration and Ableton mappings
+  area: Controllers
+  priority: P1
+  status: READY
+  depends_on:
+  - RIG-022
+  depends_hint: null
+  definition_of_done: MIDI ch16; EXP A=CC111; EXP B=CC112; banks 00 arm/FX, 01 looper, 02
+    scene launcher documented; all switches assigned; no MIDI conflicts; tested; mapping stored
+    in repo; rebuild procedure written
+  notes: Exact switch map TBD until confirmed
+  waiting_on: null
+  next_session_why: null
+- id: RIG-036
+  task: Finalize and document Novation ReMOTE ZeRO SL performance templates
+  area: Controllers
+  priority: P1
+  status: READY
+  depends_on:
+  - RIG-030
+  depends_hint: helpful
+  definition_of_done: 'Templates verified (PFL SEND C, REVERB FX, DELAY/SEND, MIDI GEN, MASTERING,
+    QUANT, FX, CHAOS); avoid broken encoder #6; MIDI ch15 documented; PAD 8 = HOME; backups
+    saved; no collisions with FCB1010/padKONTROL/Privia'
+  notes: ''
+  waiting_on: null
+  next_session_why: null
+- id: RIG-037
+  task: Document and verify final physical MIDI topology
+  area: MIDI
+  priority: P0
+  status: READY
+  depends_on:
+  - RIG-031
+  depends_hint: helpful
+  definition_of_done: Physical USB + DIN paths; U6MIDI Pro routes/filters; Thru5 WC role;
+    clock master + destinations; channels (Privia 1, padKONTROL 10, ZeRO 15, FCB 16); Ableton
+    Track/Sync/Remote settings; feedback prevention; All Notes Off path; MIDI-monitor tested
+  notes: Owned CME gear — operate, don’t repurchase
+  waiting_on: null
+  next_session_why: null
+- id: RIG-038
+  task: Create/finalize repeatable PFL JAM Ableton template
+  area: Ableton
+  priority: P0
+  status: READY
+  depends_on: []
+  depends_hint: null
+  definition_of_done: 'Turn-on-and-play set: active tracks, names, clean/wet/KAOSS paths,
+    returns/sends (incl. Send D role if used), controller mappings, clock, monitoring, Session
+    layout, record-ready, panic/recovery; can record a rough jam immediately'
+  notes: Finished music outranks rig redesign
+  waiting_on: null
+  next_session_why: null
+- id: RIG-039
+  task: Normalize padKONTROL footswitch clip-record toggle to single predictable action
+  area: Ableton / M4L
+  priority: P1
+  status: READY
+  depends_on: []
+  depends_hint: null
+  definition_of_done: Max for Live (or alternate) clip-record start/stop is one intentional
+    action each; double-press stop issue gone or documented workaround; behavior tested
+  notes: Prior workflow had two-press stop; not documented as solved in repo
+  waiting_on: null
+  next_session_why: null
+- id: RIG-040
+  task: Complete PB-A / PB-C / PB-D design for workflow access
+  area: Patchbay
+  priority: P1
+  status: BLOCKED
+  depends_on:
+  - RIG-001
+  - RIG-002
+  - RIG-003
+  - RIG-004
+  - RIG-005
+  - RIG-006
+  depends_hint: null
+  definition_of_done: Design doc assigns remaining bays for live looping, clean+wet simultaneous
+    record, front-panel access, growth space; preserves documented PB-B; no speculative CURRENT
+    jack fills until wired
+  notes: ''
+  waiting_on: null
+  next_session_why: null
+- id: RIG-041
+  task: Cable inventory and labeling pass
+  area: Studio ops
+  priority: P1
+  status: READY
+  depends_on: []
+  depends_hint: null
+  definition_of_done: Counts by type/length (TS, TRS, XLR, MIDI DIN, USB, expression, patch);
+    shortage list; installed ends labeled; patchbay cables identified; avoid needless cable
+    purchases
+  notes: Extends RIG-012
+  waiting_on: null
+  next_session_why: null
+- id: RIG-042
+  task: Audit owned OBS / webcam inventory vs needed PFL angles
+  area: Video
+  priority: P2
+  status: READY
+  depends_on: []
+  depends_hint: null
+  definition_of_done: Owned cameras/angles documented; USB bandwidth constraints noted; wishlist
+    camera row marked REDUNDANT or kept RESEARCH with a concrete gap
+  notes: ''
+  waiting_on: null
+  next_session_why: null
+- id: RIG-043
+  task: Establish rig backup / archive procedure
+  area: Studio ops
+  priority: P1
+  status: READY
+  depends_on: []
+  depends_hint: null
+  definition_of_done: Procedure covers Ableton template, M4L devices, LC3, ZeRO SL, FCB1010
+    docs, U6MIDI Pro routes, Stream Deck profiles, KAOSS settings, important samples/PFL assets;
+    docs record backup *location* without dumping binaries into git
+  notes: Extends RIG-017/018
+  waiting_on: null
+  next_session_why: null
+- id: RIG-044
+  task: Write one-performer live-looping recovery playbook
+  area: Studio ops
+  priority: P1
+  status: READY
+  depends_on:
+  - RIG-019
+  depends_hint: null
+  definition_of_done: Playbook covers bad RC-1 loop, wrong clip, runaway delay/feedback, stuck
+    note, KAOSS mistake, wrong scene, mute/solo accidents, pedal noise, full emergency stop;
+    prefer recovery without keyboard/mouse
+  notes: ''
+  waiting_on: null
+  next_session_why: null
+- id: RIG-045
+  task: Finish Stream Deck+ / OBS hands-off performance profiles
+  area: Video / ops
+  priority: P1
+  status: READY
+  depends_on:
+  - RIG-042
+  depends_hint: helpful
+  definition_of_done: Profiles (PFL HOME, OBS REC, OBS SCENES, OBS SAFE, ABLETON, FILES, MAC-RIG,
+    SETTINGS) verified or remaining gaps listed; OBS SAFE provides stop-record, mute, camera
+    isolate, replay save where supported, return to known scene; no keyboard/mouse needed
+    for core performance
+  notes: Do not recreate already-complete pages
+  waiting_on: null
+  next_session_why: null
+- id: RIG-046
+  task: Record one complete PFL reference jam through the documented rig
+  area: Integration
+  priority: P0
+  status: READY
+  depends_on:
+  - RIG-015
+  depends_hint: helpful
+  definition_of_done: At least one instrument source; AUX SEND wet path; RC-1 used; JOYO branch
+    used; KAOSS available/used; Ableton records expected paths; OBS/camera if practical; recording
+    reviewed; discrepancies logged
+  notes: Proves the rig makes music
+  waiting_on: null
+  next_session_why: null
+- id: RIG-047
+  task: Audit pedal power supplies vs CURRENT pedal load
+  area: Pedals / power
+  priority: P1
+  status: READY
+  depends_on:
+  - RIG-001
+  depends_hint: helpful
+  definition_of_done: Per-pedal voltage + current need, supply assignment, isolation, total
+    headroom documented; wishlist power item updated (buy / park / REDUNDANT)
+  notes: Change one variable at a time if diagnosing noise
+  waiting_on: null
+  next_session_why: null
+- id: RIG-048
+  task: Research stereo line-to-pedal / reamp / isolation options against owned ProRMP + PDC22
+  area: Routing
+  priority: P2
+  status: READY
+  depends_on:
+  - RIG-024
+  depends_hint: helpful
+  definition_of_done: Written comparison of capability gap vs owned gear; shortlist or “no
+    buy — workflow change” decision; no product purchase committed
+  notes: Wishlist RESEARCH companion
+  waiting_on: null
+  next_session_why: null
