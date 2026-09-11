@@ -17,6 +17,7 @@ items:
 
 
     Do **not** invent CURRENT wiring. Integration design is TODO RIG-032 (WAITING on acquisition).'
+  todo_refs: []
 - item: PFL Eurorack v1
   category: Modular
   problem_capability: Generative sound, playable modulation, strange rhythm, controlled randomness,
@@ -35,6 +36,7 @@ items:
 
 
     Requirements/boundary design: TODO RIG-033. No module shopping list until that exists.'
+  todo_refs: []
 - item: Hologram Microcosm
   category: Pedal / texture
   problem_capability: Playable granular / resampling / micro-loop texture not ergonomically
@@ -49,6 +51,7 @@ items:
   details: Keep as a legitimate candidate. Evaluate against TE-2, RE-2, DD-8, SL-2, KAOSS,
     Ableton, Reason, and future Eurorack. Status RESEARCH (not BUY NOW / BUY LATER until uniqueness
     is proven).
+  todo_refs: []
 - item: BOSS RC-505mkII
   category: Live looping
   problem_capability: Hands-on multi-track looper with faders
@@ -61,6 +64,7 @@ items:
   notes: Do not substitute for RC-600. Demoted vs foot-operated priorities.
   details: 'Previously listed as top looper buy. Reclassified: RESEARCH / lower priority vs
     foot-first RC-600 direction. Separate desk-oriented use case would need explicit justification.'
+  todo_refs: []
 - item: Expanded isolated pedal power
   category: Studio infrastructure
   problem_capability: Adequate isolated power for CURRENT pedal population; reduce hum/noise;
@@ -74,6 +78,7 @@ items:
   notes: Audit load first (TODO RIG-047). Do not buy until audit implicates supply.
   details: 'Active RESEARCH pending power audit (RIG-047). Problem statement: power the CURRENT
     pedal population with adequate isolation/headroom while reducing hum/noise.'
+  todo_refs: []
 - item: Stereo line-to-pedal / reamp / isolation solution
   category: Audio isolation
   problem_capability: Reliable line-level → pedal-level path without crushing AUX SEND (ProRMP
@@ -87,6 +92,7 @@ items:
   notes: Capability gap, not a product pick yet.
   details: Historical ProRMP on AUX SEND required maxed sends and was too quiet. Capability
     gap remains RESEARCH (RIG-048), not a product SKU.
+  todo_refs: []
 - item: Additional reliable 1080p OBS webcam angle
   category: Recording / video
   problem_capability: Extra simultaneous OBS view (hands / pedals / room / direct-address)
@@ -100,6 +106,7 @@ items:
   notes: Buy only if owned cameras cannot cover needed angles.
   details: Only if audit shows missing angles. Account for USB bandwidth and MacBook Air two-port
     limits.
+  todo_refs: []
 - item: Arturia MicroFreak
   category: Instruments
   problem_capability: Compact digital/hybrid synth exploration
@@ -111,6 +118,7 @@ items:
   likely_music_impact: Medium
   notes: Interesting but not the preferred next synthesis direction.
   details: Interesting; **DEFERRED** behind Eurorack exploration.
+  todo_refs: []
 - item: PaintAudio MIDI Captain
   category: Controllers
   problem_capability: Compact foot PC/CC/note control
@@ -122,6 +130,7 @@ items:
   likely_music_impact: Medium after MIDI plan
   notes: Finish FCB1010 first (RIG-022, RIG-035).
   details: ''
+  todo_refs: []
 - item: Pioneer DJ DDJ-FLX4
   category: Controllers / performance
   problem_capability: DJ + hybrid live workflow
@@ -133,6 +142,7 @@ items:
   likely_music_impact: Low unless DJ sets are a real goal
   notes: Buy only when hybrid set defined.
   details: ''
+  todo_refs: []
 - item: Line 6 DL4 MkII
   category: Pedals / consolidation
   problem_capability: Delay + looper consolidation; mic-input looping
@@ -144,6 +154,7 @@ items:
   likely_music_impact: Low–medium unless it replaces several pedals
   notes: EXPERIMENT only until consolidation criteria met.
   details: ''
+  todo_refs: []
 - item: Nord Stage 4 88
   category: Instruments
   problem_capability: Weighted stage piano/organ/synth replacement for Privia
@@ -155,6 +166,7 @@ items:
   likely_music_impact: High if keys become central
   notes: Elevate only if Privia limits the project.
   details: ''
+  todo_refs: []
 - item: Generic MIDI thru / splitter / router
   category: MIDI utilities
   problem_capability: Distribute / route MIDI clock and controllers
@@ -175,6 +187,7 @@ items:
 
     Generic “buy MIDI thru/splitter” is **REDUNDANT**. Finish documentation and verification
     instead (RIG-037).'
+  todo_refs: []
 - item: Additional stereo DI / line isolator (generic)
   category: Audio isolation / DI
   problem_capability: Extra DI/isolation
@@ -186,6 +199,7 @@ items:
   likely_music_impact: Low–medium
   notes: Prefer solving ProRMP/AUX gain gap (above) and PDC22 placement (RIG-024).
   details: ''
+  todo_refs: []
 - item: Expression mapping (EV-30 → SL-2 / PH-3)
   category: Controllers / workflow
   problem_capability: Hands-free params with **owned** EV-30
@@ -197,6 +211,7 @@ items:
   likely_music_impact: Medium
   notes: Not a purchase.
   details: ''
+  todo_refs: []
 - item: Default loop-building order playbook
   category: Workflow
   problem_capability: RC-1 vs KAOSS vs future RC-600 order
@@ -208,3 +223,4 @@ items:
   likely_music_impact: High
   notes: Promote into jam-template / recovery TODOs as decisions land.
   details: ''
+  todo_refs: []

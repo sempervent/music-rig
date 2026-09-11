@@ -29,22 +29,44 @@ Use the repository itself as the source of remembered state, not chat memory or 
 | Todo (rendered) | [docs/todo.md](docs/todo.md) | Human-facing TODO view; generated section owned by `uv run rig render` |
 | Wishlist (canonical) | [data/wishlist.yaml](data/wishlist.yaml) | Structured speculative desires |
 | Wishlist (rendered) | [docs/wishlist.md](docs/wishlist.md) | Human-facing wishlist view; generated section owned by `uv run rig render` |
-| Open questions | [docs/open-questions.md](docs/open-questions.md) | Unresolved facts — not tasks (still Markdown-only in Stage 1) |
+| Inbox | [data/inbox.yaml](data/inbox.yaml) | Uncategorized captures — observations only, not CURRENT truth |
+| Open questions | [docs/open-questions.md](docs/open-questions.md) | Unresolved facts — not tasks (still Markdown-only in Stage 2) |
 
 ### Planning CLI
 
 ```bash
 uv sync --extra dev --extra docs
-uv run rig todo list
+uv run rig status
+
+# Work
+uv run rig todo start RIG-001
+uv run rig todo done RIG-001
+
+# Plan next studio session
+uv run rig todo next list
+uv run rig todo next set RIG-002 RIG-038 RIG-046
+
+# Wishlist
 uv run rig wish list
-uv run rig render
+uv run rig wish promote "PFL Eurorack v1"
+
+# Capture now, classify later
+uv run rig capture "RE-2 noisy after DD-8"
+uv run rig inbox list
+uv run rig inbox triage CAP-001
+
 uv run rig render --check
 uv run rig check
 ```
 
-- Do **not** hand-edit content between `<!-- rig:todo:start -->` / `<!-- rig:todo:end -->` or wishlist markers.
+- Canonical planning data: `data/todo.yaml`, `data/wishlist.yaml`, `data/inbox.yaml`.
+- Do **not** hand-edit generated TODO/Wishlist Markdown sections.
+- `next_session` is the authoritative Next Session queue; TODO status is lifecycle only (`READY`, `IN PROGRESS`, etc.). There is no `NEXT` status.
+- Mutation commands write YAML and re-render docs unless `--no-render` is passed.
+- No CLI mutation command commits or pushes Git.
+- Inbox captures are observations, not confirmed CURRENT rig truth.
 - Open questions remain human-maintained Markdown for now.
-- `rig todo add` / `rig wish add` write YAML and re-render docs unless `--no-render` is passed.
+- Prefer the CLI/service layer for planning mutations when practical.
 
 ### Planning layers (do not collapse)
 
