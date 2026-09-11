@@ -1,0 +1,211 @@
+# Physical patchbay jack map.
+# Upper jack N pairs with lower jack N+24. Mode is normal/half-normal/thru when known.
+# Do not infer normalled signal flow from rear connections alone.
+
+schema_notes:
+  jack_fields:
+    - row: upper | lower
+    - connection: free-text device/port label, or null if unassigned/undocumented
+    - device: optional structured device name
+    - port: optional structured port name
+    - direction: optional (source | destination | bidirectional | unknown)
+    - paired_with: paired jack number on the other row
+    - mode: normal | half-normal | thru | unknown
+    - status: documented | unassigned | undocumented
+    - notes: free text
+
+patchbays:
+  PB-A:
+    hardware_model: unknown
+    status: undocumented
+    jacks: {}
+
+  PB-B:
+    hardware_model: unknown
+    status: partially_documented
+    numbering:
+      upper: "1-24"
+      lower: "25-48"
+    jacks:
+      1:
+        row: upper
+        connection: miniKORG L/MONO
+        device: miniKORG
+        port: L/MONO
+        direction: source
+        paired_with: 25
+        mode: unknown
+        status: documented
+      2:
+        row: upper
+        connection: miniKORG R
+        device: miniKORG
+        port: R
+        direction: source
+        paired_with: 26
+        mode: unknown
+        status: documented
+      3:
+        row: upper
+        connection: SR-18 MAIN L
+        device: Alesis SR-18
+        port: MAIN L
+        direction: source
+        paired_with: 27
+        mode: unknown
+        status: documented
+      4:
+        row: upper
+        connection: SR-18 MAIN R
+        device: Alesis SR-18
+        port: MAIN R
+        direction: source
+        paired_with: 28
+        mode: unknown
+        status: documented
+      7:
+        row: upper
+        connection: Privia L/MONO
+        device: Casio Privia
+        port: L/MONO
+        direction: source
+        paired_with: 31
+        mode: unknown
+        status: documented
+      8:
+        row: upper
+        connection: Privia R
+        device: Casio Privia
+        port: R
+        direction: source
+        paired_with: 32
+        mode: unknown
+        status: documented
+      9:
+        row: upper
+        connection: null
+        paired_with: 33
+        mode: unknown
+        status: unassigned
+      10:
+        row: upper
+        connection: null
+        paired_with: 34
+        mode: unknown
+        status: unassigned
+      11:
+        row: upper
+        connection: null
+        paired_with: 35
+        mode: unknown
+        status: unassigned
+      12:
+        row: upper
+        connection: null
+        paired_with: 36
+        mode: unknown
+        status: unassigned
+      25:
+        row: lower
+        connection: TASCAM input 3
+        device: TASCAM US-16x08
+        port: input 3
+        direction: destination
+        paired_with: 1
+        mode: unknown
+        status: documented
+      26:
+        row: lower
+        connection: TASCAM input 4
+        device: TASCAM US-16x08
+        port: input 4
+        direction: destination
+        paired_with: 2
+        mode: unknown
+        status: documented
+      27:
+        row: lower
+        connection: TASCAM input 11
+        device: TASCAM US-16x08
+        port: input 11
+        direction: destination
+        paired_with: 3
+        mode: unknown
+        status: documented
+      28:
+        row: lower
+        connection: TASCAM input 12
+        device: TASCAM US-16x08
+        port: input 12
+        direction: destination
+        paired_with: 4
+        mode: unknown
+        status: documented
+      31:
+        row: lower
+        connection: Alesis CH 5/L
+        device: Alesis mixer
+        port: CH 5/L
+        direction: destination
+        paired_with: 7
+        mode: unknown
+        status: documented
+      32:
+        row: lower
+        connection: Alesis CH 6/R
+        device: Alesis mixer
+        port: CH 6/R
+        direction: destination
+        paired_with: 8
+        mode: unknown
+        status: documented
+      33:
+        row: lower
+        connection: Alesis CH 7/L
+        device: Alesis mixer
+        port: CH 7/L
+        direction: destination
+        paired_with: 9
+        mode: unknown
+        status: documented
+        notes: Upper jack 9 is unassigned; no documented source for this destination.
+      34:
+        row: lower
+        connection: Alesis CH 8/R
+        device: Alesis mixer
+        port: CH 8/R
+        direction: destination
+        paired_with: 10
+        mode: unknown
+        status: documented
+        notes: Upper jack 10 is unassigned; no documented source for this destination.
+      35:
+        row: lower
+        connection: miniKORG AUDIO IN 1
+        device: miniKORG
+        port: AUDIO IN 1
+        direction: destination
+        paired_with: 11
+        mode: unknown
+        status: documented
+        notes: Upper jack 11 is unassigned; no documented source for this destination.
+      36:
+        row: lower
+        connection: miniKORG AUDIO IN 2
+        device: miniKORG
+        port: AUDIO IN 2
+        direction: destination
+        paired_with: 12
+        mode: unknown
+        status: documented
+        notes: Upper jack 12 is unassigned; no documented source for this destination.
+
+  PB-C:
+    hardware_model: unknown
+    status: undocumented
+    jacks: {}
+
+  PB-D:
+    hardware_model: unknown
+    status: undocumented
+    jacks: {}

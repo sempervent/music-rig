@@ -1,43 +1,99 @@
+# Ownership and roles. Active signal membership is not implied by presence here.
+# CURRENT active topology: docs/pedal-chains.md and data/routing.yaml.
+
 interfaces:
   - TASCAM US-16x08
   - Alesis mixer
+
 instruments:
   - Bass
-  - Guitar
+  - Electric guitar
+  - Acoustic instrument
   - Electric kazoo
   - Casio Privia
   - Korg miniKORG
+  - Alesis SR-18
+
+preamps:
+  - name: BOSS acoustic preamp
+    instrument: Acoustic instrument
+  - name: BBox preamp
+    instrument: Bass
+  - name: Flamma preamp
+    instrument: Electric guitar
+
+splitters:
+  - A/B/Y splitters  # clean TASCAM legs confirmed; other legs UNKNOWN
+
 loopers_samplers:
   - BOSS RC-1
   - KAOSS Replay
+
+patchbay_hardware:
+  owned:
+    - { model: ART Pro Audio P48, quantity: 2 }
+    - { model: Behringer PX3000, quantity: 2 }
+  named_bays:
+    - PB-A
+    - PB-B
+    - PB-C
+    - PB-D
+  model_to_bay_mapping: UNKNOWN
+
 routers_di_reamp:
   - JOYO A/B/Bypass router
   - BOSS LS-2
   - Radial ProRMP
   - PYLE-PRO PDC22 dual DI
   - MXR TRS split + tap
+
 controllers:
   - Launchpad X
+  - Novation Launch Control 3
   - Korg padKONTROL
   - Behringer FCB1010
-  - Novation Remote Zero SL
+  - Novation ReMOTE ZeRO SL
+  - Elgato Stream Deck+
   - MOSKY Dual Switch
   - BOSS EV-30
-pedals_chain_a:
+
+midi_interfaces:
+  - CME U6MIDI Pro  # 3 in / 3 out; route / merge / filter
+  - CME MIDI Thru5 WC  # hardware thru distribution
+
+# CURRENT active path membership
+active_aux_front:
+  - BOSS RC-1
+  - Cry Baby
+
+active_joyo_dirty:  # JOYO Send A
   - OD-1
   - BD-2
   - JB-2
   - MT-2w
-  - TR-2
   - DS-1
-pedals_chain_b:
-  - SY-1
-  - Flamma Mod
-  - PH-2
-  - SL-2
-  - DD-8
-  - PH-3
-  - TE-2
-  - RE-2
+
+active_joyo_space:  # JOYO Send B
+  sy1:
+    pedal: SY-1
+    send_return_loop:
+      - PH-3
+      - TR-2
+  ls2:
+    pedal: LS-2
+    mode: A+B MIX <-> BYPASS
+    loop_a:
+      - SL-2
+      - DD-8
+    loop_b:
+      - TE-2
+      - RE-2
+
 post_router:
   - BOSS CH-1
+
+# OWNED but not in CURRENT active signal path
+owned_not_in_active_chain:
+  - Flamma Mod
+  - PH-2
+  - Big Muff  # failed/no audio; bench-test

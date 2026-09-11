@@ -1,196 +1,140 @@
-# Studio Wishlist and Upgrade Priorities
+# Studio Wishlist
 
-These priorities represent the recommended purchase order for this specific rig and workflow, not absolute product quality rankings.
-
-Prices and availability must be verified before purchase. Approximate price snapshots below are dated July 15, 2026.
-
-## Priority Overview
-
-| Priority | Device | Primary role | Fit with current rig | Main benefit | Existing equipment overlap | Recommended integration point | Purchase condition or decision gate | Approximate price snapshot | Status |
-|---:|---|---|---|---|---|---|---|---|---|
-| 1 | BOSS RC-505mkII Loop Station | Central multi-track live looper | Very high | Adds structured multi-track loop architecture without removing the current AUX SEND pedal loop | Some overlap with BOSS RC-1 and KAOSS Replay, but fills a larger arrangement role | Alesis Monitor Out -> RC-505mkII -> KAOSS Replay -> TASCAM 9/10 | Buy first if one-person live-loop structure is the main bottleneck | Approximately $640 to $660 | Proposed |
-| 2 | Hologram Electronics Microcosm | Creative stereo texture processor | Very high | Adds granular, micro-looping, pitch, glitch, drone, and preset-based stereo processing not covered cleanly by the current rig | Partial overlap with KAOSS Replay and existing delay/modulation pedals, but not an adequate duplication | After BOSS CH-1 stereo output, before Alesis stereo return or stereo line input | Buy after the loop architecture is stabilized, or first among pure sound-design upgrades | Approximately $413 | Proposed |
-| 3 | PaintAudio MIDI Captain 10-switch foot controller | Compact foot-command controller | High after a MIDI plan exists | Simplifies hands-free control for Ableton and future MIDI devices | Partial overlap with Behringer FCB1010, but cleaner USB-MIDI and smaller footprint | USB-MIDI or DIN-MIDI control layer for Ableton, RC-505mkII, Microcosm, DL4 MkII, and KAOSS Replay where supported | Buy after writing a MIDI mapping plan and after finishing the direct FCB1010-to-TASCAM test | Approximately $180 | Proposed |
-| 4 | Pioneer DJ DDJ-FLX4 | DJ and hybrid performance controller | Medium | Enables a different performance discipline rather than fixing the existing one | Limited overlap with current rig because this is a new workflow | DDJ-FLX4 RCA master output -> dual RCA-to-1/4-inch cable -> Alesis mixer channel 7/8 | Buy only when a DJ/live-hybrid set or recurring DJ practice workflow is defined | Approximately $329 | Proposed |
-| 5 | Line 6 DL4 MkII | Delay and looper consolidation option | Conditional | Useful only if it replaces several existing pedals or becomes a portable-core device | Heavy overlap with DD-8, TE-2, RE-2, RC-1, KAOSS Replay, proposed Microcosm, and proposed RC-505mkII | Run a temporary DL4 consolidation experiment rather than adopt a permanent default placement | Buy only if it replaces or rotates with existing delays, anchors a specific loop workflow, becomes a portable core, or its mic input is needed | Approximately $250 | Proposed |
-| 6 | Nord Stage 4 88 | Replacement stage keyboard | Aspirational but high-impact if piano/organ become central | Strong long-term instrument upgrade, but lower immediate routing urgency than loop/control tools | Would primarily replace the Casio Privia rather than duplicate it | Nord Stage 4 main outputs -> Alesis mixer channels 5/6 | Buy sooner only if the Privia becomes the limiting factor or a self-contained stage keyboard is required | Approximately $5,999 | Proposed |
-
-## BOSS RC-505mkII
-
-This is the highest-priority workflow upgrade.
-
-It provides five simultaneous stereo phrase tracks, dedicated track controls and faders, substantial loop memory, MIDI control, multiple inputs and outputs, rhythms, input effects, and track effects.
-
-It should complement rather than automatically replace the BOSS RC-1. The RC-1 can remain in the AUX SEND pedal chain for quick pre-effects looping.
-
-Proposed initial routing:
+**Wishlist = things that might be desirable. Not a commitment to buy or implement.**
 
 ```text
-Alesis Monitor Out
-  -> BOSS RC-505mkII
-  -> KAOSS Replay
-  -> TASCAM US-16x08 inputs 9/10
+Wishlist item
+   ↓
+evaluation
+   ↓
+accepted decision
+   ↓
+TODO item  (see docs/todo.md)
 ```
 
-This preserves the current AUX SEND pedal loop while allowing the RC-505mkII to build structured multi-track arrangements before the KAOSS Replay performs sampling and destructive effects.
+Do not treat rows below as approved work. Accepted work lives only in [Todo](todo.md).
+Unresolved **facts** live in [Open Questions](open-questions.md).
 
-Feedback and monitor-bus contents must be checked before making this routing permanent.
+Evaluation order: quality → reproducibility → creative novelty → PFL usefulness → cost → learning value → speed.
+Prefer finished music and playability over gear accumulation.
 
-## Hologram Electronics Microcosm
+Prices: use documented snapshots where present; otherwise **UNKNOWN** (do not invent).
 
-This is the highest-priority creative effects addition.
+## Status legend
 
-It adds granular sampling, micro-looping, pitch manipulation, glitch processing, drones, stereo processing, expression control, presets, and MIDI clock synchronization that are not adequately duplicated by the existing DD-8, TE-2, RE-2, PH-3, SL-2, or KAOSS Replay.
+| Status | Meaning |
+|---|---|
+| IDEA | Speculative; not evaluated deeply |
+| RESEARCH | Worth comparing / reading / designing against owned gear |
+| BORROW FIRST | Try before buying if possible |
+| BUY LATER | Attractive after prerequisites or budget gate |
+| BUY NOW | Explicitly approved to purchase soon — use sparingly |
+| REDUNDANT | Capability already covered well enough by owned gear |
+| REJECTED | Evaluated and declined |
+| WAITING | Blocked on another decision, test, or arrival |
+| DEFERRED | Intentionally parked behind a preferred direction |
 
-Recommended initial placement:
+## Priority legend
+
+| Priority | Meaning |
+|---|---|
+| P0 | Directly blocks useful music-making |
+| P1 | High-value near-term |
+| P2 | Useful but not urgent |
+| P3 | Curiosity / future |
+
+## Master table
+
+| Item | Category | Problem / Capability | Priority | Status | Duplication | Cost | Friction | Likely Music Impact | Notes |
+|---|---|---|---|---|---|---|---|---|---|
+| BOSS RC-600 | Live looping | Foot-operated multi-track looping; overdub/transition control beyond RC-1; Ableton-friendly solo performance | P1 | BUY LATER | Partial: RC-1, KAOSS, Ableton clips; overlaps RC-505mkII concept | UNKNOWN | High learning + integration | High for one-person live structure | Established future direction. RC-1 stays useful for simple phrase capture. See TODO RIG-032 (WAITING on acquisition). |
+| PFL Eurorack v1 | Modular | Generative sound, playable modulation, strange rhythm, controlled randomness, drones, CV interactions, visual interest for PFL | P1 | RESEARCH | Partial: Ableton/Reason, SY-1, SL-2, delays; preferred over MicroFreak as next synth direction | UNKNOWN | High learning + case/power design | High if it unlocks unplayable-elsewhere textures | Design requirements first (TODO RIG-033). Not a shopping list yet. |
+| Hologram Microcosm | Pedal / texture | Playable granular / resampling / micro-loop texture not ergonomically covered by current delays alone | P1 | RESEARCH | TE-2, RE-2, DD-8, SL-2, KAOSS, Ableton, Reason, future Eurorack | ~$413 (Jul 2026 snapshot) | Moderate; stereo post-CH-1 candidate | High for texture if unique vs owned tools | Justify by playable capability, not “another ambient pedal.” |
+| BOSS RC-505mkII | Live looping | Hands-on multi-track looper with faders | P2 | RESEARCH | Strong overlap with preferred RC-600 + KAOSS + Ableton | ~$640–660 (Jul 2026) | High; less foot-first than RC-600 | Medium unless a separate desk-oriented use case appears | Do not substitute for RC-600. Demoted vs foot-operated priorities. |
+| Expanded isolated pedal power | Studio infrastructure | Adequate isolated power for CURRENT pedal population; reduce hum/noise; avoid current-capacity problems | P1 | RESEARCH | Existing supplies (inventory incomplete) | UNKNOWN | Mounting / recabling | Medium–high if noise or brownouts limit takes | Audit load first (TODO RIG-047). Do not buy until audit implicates supply. |
+| Stereo line-to-pedal / reamp / isolation solution | Audio isolation | Reliable line-level → pedal-level path without crushing AUX SEND (ProRMP was too quiet) | P2 | RESEARCH | Radial ProRMP, PYLE PDC22, mixer AUX, patchbays | UNKNOWN | Gain-staging design | Medium for wet-loop flexibility | Capability gap, not a product pick yet. |
+| Additional reliable 1080p OBS webcam angle | Recording / video | Extra simultaneous OBS view (hands / pedals / room / direct-address) without needing 4K everywhere | P2 | RESEARCH | Unknown until camera inventory audited | UNKNOWN | USB bandwidth on MacBook Air two-port topology | Medium for PFL video | Buy only if owned cameras cannot cover needed angles. |
+| Arturia MicroFreak | Instruments | Compact digital/hybrid synth exploration | P3 | DEFERRED | Behind Eurorack exploration preference | UNKNOWN | Moderate | Medium | Interesting but not the preferred next synthesis direction. |
+| PaintAudio MIDI Captain | Controllers | Compact foot PC/CC/note control | P2 | WAITING | Overlaps FCB1010 (owned) | ~$180 (Jul 2026) | Mapping work | Medium after MIDI plan | Finish FCB1010 first (RIG-022, RIG-035). |
+| Pioneer DJ DDJ-FLX4 | Controllers / performance | DJ + hybrid live workflow | P3 | IDEA | New workflow | ~$329 (Jul 2026) | New discipline | Low unless DJ sets are a real goal | Buy only when hybrid set defined. |
+| Line 6 DL4 MkII | Pedals / consolidation | Delay + looper consolidation; mic-input looping | P3 | RESEARCH | Heavy: DD-8, TE-2, RE-2, RC-1, KAOSS, Microcosm, RC-600 | ~$250 (Jul 2026) | High if stacked without removals | Low–medium unless it replaces several pedals | EXPERIMENT only until consolidation criteria met. |
+| Nord Stage 4 88 | Instruments | Weighted stage piano/organ/synth replacement for Privia | P3 | BUY LATER | Would replace Privia | ~$5,999 (Jul 2026) | High cost | High if keys become central | Elevate only if Privia limits the project. |
+| Generic MIDI thru / splitter / router | MIDI utilities | Distribute / route MIDI clock and controllers | — | REDUNDANT | **Owned:** CME U6MIDI Pro (3×3 route/merge/filter) + CME MIDI Thru5 WC | — | — | — | Do not buy topology twice. Document owned topology (TODO RIG-037). |
+| Additional stereo DI / line isolator (generic) | Audio isolation / DI | Extra DI/isolation | P3 | IDEA | Overlaps PYLE-PRO PDC22 + line-to-pedal research item | UNKNOWN | Placement | Low–medium | Prefer solving ProRMP/AUX gain gap (above) and PDC22 placement (RIG-024). |
+| Expression mapping (EV-30 → SL-2 / PH-3) | Controllers / workflow | Hands-free params with **owned** EV-30 | P2 | IDEA | N/A (owned) | Time | Patching | Medium | Not a purchase. |
+| Default loop-building order playbook | Workflow | RC-1 vs KAOSS vs future RC-600 order | P2 | IDEA | N/A | Time | Process | High | Promote into jam-template / recovery TODOs as decisions land. |
+
+No items are marked **BUY NOW** or **REJECTED**.
+
+## Relationship to TODO
+
+| Wishlist outcome | What happens |
+|---|---|
+| Stay IDEA / RESEARCH / BUY LATER / DEFERRED | Remains here only |
+| Decision: buy or implement | Create a TODO with Definition of Done |
+| Capability already owned | Mark REDUNDANT; document/operate owned gear via TODO |
+
+Example:
 
 ```text
-JOYO output
-  -> BOSS CH-1 stereo output
-  -> Hologram Microcosm stereo input
-  -> Alesis stereo return or stereo line channel
+Wishlist: BOSS RC-600 — BUY LATER
+   ↓ (after acquisition)
+TODO: RIG-032 — Design and implement RC-600 integration (was WAITING)
 ```
 
-Placing it after the CH-1 preserves the current stereo spread and uses the Microcosm's stereo and line-level capabilities.
+## Detail notes
 
-A dedicated TASCAM capture path is a valid alternative experiment if the Microcosm becomes important enough to warrant isolated recording.
+### BOSS RC-600 (established direction)
 
-Ableton should remain the master clock.
+Desired role: multi-track foot looping, sophisticated overdub/transition control, Ableton integration without replacing Ableton, solo-performance operation. RC-1 remains for simple pre-effects phrase capture.
 
-## PaintAudio MIDI Captain 10-switch foot controller
+Do **not** invent CURRENT wiring. Integration design is TODO RIG-032 (WAITING on acquisition).
 
-The MIDI Captain can send PC, CC, note, and other configurable commands from ten footswitches, and its Time Engine can replay sequences of switch actions.
+### PFL Eurorack v1
 
-The Time Engine is not a substitute for MIDI clock or MTC generation. Ableton remains the intended clock master.
+Purpose: make Positive Feedback Loop more interesting via generative/modulation/CV/ergonomics and visual patching — not modular-for-its-own-sake. Prefer exploring Eurorack over treating MicroFreak as the obvious next synth.
 
-Comparison with the existing Behringer FCB1010:
+Requirements/boundary design: TODO RIG-033. No module shopping list until that exists.
 
-- The FCB1010 remains a potentially usable controller.
-- Its current problem may be the USB Uno interface or configuration rather than the controller itself.
-- The existing direct test from FCB1010 MIDI OUT to TASCAM MIDI IN should be completed before retiring it.
-- The MIDI Captain offers a smaller form factor, native USB-MIDI, simpler configuration, and a cleaner future control surface.
-- Its value increases after adding the RC-505mkII or Microcosm.
+### Hologram Microcosm
 
-Possible control targets:
+Keep as a legitimate candidate. Evaluate against TE-2, RE-2, DD-8, SL-2, KAOSS, Ableton, Reason, and future Eurorack. Status RESEARCH (not BUY NOW / BUY LATER until uniqueness is proven).
 
-- Ableton scene launch and transport
-- RC-505mkII track operations and memory changes
-- Microcosm presets, effect parameters, bypass, and looper functions
-- Future DL4 MkII presets and looper controls
-- KAOSS Replay commands where supported
+### BOSS RC-505mkII
 
-## Pioneer DJ DDJ-FLX4
+Previously listed as top looper buy. Reclassified: RESEARCH / lower priority vs foot-first RC-600 direction. Separate desk-oriented use case would need explicit justification.
 
-This is a new workflow rather than a repair or upgrade to the current workflow.
+### MIDI topology (owned — not a purchase)
 
-Possible uses:
+Owned:
 
-- Hybrid DJ and live-looping performances
-- Transitioning between completed tracks and live improvisation
-- Playing interludes and reference tracks
-- Feeding external tracks into the RC-505mkII or KAOSS Replay
-- Preparing conventional two-deck DJ sets
+- CME U6MIDI Pro — 3 in / 3 out, routing, merging, filtering/remapping
+- CME MIDI Thru5 WC — hardware thru distribution
 
-Recommended simple analog integration:
+Generic “buy MIDI thru/splitter” is **REDUNDANT**. Finish documentation and verification instead (RIG-037).
 
-```text
-DDJ-FLX4 RCA master output
-  -> dual RCA-to-1/4-inch cable
-  -> Alesis mixer channel 7/8
-```
+### Isolated pedal power
 
-The TASCAM US-16x08 should remain the main studio audio interface unless a deliberate aggregate-device design is tested and documented.
+Active RESEARCH pending power audit (RIG-047). Problem statement: power the CURRENT pedal population with adequate isolation/headroom while reducing hum/noise.
 
-Decision gate: buy only when a DJ/live-hybrid set or recurring DJ practice workflow has been defined.
+### Stereo line-to-pedal / isolation
 
-## Line 6 DL4 MkII
+Historical ProRMP on AUX SEND required maxed sends and was too quiet. Capability gap remains RESEARCH (RIG-048), not a product SKU.
 
-This is a conditional consolidation purchase.
+### Additional OBS camera
 
-Benefits:
+Only if audit shows missing angles. Account for USB bandwidth and MacBook Air two-port limits.
 
-- Thirty delay models
-- Four-switch performance interface
-- Stereo operation
-- MIDI input and output/thru
-- Expression and external footswitch support
-- One-switch and four-switch looping modes
-- MicroSD-expanded loop storage
-- XLR dynamic microphone input
+### MicroFreak
 
-It overlaps heavily with the existing:
+Interesting; **DEFERRED** behind Eurorack exploration.
 
-- BOSS DD-8
-- BOSS TE-2
-- BOSS RE-2
-- BOSS RC-1
-- KAOSS Replay
-- Proposed Microcosm
-- Proposed RC-505mkII
+## Priority change conditions
 
-It should not be permanently added in series after every existing delay.
-
-Valid purchase conditions:
-
-- It replaces or rotates with the DD-8, TE-2, and RE-2.
-- Its four-switch looping interface becomes part of a specific performance workflow.
-- It becomes the core of a smaller portable pedalboard.
-- Its microphone-input looping is specifically needed.
-
-Proposed DL4 consolidation experiment:
-
-```text
-Alesis AUX SEND
-  -> Cry Baby
-  -> BOSS RC-1
-  -> JOYO A/B/Bypass input
-     -> existing Chain B delay/modulation segment removed or bypassed for the test
-  -> JOYO output
-  -> Line 6 DL4 MkII stereo input/output in place of selected delay pedals for comparison
-  -> Alesis stereo return or stereo line input
-```
-
-This is an experiment only, not a permanent routing recommendation.
-
-## Nord Stage 4 88
-
-This is an aspirational replacement instrument.
-
-It offers a weighted triple-sensor 88-key action with aftertouch, piano, organ, and synthesizer engines, per-layer effects, drawbars, MIDI, USB-MIDI, and four assignable outputs.
-
-It would primarily replace the Casio Privia rather than merely sit beside it.
-
-Recommended initial replacement routing:
-
-```text
-Nord Stage 4 main outputs
-  -> Alesis mixer channels 5/6
-```
-
-Optional future testing should include the Nord's assignable outputs into spare TASCAM inputs for isolated piano, organ, or synth capture where the Nord's routing capabilities permit it.
-
-This moves from priority six to priority two if any of the following become true:
-
-- The Privia keybed or sounds materially limit performance.
-- Piano and organ become central to the project.
-- A self-contained live stage keyboard is required.
-- The Privia is being retired rather than retained.
-
-## Conditions That Change the Priority
-
-- If keyboard performance becomes the central focus, move the Nord Stage 4 to priority two.
-- If a DJ/live-hybrid set is actively being developed, move the DDJ-FLX4 to priority three.
-- If the FCB1010 works reliably through the TASCAM MIDI input, move the MIDI Captain below the DDJ-FLX4.
-- If the DL4 MkII will replace multiple existing delay pedals, move it above the DDJ-FLX4.
-- If no existing equipment will be removed, leave the DL4 MkII near the bottom because of redundancy.
-
-## Recommended Acquisition Phases
-
-1. Performance architecture: RC-505mkII
-2. New sound design: Microcosm
-3. Hands-free control: MIDI Captain after a MIDI mapping plan is written
-4. New performance discipline: DDJ-FLX4
-5. Keyboard replacement: Nord Stage 4 88
-6. Optional delay consolidation: DL4 MkII
-
-A dependable MIDI splitter/router and isolated pedal power may have greater infrastructure value than some wishlist devices and should remain tracked separately.
+- RC-600 acquired → promote RIG-032 from WAITING; demote RC-505 further or REJECT if redundant.
+- Eurorack MVP defined and budgeted → may become BUY LATER for case/power only after RIG-033.
+- FCB1010 reliable → demote MIDI Captain.
+- Power audit clears supply → keep isolated-power wishlist parked or REDUNDANT.
+- Camera audit shows three solid OBS angles → camera wishlist REDUNDANT.
+- Keyboard focus → elevate Nord.
+- DL4 replaces multiple delays → elevate; else leave low due to redundancy.

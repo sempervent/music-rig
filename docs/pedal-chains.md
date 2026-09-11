@@ -1,34 +1,99 @@
 # Pedal Chains
 
-## Current AUX SEND chain front end
+Exact **CURRENT** active pedal topology. Owned pedals that are not in this path remain listed under inventory, not here.
+
+## AUX SEND front end (CURRENT)
 
 ```text
-Alesis AUX SEND -> Cry Baby -> BOSS RC-1 -> JOYO A/B/Bypass
+Alesis AUX SEND
+  -> BOSS RC-1
+  -> Cry Baby wah
+  -> JOYO A/B/Bypass
+       A = DIRTY
+       B = SPACE
 ```
 
-## JOYO Chain A
+Purpose of RC-1 ahead of wah / JOYO: a captured phrase can subsequently be manipulated by the downstream pedals.
+
+## JOYO DIRTY — Send A (CURRENT)
 
 ```text
-OD-1 -> BD-2 -> JB-2 -> MT-2w -> TR-2 -> DS-1 -> JOYO Return A
+JOYO SEND A
+  -> BOSS OD-1
+  -> BOSS BD-2
+  -> BOSS JB-2
+  -> BOSS MT-2w
+  -> BOSS DS-1
+  -> JOYO RETURN A
 ```
 
-Intent: gain, drive, dirt, tremolo, classic stompbox abuse.
+Intent: gain, drive, dirt, classic stompbox abuse.
 
-## JOYO Chain B
+**Note:** TR-2 is **not** in this branch. It moved into the SPACE / SY-1 SEND loop. Do not infer that TR-2 left the rig.
+
+## JOYO SPACE — Send B (CURRENT)
 
 ```text
-SY-1
-  -> SY-1 send -> Flamma Mod -> PH-2 -> SY-1 return
-  -> SL-2 -> DD-8 -> PH-3 -> TE-2 -> RE-2 -> JOYO Return B
+JOYO SEND B
+  -> BOSS SY-1
+       SEND
+         -> BOSS PH-3
+         -> BOSS TR-2
+       RETURN
+  -> BOSS LS-2 [A+B MIX <-> BYPASS]
+       LOOP A: BOSS SL-2 -> BOSS DD-8
+       LOOP B: BOSS TE-2 -> BOSS RE-2
+  -> JOYO RETURN B
 ```
 
-Intent: synth, modulation, slicer, delay, phaser, texture, Space Echo weirdness.
-
-## Post-JOYO stereo spread
+Expanded:
 
 ```text
-JOYO output -> BOSS CH-1 stereo out L/R -> Alesis stereo return or stereo line channel
+JOYO SEND B
+  -> SY-1
+
+SY-1 SEND
+  -> PH-3
+  -> TR-2
+  -> SY-1 RETURN
+
+SY-1 OUTPUT
+  -> LS-2
+
+LS-2 LOOP A:
+  SEND A -> SL-2 -> DD-8 -> RETURN A
+
+LS-2 LOOP B:
+  SEND B -> TE-2 -> RE-2 -> RETURN B
+
+LS-2 OUT
+  -> JOYO RETURN B
 ```
+
+LS-2 mode in use: **A+B MIX ↔ BYPASS**.
+
+Intent: synth voice (SY-1), phase + tremolo in the SY-1 loop, then parallel texture loops (slicer/delay vs. TE-2/Space Echo) via LS-2.
+
+## Post-JOYO stereo spread (CURRENT)
+
+```text
+JOYO OUT
+  -> BOSS CH-1
+  -> stereo L/R
+  -> Alesis return / stereo line input
+```
+
+Path is mono through JOYO; CH-1 is the stereo stage.
+
+## Owned but not in CURRENT active chain
+
+These remain inventory unless reintroduced and documented:
+
+| Device | Notes |
+|---|---|
+| Flamma Mod | OWNED; not in CURRENT SPACE topology |
+| PH-2 | OWNED; not in CURRENT SPACE topology |
+| TR-2 | OWNED and CURRENT, but in SY-1 SEND after PH-3 — not in DIRTY |
 
 ## Known pedal issues
 

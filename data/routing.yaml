@@ -1,26 +1,58 @@
+# High-level CURRENT routes. Pedal detail: docs/pedal-chains.md. Patchbays: data/patchbays.yaml.
 routes:
   clean_mixer_capture:
+    status: CURRENT
     from: Alesis Main Out
     to: TASCAM 1/2
   kaoss_capture:
+    status: CURRENT
     from: Alesis Monitor Out
     through: KAOSS Replay
     to: TASCAM 9/10
   aux_send_loop:
+    status: CURRENT
     from: Alesis AUX SEND
     chain:
-      - Cry Baby
       - BOSS RC-1
+      - Cry Baby
       - JOYO A/B/Bypass
-      - Chain A or Chain B
+      - DIRTY (Send A) or SPACE (Send B)
       - BOSS CH-1 stereo out
     to: Alesis stereo return or line return
+    notes: >-
+      RC-1 ahead of wah/JOYO so captured phrases can be manipulated by downstream pedals.
+      JOYO path is mono until CH-1.
   miniKORG_direct:
+    status: CURRENT
     from: miniKORG stereo out
     to: TASCAM 3/4
-  guitar_clean:
-    from: Guitar direct or clean split
+    via_patchbay: PB-B
+  acoustic_clean:
+    status: CURRENT
+    from: Acoustic instrument
+    through:
+      - BOSS acoustic preamp
+      - A/B/Y clean leg
     to: TASCAM 5
+    other_aby_leg: UNKNOWN
   bass_clean:
-    from: Bass direct or clean split
+    status: CURRENT
+    from: Bass
+    through:
+      - BBox preamp
+      - A/B/Y clean leg
+    to: TASCAM 6
+    other_aby_leg: UNKNOWN
+  electric_guitar_clean:
+    status: CURRENT
+    from: Electric guitar
+    through:
+      - Flamma preamp
+      - A/B/Y clean leg
     to: TASCAM 7
+    other_aby_leg: UNKNOWN
+  sr18_direct:
+    status: CURRENT
+    from: Alesis SR-18 MAIN L/R
+    to: TASCAM 11/12
+    via_patchbay: PB-B
