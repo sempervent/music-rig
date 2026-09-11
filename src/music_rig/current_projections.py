@@ -201,6 +201,17 @@ def render_tascam_mermaid(data: dict[str, Any] | None = None) -> str:
 
 
 def format_current_preview(preview) -> str:
+    if str(preview.domain).startswith("routing") and preview.message.strip():
+        lines = [
+            preview.message.rstrip(),
+            "",
+            "This modifies authoritative CURRENT state.",
+        ]
+        if preview.affected_files:
+            lines.append("Affected files:")
+            for f in preview.affected_files:
+                lines.append(f"  {f}")
+        return "\n".join(lines) + "\n"
     lines = [
         "CURRENT UPDATE",
         "",

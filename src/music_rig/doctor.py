@@ -5,7 +5,12 @@ from __future__ import annotations
 from pathlib import Path
 
 from music_rig.checks import run_checks
-from music_rig.models import ChangeStatus, InboxStatus, QuestionStatus
+from music_rig.models import (
+    ChangeCategory,
+    ChangeStatus,
+    InboxStatus,
+    QuestionStatus,
+)
 from music_rig.reconcile import reconciliation_advisories
 from music_rig.rig_views import patchbay_unknown_mode_stats
 from music_rig.session_service import find_active
@@ -32,6 +37,10 @@ def build_doctor_text(
     docs_todo: Path | None = None,
     docs_wishlist: Path | None = None,
     docs_questions: Path | None = None,
+    routing_path: Path | None = None,
+    docs_routing: Path | None = None,
+    docs_pedal_chains: Path | None = None,
+    diagram_aux_loop: Path | None = None,
 ) -> str:
     attention = 0
     lines = ["RIG DOCTOR", ""]
@@ -47,6 +56,10 @@ def build_doctor_text(
         docs_todo=docs_todo,
         docs_wishlist=docs_wishlist,
         docs_questions=docs_questions,
+        routing_path=routing_path,
+        docs_routing=docs_routing,
+        docs_pedal_chains=docs_pedal_chains,
+        diagram_aux_loop=diagram_aux_loop,
     )
     planning_errors = [
         e
@@ -178,6 +191,67 @@ def build_doctor_text(
     else:
         lines.append("✓ Channel-map and patchbay docs synchronized")
 
+    # Routing
+    lines.append("")
+    lines.append("Routing")
+    routing_errors = [
+        e
+        for e in checks.errors
+        if e.startswith("routing:") or "routing.yaml" in e
+    ]
+    if routing_errors:
+        lines.append("✗ Named paths invalid")
+        attention += 1
+    else:
+        lines.append("✓ Named paths valid")
+
+    routing_projection_names = (
+        "current-routing.md",
+        "pedal-chains.md",
+        "aux-send-loop.mmd",
+    )
+    routing_stale = [
+        e for e in checks.errors if any(name in e for name in routing_projection_names)
+    ]
+    if routing_stale:
+        lines.append("✗ Generated pedal-chain/routing docs out of sync")
+        attention += 1
+    else:
+        lines.append("✓ Generated pedal-chain/routing docs synchronized")
+
+    try:
+        questions = load_questions(questions_path)
+        routing_questions = sum(
+            1
+            for q in questions.questions
+            if q.status == QuestionStatus.OPEN
+            and ("routing" in q.area.casefold() or "pedals" in q.area.casefold())
+        )
+        if routing_questions:
+            lines.append(f"⚠ {routing_questions} OPEN routing-related question(s)")
+            attention += 1
+        else:
+            lines.append("✓ No OPEN routing-related questions")
+    except StoreError:
+        pass
+
+    try:
+        changes = load_changes(changes_path)
+        routing_changes = sum(
+            1
+            for change in changes.items
+            if change.status == ChangeStatus.OPEN
+            and change.category
+            in {ChangeCategory.PEDAL_CHAIN, ChangeCategory.AUDIO_ROUTING}
+        )
+        if routing_changes:
+            lines.append(f"⚠ {routing_changes} OPEN PEDAL_CHAIN / AUDIO_ROUTING change(s)")
+            attention += 1
+        else:
+            lines.append("✓ No OPEN PEDAL_CHAIN / AUDIO_ROUTING changes")
+    except StoreError:
+        pass
+
     # Repository
     lines.append("")
     lines.append("Repository")
@@ -217,6 +291,8 @@ def build_doctor_text(
         and "out of date" not in e
         and "inbox" not in e.lower()
         and "question" not in e.lower()
+        and not e.startswith("routing:")
+        and not any(name in e for name in routing_projection_names)
     ]
     if other_errors:
         lines.append("")

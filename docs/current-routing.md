@@ -16,16 +16,6 @@ Authoritative end-to-end overview of the **CURRENT** physical studio. For jack-l
 | 11/12 | Alesis SR-18 MAIN L/R | Drum machine direct (also documented on PB-B) |
 | 13–16 | UNASSIGNED | — |
 
-## Clean instrument paths (preamp → split → TASCAM)
-
-Confirmed clean destinations only. The other A/B/Y leg for each instrument is **UNKNOWN** unless documented elsewhere.
-
-```text
-Acoustic  -> BOSS acoustic preamp -> A/B/Y -> clean leg -> TASCAM 5
-Bass      -> BBox preamp          -> A/B/Y -> clean leg -> TASCAM 6
-Electric  -> Flamma preamp        -> A/B/Y -> clean leg -> TASCAM 7
-```
-
 ## Alesis mixer inputs
 
 | Alesis Channel | Source | Status | Notes |
@@ -37,36 +27,96 @@ Electric  -> Flamma preamp        -> A/B/Y -> clean leg -> TASCAM 7
 | 5/6 | Privia piano | CURRENT | Stereo; rear patch documented on PB-B 7/8 → 31/32 |
 | 7/8 | — | UNASSIGNED sources | PB-B lower 33/34 connect to these channels; no upper-row sources documented |
 
-## AUX SEND wet-processing path (CURRENT)
-
-Creative wet loop. RC-1 sits ahead of the wah and JOYO branches so a captured phrase can be manipulated by downstream pedals.
-
-```text
-Alesis AUX SEND
-  -> BOSS RC-1
-  -> Cry Baby wah
-  -> JOYO A/B/Bypass
-       A = DIRTY
-       B = SPACE
-  -> BOSS CH-1 chorus
-  -> stereo L/R back to Alesis return / stereo line input
-```
+The sections below project structured CURRENT paths from `data/routing.yaml`. Conceptual distinctions between **clean capture**, the **AUX SEND wet loop**, and the **KAOSS path** remain intentional.
 
 JOYO routing up to CH-1 is **mono**. CH-1 provides the post-chain stereo output. Do not call dual mono "stereo."
 
-Exact DIRTY and SPACE topologies: [Pedal Chains](pedal-chains.md).
+<!-- rig:routing:start -->
+<!-- GENERATED FROM data/routing.yaml BY `uv run rig render`. DO NOT EDIT THIS SECTION DIRECTLY. -->
 
-## KAOSS Replay path (CURRENT)
+## Named CURRENT paths (from `data/routing.yaml`)
 
-Separate from clean capture and from the AUX SEND wet loop.
+### Clean capture
+
+**Clean mixer capture** (`clean_mixer`)
+
+```text
+Alesis Main Out
+-> TASCAM 1/2
+```
+
+**Acoustic clean capture** (`acoustic`)
+
+```text
+Acoustic instrument
+-> BOSS acoustic preamp
+  -> A/B/Y clean leg
+  -> TASCAM 5
+  other A/B/Y leg
+    -> other A/B/Y leg: UNKNOWN
+```
+
+**Bass clean capture** (`bass`)
+
+```text
+Bass
+-> BBox preamp
+  -> A/B/Y clean leg
+  -> TASCAM 6
+  other A/B/Y leg
+    -> other A/B/Y leg: UNKNOWN
+```
+
+**Electric guitar clean capture** (`electric`)
+
+```text
+Electric guitar
+-> Flamma preamp
+  -> A/B/Y clean leg
+  -> TASCAM 7
+  other A/B/Y leg
+    -> other A/B/Y leg: UNKNOWN
+```
+
+**miniKORG direct capture** (`minikorg`)
+
+```text
+miniKORG stereo out
+-> PB-B
+-> TASCAM 3/4
+```
+
+**SR-18 direct capture** (`sr18`)
+
+```text
+Alesis SR-18 MAIN L/R
+-> PB-B
+-> TASCAM 11/12
+```
+
+### AUX SEND wet-processing path
+
+```text
+Alesis AUX SEND
+-> BOSS RC-1
+-> Cry Baby
+-> JOYO A/B/Bypass
+  A = DIRTY (see: rig path show dirty)
+  B = SPACE (see: rig path show space)
+  -> BOSS CH-1 stereo out
+  -> Alesis return / line return
+```
+
+Exact DIRTY and SPACE topologies: [Pedal Chains](pedal-chains.md) or `rig path show dirty` / `rig path show space`.
+
+### KAOSS Replay path
 
 ```text
 Alesis Monitor Out
-  -> KAOSS Replay
-  -> TASCAM US-16x08 inputs 9/10
+-> KAOSS Replay
+-> TASCAM 9/10
 ```
-
-Treat KAOSS like its own instrument once sampled.
+<!-- rig:routing:end -->
 
 ## Patchbay connectivity
 

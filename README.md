@@ -162,6 +162,14 @@ uv run rig current patchbay set-mode PB-B 1 half-normal --question Q-008
 uv run rig current channels set-source tascam 8 "Spare DI"
 uv run rig current channels clear-source tascam 8
 
+# CURRENT routing / pedal topology
+uv run rig path show space
+uv run rig current path branches space
+uv run rig current path verify space
+uv run rig current path move space TR-2 --branch sy1-send --after PH-3 --dry-run
+uv run rig current path move space TR-2 --branch sy1-send --after PH-3
+uv run rig change "TR-2 may have moved" --category PEDAL_CHAIN
+
 # While working
 uv run rig session note "PH-3 confirmed before TR-2"
 uv run rig session discovery "RE-2 quiet on separate power"

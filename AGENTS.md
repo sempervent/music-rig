@@ -18,7 +18,7 @@ Use the repository itself as the source of remembered state, not chat memory or 
 | Layer | File | Role |
 |---|---|---|
 | Overview | [docs/current-routing.md](docs/current-routing.md) | End-to-end physical CURRENT routing |
-| Routes | [data/routing.yaml](data/routing.yaml) | Machine-readable high-level routes |
+| Routes | [data/routing.yaml](data/routing.yaml) | Canonical structured CURRENT audio/pedal topology (`named_paths`) + high-level routes |
 | Channels | [data/channel-map.yaml](data/channel-map.yaml) | Interface and mixer channel assignments |
 | Patchbays | [data/patchbays.yaml](data/patchbays.yaml) | Physical patchbay jack assignments and normalization state |
 | Patchbay ops | [docs/patchbays.md](docs/patchbays.md) | Human-readable patchbay reference at the rack |
@@ -84,6 +84,12 @@ uv run rig path show space
 uv run rig change "Moved TR-2 after PH-3" --category PEDAL_CHAIN
 uv run rig changes list
 
+# Supported CURRENT routing mutations (preview + confirm; inventory unchanged)
+uv run rig current path branches space
+uv run rig current path verify space
+uv run rig current path move space TR-2 --branch sy1-send --after PH-3 --dry-run
+uv run rig current path move space TR-2 --branch sy1-send --after PH-3
+
 uv run rig render --check
 uv run rig check
 ```
@@ -93,6 +99,11 @@ uv run rig check
 - Change captures: `data/changes.yaml` (`CHG-*`) — OPEN means the physical/logical rig may differ from documented CURRENT until reconciled.
 - Questions: `data/open-questions.yaml` (`Q-*`) — unresolved facts. Resolving records an answer; it does **not** rewrite CURRENT.
 - Do **not** hand-edit generated TODO/Wishlist/Questions Markdown sections.
+- Do **not** hand-edit generated routing sections (`docs/current-routing.md`, `docs/pedal-chains.md`) or `diagrams/aux-send-loop.mmd`.
+- `data/routing.yaml` is canonical for structured CURRENT audio/pedal topology (`named_paths`).
+- Use `rig current path …` for supported structured routing mutations.
+- Do not infer a CURRENT route update from inbox observations, session discoveries, freeform OPEN changes, or unresolved questions.
+- Use `rig change` when physical state may have changed but has not been reconciled.
 - `next_session` is the authoritative Next Session queue; TODO status is lifecycle only (`READY`, `IN PROGRESS`, etc.). There is no `NEXT` status.
 - `rig now` is deterministic: active session → IN PROGRESS → Next Session order → highest READY (P0–P3, YAML order) → Just Play. No LLM.
 - Mutation commands write YAML and re-render docs unless `--no-render` is passed.
@@ -138,11 +149,12 @@ Before treating CURRENT docs as unquestionably authoritative:
 Do not automatically apply captured changes.
 Do not elevate discoveries to CURRENT facts without reconciliation.
 
-Do not hand-edit generated CURRENT sections (`docs/patchbays.md`, channel maps, generated diagrams).
+Do not hand-edit generated CURRENT sections (`docs/patchbays.md`, channel maps, `docs/current-routing.md`, `docs/pedal-chains.md`, generated diagrams).
 
 Canonical structured CURRENT sources include:
 - `data/patchbays.yaml`
 - `data/channel-map.yaml`
+- `data/routing.yaml` (`named_paths` for pedal/audio topology)
 
 For supported CURRENT mutations, prefer `uv run rig current …` / the service layer.
 
@@ -151,6 +163,14 @@ They do not become CURRENT until reconciled.
 
 Never infer a CURRENT update from freeform text.
 Always preview; use `--dry-run` when unsure.
+
+Do not infer a CURRENT route update from:
+- inbox observations
+- session discoveries
+- freeform OPEN changes
+- unresolved questions
+
+Use `rig change` when physical state may have changed but has not been reconciled.
 
 ### Planning layers (do not collapse)
 

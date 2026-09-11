@@ -42,6 +42,9 @@ questions:
     answer: ""
     notes: ""
     resolved_at: null
+    target:
+      domain: routing.verify
+      path: kaoss
 
   - id: Q-005
     question: Should the PYLE-PRO dual DI live near the Privia, near the JOYO output, or near clean instrument taps?

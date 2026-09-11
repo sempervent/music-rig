@@ -203,39 +203,39 @@ def studio(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
                     "space": {
                         "label": "SPACE test",
                         "status": "CURRENT",
-                        "tree": {
-                            "label": "JOYO SEND B",
-                            "children": [
-                                {
-                                    "label": "SY-1",
-                                    "children": [
-                                        {
-                                            "label": "SEND",
-                                            "children": [
-                                                {
-                                                    "label": "PH-3",
-                                                    "children": [
-                                                        {"label": "TR-2"},
-                                                    ],
-                                                }
-                                            ],
-                                        },
-                                        {
-                                            "label": "OUTPUT",
-                                            "children": [
-                                                {"label": "LS-2"},
-                                                {"label": "UNKNOWN return"},
-                                            ],
-                                        },
-                                    ],
-                                }
-                            ],
+                        "branches": {
+                            "main": {
+                                "label": "Main path",
+                                "nodes": [
+                                    {"id": "joyo-send-b", "label": "JOYO SEND B"},
+                                    {"id": "sy-1", "label": "SY-1"},
+                                    {"id": "ls-2", "label": "LS-2"},
+                                    {"id": "unknown-return", "label": "UNKNOWN return"},
+                                ],
+                            },
+                            "sy1-send": {
+                                "label": "SEND",
+                                "attach": "sy-1",
+                                "position": "before",
+                                "nodes": [
+                                    {"id": "ph-3", "label": "PH-3"},
+                                    {"id": "tr-2", "label": "TR-2"},
+                                ],
+                            },
                         },
                     },
                     "aux": {
                         "label": "AUX",
                         "status": "CURRENT",
-                        "tree": {"label": "AUX SEND", "children": [{"label": "RC-1"}]},
+                        "branches": {
+                            "main": {
+                                "label": "Main path",
+                                "nodes": [
+                                    {"id": "aux-send", "label": "AUX SEND"},
+                                    {"id": "rc-1", "label": "RC-1"},
+                                ],
+                            }
+                        },
                     },
                 },
             }

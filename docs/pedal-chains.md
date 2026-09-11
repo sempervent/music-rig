@@ -2,88 +2,73 @@
 
 Exact **CURRENT** active pedal topology. Owned pedals that are not in this path remain listed under inventory, not here.
 
+Canonical structured source: `data/routing.yaml` (`named_paths`). Use `uv run rig path show …` / `uv run rig current path …` for inspection and supported mutations.
+
+Purpose of RC-1 ahead of wah / JOYO: a captured phrase can subsequently be manipulated by the downstream pedals.
+
+<!-- rig:pedal-chains:start -->
+<!-- GENERATED FROM data/routing.yaml BY `uv run rig render`. DO NOT EDIT THIS SECTION DIRECTLY. -->
+
 ## AUX SEND front end (CURRENT)
 
 ```text
 Alesis AUX SEND
-  -> BOSS RC-1
-  -> Cry Baby wah
-  -> JOYO A/B/Bypass
-       A = DIRTY
-       B = SPACE
+-> BOSS RC-1
+-> Cry Baby
+-> JOYO A/B/Bypass
+  A = DIRTY (see: rig path show dirty)
+  B = SPACE (see: rig path show space)
 ```
-
-Purpose of RC-1 ahead of wah / JOYO: a captured phrase can subsequently be manipulated by the downstream pedals.
 
 ## JOYO DIRTY — Send A (CURRENT)
 
 ```text
 JOYO SEND A
-  -> BOSS OD-1
-  -> BOSS BD-2
-  -> BOSS JB-2
-  -> BOSS MT-2w
-  -> BOSS DS-1
-  -> JOYO RETURN A
+-> BOSS OD-1
+-> BOSS BD-2
+-> BOSS JB-2
+-> BOSS MT-2w
+-> BOSS DS-1
+-> JOYO RETURN A
 ```
 
 Intent: gain, drive, dirt, classic stompbox abuse.
 
-**Note:** TR-2 is **not** in this branch. It moved into the SPACE / SY-1 SEND loop. Do not infer that TR-2 left the rig.
+**Note:** TR-2 is **not** in this branch. It lives in the SPACE / SY-1 SEND loop. Do not infer that TR-2 left the rig.
 
 ## JOYO SPACE — Send B (CURRENT)
 
 ```text
 JOYO SEND B
-  -> BOSS SY-1
-       SEND
-         -> BOSS PH-3
-         -> BOSS TR-2
-       RETURN
-  -> BOSS LS-2 [A+B MIX <-> BYPASS]
-       LOOP A: BOSS SL-2 -> BOSS DD-8
-       LOOP B: BOSS TE-2 -> BOSS RE-2
-  -> JOYO RETURN B
-```
-
-Expanded:
-
-```text
-JOYO SEND B
-  -> SY-1
-
-SY-1 SEND
-  -> PH-3
-  -> TR-2
-  -> SY-1 RETURN
-
-SY-1 OUTPUT
-  -> LS-2
-
-LS-2 LOOP A:
-  SEND A -> SL-2 -> DD-8 -> RETURN A
-
-LS-2 LOOP B:
-  SEND B -> TE-2 -> RE-2 -> RETURN B
-
-LS-2 OUT
-  -> JOYO RETURN B
+-> SY-1
+  SY-1 SEND loop
+    -> PH-3
+    -> TR-2
+    -> SY-1 RETURN
+  -> LS-2 [A+B MIX ↔ BYPASS]
+    LS-2 Loop A
+      -> SL-2
+      -> DD-8
+    LS-2 Loop B
+      -> TE-2
+      -> RE-2
+    -> JOYO RETURN B
 ```
 
 LS-2 mode in use: **A+B MIX ↔ BYPASS**.
 
-Intent: synth voice (SY-1), phase + tremolo in the SY-1 loop, then parallel texture loops (slicer/delay vs. TE-2/Space Echo) via LS-2.
+Intent: synth voice (SY-1), phase + tremolo in the SY-1 loop, then parallel texture loops via LS-2.
 
 ## Post-JOYO stereo spread (CURRENT)
 
 ```text
 JOYO OUT
-  -> BOSS CH-1
-  -> stereo L/R
-  -> Alesis return / stereo line input
+-> BOSS CH-1 stereo out
+-> Alesis return / line return
 ```
 
 Path is mono through JOYO; CH-1 is the stereo stage.
+<!-- rig:pedal-chains:end -->
 
 ## Owned but not in CURRENT active chain
 

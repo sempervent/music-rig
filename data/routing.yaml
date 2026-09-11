@@ -1,5 +1,6 @@
 # High-level CURRENT routes. Pedal detail: docs/pedal-chains.md. Patchbays: data/patchbays.yaml.
-# named_paths: structured CLI projections of the same CURRENT facts (not a second source of truth).
+# named_paths: structured CLI CURRENT topology (canonical for path mutations / projections).
+# Do not infer CURRENT updates from freeform changes or inbox notes.
 routes:
   clean_mixer_capture:
     status: CURRENT
@@ -63,143 +64,225 @@ named_paths:
     label: AUX SEND wet loop
     status: CURRENT
     route_ref: aux_send_loop
-    tree:
-      label: Alesis AUX SEND
-      children:
-        - label: BOSS RC-1
-          children:
-            - label: Cry Baby
-              children:
-                - label: JOYO A/B/Bypass
-                  children:
-                    - label: "A = DIRTY (see: rig path show dirty)"
-                    - label: "B = SPACE (see: rig path show space)"
-                    - label: BOSS CH-1 stereo out
-                      children:
-                        - label: Alesis return / line return
+    notes: >-
+      A = DIRTY (see: rig path show dirty); B = SPACE (see: rig path show space).
+      JOYO path is mono until CH-1.
+    branches:
+      main:
+        label: Main path
+        nodes:
+          - id: alesis-aux-send
+            label: Alesis AUX SEND
+          - id: rc-1
+            label: BOSS RC-1
+          - id: cry-baby
+            label: Cry Baby
+          - id: joyo
+            label: JOYO A/B/Bypass
+            note: A = DIRTY (rig path show dirty); B = SPACE (rig path show space)
+          - id: ch-1
+            label: BOSS CH-1 stereo out
+            signal: stereo
+          - id: alesis-return
+            label: Alesis return / line return
+      joyo-a:
+        label: "A = DIRTY (see: rig path show dirty)"
+        attach: joyo
+        position: before
+        nodes: []
+      joyo-b:
+        label: "B = SPACE (see: rig path show space)"
+        attach: joyo
+        position: before
+        nodes: []
   dirty:
     label: JOYO DIRTY — Send A
     status: CURRENT
-    tree:
-      label: JOYO SEND A
-      children:
-        - label: BOSS OD-1
-          children:
-            - label: BOSS BD-2
-              children:
-                - label: BOSS JB-2
-                  children:
-                    - label: BOSS MT-2w
-                      children:
-                        - label: BOSS DS-1
-                          children:
-                            - label: JOYO RETURN A
+    branches:
+      main:
+        label: DIRTY chain
+        nodes:
+          - id: joyo-send-a
+            label: JOYO SEND A
+          - id: od-1
+            label: BOSS OD-1
+          - id: bd-2
+            label: BOSS BD-2
+          - id: jb-2
+            label: BOSS JB-2
+          - id: mt-2w
+            label: BOSS MT-2w
+          - id: ds-1
+            label: BOSS DS-1
+          - id: joyo-return-a
+            label: JOYO RETURN A
   space:
     label: JOYO SPACE — Send B
     status: CURRENT
-    tree:
-      label: JOYO SEND B
-      children:
-        - label: SY-1
-          children:
-            - label: SEND
-              children:
-                - label: PH-3
-                  children:
-                    - label: TR-2
-                      children:
-                        - label: SY-1 RETURN
-            - label: OUTPUT
-              children:
-                - label: LS-2 [A+B MIX ↔ BYPASS]
-                  children:
-                    - label: Loop A
-                      children:
-                        - label: SL-2
-                          children:
-                            - label: DD-8
-                    - label: Loop B
-                      children:
-                        - label: TE-2
-                          children:
-                            - label: RE-2
-                    - label: OUT
-                      children:
-                        - label: JOYO RETURN B
+    branches:
+      main:
+        label: Main path
+        nodes:
+          - id: joyo-send-b
+            label: JOYO SEND B
+          - id: sy-1
+            label: SY-1
+          - id: ls-2
+            label: LS-2
+            mode: A+B MIX ↔ BYPASS
+          - id: joyo-return-b
+            label: JOYO RETURN B
+      sy1-send:
+        label: SY-1 SEND loop
+        attach: sy-1
+        position: before
+        nodes:
+          - id: ph-3
+            label: PH-3
+          - id: tr-2
+            label: TR-2
+          - id: sy1-return
+            label: SY-1 RETURN
+      ls2-a:
+        label: LS-2 Loop A
+        attach: ls-2
+        position: before
+        nodes:
+          - id: sl-2
+            label: SL-2
+          - id: dd-8
+            label: DD-8
+      ls2-b:
+        label: LS-2 Loop B
+        attach: ls-2
+        position: before
+        nodes:
+          - id: te-2
+            label: TE-2
+          - id: re-2
+            label: RE-2
   kaoss:
     label: KAOSS Replay monitor/sample path
     status: CURRENT
     route_ref: kaoss_capture
-    tree:
-      label: Alesis Monitor Out
-      children:
-        - label: KAOSS Replay
-          children:
-            - label: TASCAM 9/10
+    branches:
+      main:
+        label: Main path
+        nodes:
+          - id: alesis-monitor
+            label: Alesis Monitor Out
+          - id: kaoss-replay
+            label: KAOSS Replay
+          - id: tascam-9-10
+            label: TASCAM 9/10
   clean_mixer:
     label: Clean mixer capture
     status: CURRENT
     route_ref: clean_mixer_capture
-    tree:
-      label: Alesis Main Out
-      children:
-        - label: TASCAM 1/2
+    branches:
+      main:
+        label: Main path
+        nodes:
+          - id: alesis-main
+            label: Alesis Main Out
+          - id: tascam-1-2
+            label: TASCAM 1/2
   acoustic:
     label: Acoustic clean capture
     status: CURRENT
     route_ref: acoustic_clean
-    tree:
-      label: Acoustic instrument
-      children:
-        - label: BOSS acoustic preamp
-          children:
-            - label: A/B/Y clean leg
-              children:
-                - label: TASCAM 5
-            - label: "other A/B/Y leg: UNKNOWN"
+    branches:
+      main:
+        label: Main path
+        nodes:
+          - id: acoustic-in
+            label: Acoustic instrument
+          - id: boss-acoustic-preamp
+            label: BOSS acoustic preamp
+          - id: aby-clean
+            label: A/B/Y clean leg
+          - id: tascam-5
+            label: TASCAM 5
+      aby-other:
+        label: other A/B/Y leg
+        attach: boss-acoustic-preamp
+        position: after
+        nodes:
+          - id: aby-other-unknown
+            label: "other A/B/Y leg: UNKNOWN"
   bass:
     label: Bass clean capture
     status: CURRENT
     route_ref: bass_clean
-    tree:
-      label: Bass
-      children:
-        - label: BBox preamp
-          children:
-            - label: A/B/Y clean leg
-              children:
-                - label: TASCAM 6
-            - label: "other A/B/Y leg: UNKNOWN"
+    branches:
+      main:
+        label: Main path
+        nodes:
+          - id: bass-in
+            label: Bass
+          - id: bbox-preamp
+            label: BBox preamp
+          - id: aby-clean
+            label: A/B/Y clean leg
+          - id: tascam-6
+            label: TASCAM 6
+      aby-other:
+        label: other A/B/Y leg
+        attach: bbox-preamp
+        position: after
+        nodes:
+          - id: aby-other-unknown
+            label: "other A/B/Y leg: UNKNOWN"
   electric:
     label: Electric guitar clean capture
     status: CURRENT
     route_ref: electric_guitar_clean
-    tree:
-      label: Electric guitar
-      children:
-        - label: Flamma preamp
-          children:
-            - label: A/B/Y clean leg
-              children:
-                - label: TASCAM 7
-            - label: "other A/B/Y leg: UNKNOWN"
+    branches:
+      main:
+        label: Main path
+        nodes:
+          - id: electric-in
+            label: Electric guitar
+          - id: flamma-preamp
+            label: Flamma preamp
+          - id: aby-clean
+            label: A/B/Y clean leg
+          - id: tascam-7
+            label: TASCAM 7
+      aby-other:
+        label: other A/B/Y leg
+        attach: flamma-preamp
+        position: after
+        nodes:
+          - id: aby-other-unknown
+            label: "other A/B/Y leg: UNKNOWN"
   minikorg:
     label: miniKORG direct capture
     status: CURRENT
     route_ref: miniKORG_direct
-    tree:
-      label: miniKORG stereo out
-      children:
-        - label: PB-B
-          children:
-            - label: TASCAM 3/4
+    branches:
+      main:
+        label: Main path
+        nodes:
+          - id: minikorg-out
+            label: miniKORG stereo out
+            signal: stereo
+          - id: pb-b
+            label: PB-B
+          - id: tascam-3-4
+            label: TASCAM 3/4
   sr18:
     label: SR-18 direct capture
     status: CURRENT
     route_ref: sr18_direct
-    tree:
-      label: Alesis SR-18 MAIN L/R
-      children:
-        - label: PB-B
-          children:
-            - label: TASCAM 11/12
+    branches:
+      main:
+        label: Main path
+        nodes:
+          - id: sr18-main
+            label: Alesis SR-18 MAIN L/R
+            signal: stereo
+          - id: pb-b
+            label: PB-B
+          - id: tascam-11-12
+            label: TASCAM 11/12

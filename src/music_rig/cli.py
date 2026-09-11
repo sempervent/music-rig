@@ -16,6 +16,7 @@ from music_rig import (
     inbox_service,
     patchbay_state,
     question_service,
+    routing_state,
     session_service,
     todo_service,
     wishlist_service,
@@ -82,6 +83,10 @@ current_ch_app = typer.Typer(
     help="CURRENT channel-map mutations (data/channel-map.yaml).",
     no_args_is_help=True,
 )
+current_path_app = typer.Typer(
+    help="CURRENT named-path mutations (data/routing.yaml).",
+    no_args_is_help=True,
+)
 app.add_typer(todo_app, name="todo")
 app.add_typer(wish_app, name="wish")
 todo_app.add_typer(next_app, name="next")
@@ -94,6 +99,7 @@ app.add_typer(path_app, name="path")
 app.add_typer(current_app, name="current")
 current_app.add_typer(current_pb_app, name="patchbay")
 current_app.add_typer(current_ch_app, name="channels")
+current_app.add_typer(current_path_app, name="path")
 
 
 def _fail(message: str, code: int = 1) -> None:
@@ -1232,6 +1238,368 @@ def _maybe_resolve_evidence(
                 f"Mark {change_id.strip().upper()} APPLIED?", default=False
             )
     return resolve_q, apply_chg, answer
+
+
+def _commit_routing_preview(
+    preview,
+    data: dict,
+    *,
+    yes: bool,
+    dry_run: bool,
+    question: Optional[str],
+    change: Optional[str],
+    answer_hint: str,
+    no_render: bool,
+) -> None:
+    if not _confirm_current(preview, yes=yes, dry_run=dry_run):
+        if dry_run:
+            try:
+                current_service.commit_routing(
+                    data,
+                    preview,
+                    dry_run=True,
+                    render=False,
+                    question_id=question,
+                    change_id=change,
+                )
+            except StoreError as exc:
+                _fail(str(exc))
+            raise typer.Exit(0)
+        if not preview.changed:
+            raise typer.Exit(0)
+        raise typer.Abort()
+    resolve_q, apply_chg, answer = _maybe_resolve_evidence(
+        question_id=question,
+        change_id=change,
+        answer_hint=answer_hint,
+        yes=yes,
+    )
+    try:
+        result = current_service.commit_routing(
+            data,
+            preview,
+            render=not no_render,
+            question_id=question,
+            change_id=change,
+            resolve_q=resolve_q,
+            apply_chg=apply_chg,
+            answer=answer,
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"[green]Applied:[/green] {result.message}")
+
+
+@current_path_app.command("branches")
+def current_path_branches(path: str) -> None:
+    """List editable branches for a CURRENT named path."""
+    try:
+        data = routing_state.load_raw()
+        path_id, named = routing_state.get_named_path(data, path)
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(routing_state.format_branch_list(path_id, named).rstrip())
+
+
+@current_path_app.command("move")
+def current_path_move(
+    path: str,
+    node: str,
+    branch: Optional[str] = typer.Option(None, "--branch"),
+    before: Optional[str] = typer.Option(None, "--before"),
+    after: Optional[str] = typer.Option(None, "--after"),
+    first: bool = typer.Option(False, "--first"),
+    last: bool = typer.Option(False, "--last"),
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    question: Optional[str] = typer.Option(None, "--question"),
+    change: Optional[str] = typer.Option(None, "--change"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        preview, data = routing_state.propose_move(
+            path,
+            node,
+            branch=branch,
+            before=before,
+            after=after,
+            first=first,
+            last=last,
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+    _commit_routing_preview(
+        preview,
+        data,
+        yes=yes,
+        dry_run=dry_run,
+        question=question,
+        change=change,
+        answer_hint=preview.after.get("chain", ""),
+        no_render=no_render,
+    )
+
+
+@current_path_app.command("insert")
+def current_path_insert(
+    path: str,
+    node_id: str,
+    label: Optional[str] = typer.Option(None, "--label"),
+    branch: Optional[str] = typer.Option(None, "--branch"),
+    before: Optional[str] = typer.Option(None, "--before"),
+    after: Optional[str] = typer.Option(None, "--after"),
+    first: bool = typer.Option(False, "--first"),
+    last: bool = typer.Option(False, "--last"),
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    question: Optional[str] = typer.Option(None, "--question"),
+    change: Optional[str] = typer.Option(None, "--change"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        preview, data = routing_state.propose_insert(
+            path,
+            node_id,
+            label=label,
+            branch=branch,
+            before=before,
+            after=after,
+            first=first,
+            last=last,
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+    _commit_routing_preview(
+        preview,
+        data,
+        yes=yes,
+        dry_run=dry_run,
+        question=question,
+        change=change,
+        answer_hint=f"{node_id} inserted in {path}",
+        no_render=no_render,
+    )
+
+
+@current_path_app.command("remove")
+def current_path_remove(
+    path: str,
+    node: str,
+    branch: Optional[str] = typer.Option(None, "--branch"),
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    question: Optional[str] = typer.Option(None, "--question"),
+    change: Optional[str] = typer.Option(None, "--change"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        preview, data = routing_state.propose_remove(path, node, branch=branch)
+    except StoreError as exc:
+        _fail(str(exc))
+    _commit_routing_preview(
+        preview,
+        data,
+        yes=yes,
+        dry_run=dry_run,
+        question=question,
+        change=change,
+        answer_hint=f"{node} removed from {path}",
+        no_render=no_render,
+    )
+
+
+@current_path_app.command("set-mode")
+def current_path_set_mode(
+    path: str,
+    node: str,
+    mode: str,
+    branch: Optional[str] = typer.Option(None, "--branch"),
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    question: Optional[str] = typer.Option(None, "--question"),
+    change: Optional[str] = typer.Option(None, "--change"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    try:
+        preview, data = routing_state.propose_set_mode(
+            path, node, mode, branch=branch
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+    _commit_routing_preview(
+        preview,
+        data,
+        yes=yes,
+        dry_run=dry_run,
+        question=question,
+        change=change,
+        answer_hint=mode.strip(),
+        no_render=no_render,
+    )
+
+
+def _numbered_branch(branch) -> None:
+    if not branch.nodes:
+        console.print("  (empty)")
+        return
+    for index, node in enumerate(branch.nodes, start=1):
+        console.print(f"  {index}. {routing_state.node_display(node)} [{node.id}]")
+
+
+def _wizard_node(branch, prompt: str) -> str:
+    raw = typer.prompt(prompt).strip()
+    if raw.isdigit() and 1 <= int(raw) <= len(branch.nodes):
+        return branch.nodes[int(raw) - 1].id
+    return raw
+
+
+def _wizard_placement(branch) -> dict:
+    console.print("Placement: [1] before  [2] after  [3] first  [4] last")
+    choice = typer.prompt("Placement", default="4").strip().lower()
+    if choice in {"1", "before"}:
+        return {"before": _wizard_node(branch, "Before node")}
+    if choice in {"2", "after"}:
+        return {"after": _wizard_node(branch, "After node")}
+    if choice in {"3", "first"}:
+        return {"first": True}
+    if choice in {"4", "last"}:
+        return {"last": True}
+    raise StoreError(f"Invalid placement {choice!r}")
+
+
+@current_path_app.command("verify")
+def current_path_verify(
+    path: str,
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    """Verify every branch and apply all selected edits as one transaction."""
+    try:
+        original = routing_state.load_raw()
+        path_id, initial = routing_state.get_named_path(original, path)
+    except StoreError as exc:
+        _fail(str(exc))
+    branch_ids = ["main", *[bid for bid in initial.branches if bid != "main"]]
+    mutations: list[dict] = []
+    pending_changes: list[str] = []
+
+    for branch_id in branch_ids:
+        while True:
+            try:
+                _preview, staged = routing_state.propose_batch(
+                    path_id, mutations, data=original
+                )
+                _pid, named = routing_state.get_named_path(staged, path_id)
+                branch = named.branches[branch_id]
+            except StoreError as exc:
+                _fail(str(exc))
+            console.print("")
+            console.print(f"[bold]{path_id} / {branch_id} — {branch.label}[/bold]")
+            _numbered_branch(branch)
+            if typer.confirm("Does this match?", default=True):
+                break
+            console.print("  [1] reorder")
+            console.print("  [2] remove")
+            console.print("  [3] add")
+            console.print("  [4] record change only")
+            console.print("  [q] quit")
+            choice = typer.prompt("Choice").strip().lower()
+            try:
+                if choice in {"1", "reorder"}:
+                    node = _wizard_node(branch, "Node")
+                    mutations.append(
+                        {
+                            "op": "move",
+                            "branch": branch_id,
+                            "node": node,
+                            **_wizard_placement(branch),
+                        }
+                    )
+                elif choice in {"2", "remove"}:
+                    mutations.append(
+                        {
+                            "op": "remove",
+                            "branch": branch_id,
+                            "node": _wizard_node(branch, "Node"),
+                        }
+                    )
+                elif choice in {"3", "add"}:
+                    node_id = typer.prompt("Node id").strip()
+                    label = typer.prompt("Label", default=node_id).strip()
+                    mutations.append(
+                        {
+                            "op": "insert",
+                            "branch": branch_id,
+                            "node": node_id,
+                            "label": label,
+                            **_wizard_placement(branch),
+                        }
+                    )
+                elif choice in {"4", "record", "record change only"}:
+                    pending_changes.append(
+                        typer.prompt(
+                            "What differs physically?",
+                            default=f"{path_id}/{branch_id} differs from CURRENT",
+                        ).strip()
+                    )
+                    break
+                elif choice in {"q", "quit"}:
+                    console.print("Quit: nothing written.")
+                    raise typer.Exit(0)
+                else:
+                    raise StoreError(f"Invalid choice {choice!r}")
+            except StoreError as exc:
+                _fail(str(exc))
+
+    try:
+        preview, data = routing_state.propose_batch(
+            path_id, mutations, data=original
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print("")
+    console.print(format_current_preview(preview).rstrip())
+    if pending_changes:
+        console.print("")
+        console.print("Change records to create:")
+        for summary in pending_changes:
+            console.print(f"  - {summary}")
+    if dry_run:
+        try:
+            current_service.commit_routing(
+                data, preview, dry_run=True, render=False
+            )
+        except StoreError as exc:
+            _fail(str(exc))
+        console.print("[dim]Dry-run: nothing written.[/dim]")
+        raise typer.Exit(0)
+    if not preview.changed and not pending_changes:
+        console.print("No routing changes selected.")
+        raise typer.Exit(0)
+    if not yes and not typer.confirm(
+        f"Apply {len(mutations)} routing mutation(s) and "
+        f"create {len(pending_changes)} change record(s)?",
+        default=False,
+    ):
+        raise typer.Abort()
+    try:
+        if preview.changed:
+            current_service.commit_routing(
+                data, preview, render=not no_render
+            )
+        for summary in pending_changes:
+            change_service.create_change(
+                summary,
+                category=ChangeCategory.PEDAL_CHAIN,
+                affected_areas=[f"Routing: {path_id}"],
+            )
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(
+        f"[green]Applied:[/green] {len(mutations)} routing mutation(s); "
+        f"{len(pending_changes)} change record(s) created."
+    )
 
 
 @current_pb_app.command("show")

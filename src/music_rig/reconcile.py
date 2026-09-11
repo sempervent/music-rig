@@ -262,6 +262,11 @@ def format_reconcile_question(
                 f"    uv run rig current patchbay set-model {target.bay} "
                 f'"<model>" --question {q.id}'
             )
+        elif target is not None and target.domain == "routing.verify" and target.path:
+            lines.append(f"  This question maps to CURRENT path: {target.path}")
+            lines.append(
+                f"    uv run rig current path verify {target.path}"
+            )
         else:
             lines.append("  inspect the physical rig")
             lines.append(f"  then: uv run rig question resolve {q.id}")

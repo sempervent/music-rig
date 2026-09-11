@@ -7,7 +7,7 @@ from pathlib import Path
 
 from music_rig.models import TERMINAL_FOR_NEXT, ChangeStatus, QuestionStatus
 from music_rig.render import check_render_sync
-from music_rig import channel_state, patchbay_state
+from music_rig import channel_state, patchbay_state, routing_state
 from music_rig.store import (
     CHANGES_PATH,
     CHANNEL_MAP_PATH,
@@ -43,6 +43,10 @@ def run_checks(
     docs_todo: Path | None = None,
     docs_wishlist: Path | None = None,
     docs_questions: Path | None = None,
+    routing_path: Path | None = None,
+    docs_routing: Path | None = None,
+    docs_pedal_chains: Path | None = None,
+    diagram_aux_loop: Path | None = None,
 ) -> CheckResult:
     errors: list[str] = []
     warnings: list[str] = []
@@ -92,7 +96,10 @@ def run_checks(
         errors.append(str(exc))
 
     try:
-        load_routing()
+        load_routing(routing_path)
+        routing = routing_state.load_raw(routing_path)
+        for err in routing_state.validate_routing_doc(routing):
+            errors.append(f"routing: {err}")
     except StoreError as exc:
         errors.append(str(exc))
 
@@ -168,6 +175,10 @@ def run_checks(
             docs_todo=docs_todo,
             docs_wishlist=docs_wishlist,
             docs_questions=docs_questions,
+            routing_path=routing_path,
+            docs_routing=docs_routing,
+            docs_pedal_chains=docs_pedal_chains,
+            diagram_aux_loop=diagram_aux_loop,
         )
         for path in stale:
             errors.append(
