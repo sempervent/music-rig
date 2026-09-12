@@ -354,7 +354,7 @@ def test_production_semantic_fingerprint_stable_keys():
         "alesis-return-1-2",
     ]
     assert [n["id"] for n in fingerprint["kaoss"]["branches"]["main"]["nodes"]] == [
-        "tascam-3-4",
+        "tascam-out-3-4",
         "kaoss-replay",
-        "tascam-15-16",
+        "tascam-in-15-16",
     ]
