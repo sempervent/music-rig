@@ -55,12 +55,14 @@ def _minimal_todo(**overrides) -> dict:
 def test_load_repo_todo_yaml():
     doc = load_todo()
     assert len(doc.tasks) == 44
-    assert doc.next_session == ["RIG-001", "RIG-002", "RIG-003"]
+    # RIG-003 completed via approved Q-001 reconciliation; Next Session is top active work.
+    assert doc.next_session == ["RIG-001", "RIG-002"]
     assert doc.next_id() == "RIG-049"
     ids = {t.id for t in doc.tasks}
     assert "RIG-032" in ids
     assert "RIG-048" in ids
     assert "RIG-026" not in ids
+    assert doc.task_map()["RIG-003"].status.value == "DONE"
 
 
 def test_load_repo_wishlist_yaml():

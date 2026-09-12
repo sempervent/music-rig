@@ -376,6 +376,10 @@ def fx16(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 # --- production metadata (read-only) ---
 
 
+# Production Questions reconciled in the approved post-Stage-18 answering session.
+_RECONCILED_PROD = frozenset({"Q-001", "Q-002", "Q-003", "Q-004", "Q-006"})
+
+
 def test_production_questions_have_verification_metadata_answers_untouched():
     doc = load_questions()
     prod = [q for q in doc.questions if q.id.startswith("Q-") and int(q.id.split("-")[1]) <= 20]
@@ -385,10 +389,17 @@ def test_production_questions_have_verification_metadata_answers_untouched():
         assert q.verification is not None, q.id
         assert q.verification.kind
         assert q.verification.answer_type in {"ENUM", "BOOL", "REF", "TEXT"}
-        assert q.status == QuestionStatus.OPEN
-        assert q.answer == ""
-        assert q.resolved_at is None
-        assert q.reconciled_at is None
+        assert q.verification_result is None  # never invent observations
+        if q.id in _RECONCILED_PROD:
+            assert q.status == QuestionStatus.RESOLVED
+            assert q.answer.strip()
+            assert q.resolved_at is not None
+            assert q.reconciled_at is not None
+        else:
+            assert q.status == QuestionStatus.OPEN
+            assert q.answer == ""
+            assert q.resolved_at is None
+            assert q.reconciled_at is None
         kinds[q.verification.kind] = kinds.get(q.verification.kind, 0) + 1
         # recipes validate via pydantic already
         if q.verification.answer_type in {"ENUM", "BOOL"}:
@@ -403,6 +414,9 @@ def test_production_questions_have_verification_metadata_answers_untouched():
     q7 = doc.question_map()["Q-007"]
     assert q7.target is not None
     assert q7.target.domain == "inventory.patchbay_mapping"
+    # Approved Q-001 A/B/Y reconciliation baseline
+    q1 = doc.question_map()["Q-001"]
+    assert "Alesis 2" in q1.answer and "Alesis 1" in q1.answer and "Alesis 3" in q1.answer
 
 
 def test_production_readiness_matrix_no_answers():
@@ -410,9 +424,13 @@ def test_production_readiness_matrix_no_answers():
     assert len(rows) >= 20
     for row in rows:
         if row["id"] in {f"Q-{i:03d}" for i in range(1, 21)}:
-            assert row["answer"] == ""
-            assert row["resolved_at"] is None
             assert row["kind"]
+            if row["id"] in _RECONCILED_PROD:
+                assert row["answer"]
+                assert row["resolved_at"] is not None
+            else:
+                assert row["answer"] == ""
+                assert row["resolved_at"] is None
 
 
 # --- queue ordering / filters ---
