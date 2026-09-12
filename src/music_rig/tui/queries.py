@@ -5,12 +5,19 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from music_rig.models import ChangeStatus, InboxStatus, QuestionStatus, WishStatus
+from music_rig.models import (
+    ChangeStatus,
+    HumanActionStatus,
+    InboxStatus,
+    QuestionStatus,
+    WishStatus,
+)
 from music_rig.patchbay_state import list_pairs, load_raw
 from music_rig.session_service import find_active, list_sessions
 from music_rig.snapshot_service import list_snapshots
 from music_rig.store import (
     load_changes,
+    load_human_actions,
     load_inbox,
     load_inventory,
     load_questions,
@@ -27,6 +34,7 @@ class HomeCounts:
     next_session: int
     wishlist: int
     inbox_open: int
+    human_pending: int
     changes_open: int
     patchbay_bays: int
     patchbay_unknown_modes: int
@@ -61,6 +69,8 @@ def home_counts(
         1 for w in wish.items if w.status not in {WishStatus.REJECTED, WishStatus.ACQUIRED}
     )
     inbox_open = sum(1 for i in inbox.items if i.status == InboxStatus.OPEN)
+    human_doc = load_human_actions()
+    human_pending = sum(1 for i in human_doc.items if i.status is HumanActionStatus.PENDING)
     changes_open = sum(1 for c in changes.items if c.status == ChangeStatus.OPEN)
 
     unknown_modes = 0
@@ -87,6 +97,7 @@ def home_counts(
         next_session=len(todo.next_session),
         wishlist=wish_active,
         inbox_open=inbox_open,
+        human_pending=human_pending,
         changes_open=changes_open,
         patchbay_bays=bays,
         patchbay_unknown_modes=unknown_modes,
