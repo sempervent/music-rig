@@ -65,7 +65,7 @@ class QuestionsScreen(Screen):
 
     def __init__(self, *, initial_id: str | None = None) -> None:
         super().__init__()
-        self._filter = "OPEN"
+        self._filter = "ACTIVE"
         self._search = ""
         self._row_ids: list[str] = []
         self._initial_id = initial_id.upper() if initial_id else None
@@ -87,7 +87,7 @@ class QuestionsScreen(Screen):
 
     def on_mount(self) -> None:
         table = self.query_one("#list-table", DataTable)
-        table.add_columns("ID", "Status", "Area", "Question")
+        table.add_columns("ID", "Lifecycle", "Area", "Question")
         table.focus()
         self._set_mode(EditorMode.NORMAL)
         self.reload(select_id=self._initial_id)
@@ -109,12 +109,17 @@ class QuestionsScreen(Screen):
         table.clear()
         self._row_ids = []
         for q in items:
-            table.add_row(q.id, q.status.value, q.area, truncate(q.question, 48))
+            table.add_row(
+                q.id,
+                question_service.lifecycle_label(q),
+                q.area,
+                truncate(q.question, 48),
+            )
             self._row_ids.append(q.id)
         self.query_one("#filter-label", Static).update(
             f"Filter: {self._filter}  ·  {len(self._row_ids)} shown"
             + (f"  ·  search: {self._search!r}" if self._search else "")
-            + "  ·  a Answer · A Add · r Resolve · V Verify"
+            + "  ·  a Answer · A Add · R Resolve · V Verify · C Reconcile"
         )
         if select_id and select_id in self._row_ids:
             table.move_cursor(row=self._row_ids.index(select_id))
@@ -258,20 +263,25 @@ class QuestionsScreen(Screen):
         self.app.push_screen(
             HelpScreen(
                 "Questions\n\n"
-                "a       Answer (question text stays visible; may keep OPEN)\n"
+                "a       Answer (Save Draft / Answer & Resolve)\n"
                 "A       Add question\n"
-                "r / R   Resolve (answer required; not verification_result)\n"
+                "r / R   Resolve draft → FINAL (answer required)\n"
                 "V       Verify (observation / verification_result flow)\n"
                 "C       Reconcile handoff\n"
                 "e / i   edit fields (Ctrl+S / :w apply)\n"
                 "d       defer · o reopen · t target\n"
-                "f       cycle filter OPEN/RESOLVED/DEFERRED/ALL\n"
+                "f       cycle ACTIVE/OPEN/RESOLVED/UNRECONCILED/DEFERRED/ALL\n"
                 "/ n N   search\n"
                 "Ctrl+r  refresh (not Resolve)\n"
                 "Esc/q   back\n\n"
                 f"{VIM_HELP_COMMON}\n"
+                "Labels: OPEN/UNANSWERED · OPEN/DRAFT · "
+                "RESOLVED/UNRECONCILED · RESOLVED/RECONCILED\n"
+                "ACTIVE includes OPEN + RESOLVED-unreconciled "
+                "(excludes RECONCILED/DEFERRED).\n"
                 "Resolving does not rewrite CURRENT.\n"
-                "Under filter=OPEN, a resolved question disappears from the list."
+                "Under filter=OPEN, a resolved question leaves the list "
+                "but reconciliation may still be pending."
             )
         )
 
@@ -286,16 +296,19 @@ class QuestionsScreen(Screen):
                 return
             outcome, qid = result
             if outcome is SaveOutcome.SUCCESS and qid:
+                filter_was_open = self._filter == "OPEN"
                 self.reload(select_id=qid)
-                if self._filter == "OPEN":
-                    still = self._selected_id()
-                    # Answer-only keeps OPEN; Resolve hides under OPEN
-                    fresh = question_service.get_question(qid)
-                    if fresh.status != QuestionStatus.OPEN and still != qid:
-                        self.notify(
-                            f"{qid} updated. Hidden because filter=OPEN. "
-                            "Press f for RESOLVED/ALL."
-                        )
+                fresh = question_service.get_question(qid)
+                if (
+                    filter_was_open
+                    and fresh.status != QuestionStatus.OPEN
+                    and qid not in self._row_ids
+                ):
+                    self.notify(
+                        f"{qid} answered and resolved. "
+                        "It is hidden because this view shows OPEN Questions. "
+                        "Reconciliation remains pending."
+                    )
 
         self.app.push_screen(AnswerScreen(q.id, resolve_on_save=False), _done)
 
@@ -341,21 +354,57 @@ class QuestionsScreen(Screen):
         if q.status == QuestionStatus.RESOLVED:
             self.notify(f"{q.id} already RESOLVED", severity="warning")
             return
+        # Prefer promoting existing draft without reopening full editor when possible
+        if q.answer.strip():
+            def _done(ok: bool | None) -> None:
+                if not ok:
+                    return
+                try:
+                    updated = question_service.resolve_question(q.id, render=True)
+                except StoreError as exc:
+                    self.notify(format_error(exc), severity="error")
+                    return
+                filter_was_open = self._filter == "OPEN"
+                self.reload(select_id=updated.id)
+                self.notify(
+                    f"{updated.id} resolved (FINAL). "
+                    "CURRENT reconciliation still required."
+                )
+                if filter_was_open and updated.id not in self._row_ids:
+                    self.notify(
+                        f"{updated.id} answered and resolved. "
+                        "It is hidden because this view shows OPEN Questions. "
+                        "Reconciliation remains pending."
+                    )
+
+            self.app.push_screen(
+                ConfirmModal(
+                    f"Resolve draft {q.id}?",
+                    "Promotes existing draft answer to FINAL (RESOLVED).\n"
+                    "Does not invent verification_result.\n"
+                    "Enter confirms · Esc cancels.",
+                    confirm_label="Resolve",
+                ),
+                _done,
+            )
+            return
         from music_rig.tui.screens.answer import AnswerScreen
 
-        def _done(result: tuple[SaveOutcome, str | None] | None) -> None:
+        def _done_screen(result: tuple[SaveOutcome, str | None] | None) -> None:
             if result is None:
                 return
             outcome, qid = result
             if outcome is SaveOutcome.SUCCESS and qid:
                 filter_was_open = self._filter == "OPEN"
                 self.reload(select_id=qid)
-                if filter_was_open:
+                if filter_was_open and qid not in self._row_ids:
                     self.notify(
-                        "Hidden because filter=OPEN. Press f for RESOLVED/ALL."
+                        f"{qid} answered and resolved. "
+                        "It is hidden because this view shows OPEN Questions. "
+                        "Reconciliation remains pending."
                     )
 
-        self.app.push_screen(AnswerScreen(q.id, resolve_on_save=True), _done)
+        self.app.push_screen(AnswerScreen(q.id, resolve_on_save=True), _done_screen)
 
     def action_verify(self) -> None:
         q = self._selected()

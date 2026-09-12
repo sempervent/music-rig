@@ -98,6 +98,25 @@ class PatchbayModeAdapter(ReconciliationAdapter):
         bay = target.bay.strip().upper()
         current = self.read_current(question, paths=paths)
 
+        if question.status == QuestionStatus.OPEN and question.answer.strip():
+            return Plan(
+                artifact_type="question",
+                artifact_id=question.id,
+                state=ReconciliationState.DRAFT_ANSWER,
+                capability=self.capability,
+                current=current,
+                desired=question.answer.strip(),
+                blockers=[
+                    {
+                        "code": "draft_answer",
+                        "message": "OPEN with draft answer — resolve before reconcile",
+                    }
+                ],
+                suggested_commands=[
+                    f"uv run rig question resolve {question.id}",
+                ],
+            )
+
         if question.status != QuestionStatus.RESOLVED or not question.answer.strip():
             return Plan(
                 artifact_type="question",

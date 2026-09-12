@@ -47,8 +47,12 @@ Evidence labels (`VERIFIED` | `INTENDED` | `UNKNOWN`) matter more than prose ton
      uv run rig inspect cleanup --json
 
 2. Work a factual uncertainty (human/observed answer — never invent)
-     uv run rig question show Q-xxx
+     # Provisional:
+     uv run rig question draft Q-xxx --answer "<draft>" --json
+     # Final (RESOLVED; reconciled_at still null):
      uv run rig question answer Q-xxx --answer "<answer>" --json
+     # Promote existing draft:
+     uv run rig question resolve Q-xxx
      # optional dry-run:
      uv run rig question answer Q-xxx --answer "<answer>" --dry-run --json
 
@@ -62,18 +66,25 @@ Evidence labels (`VERIFIED` | `INTENDED` | `UNKNOWN`) matter more than prose ton
      uv run rig reconcile apply question Q-xxx --dry-run --json
      uv run rig reconcile apply question Q-xxx --yes --json
      uv run rig reconcile verify question Q-xxx --json
+     # Adapter MATCH path:
      uv run rig reconcile finalize question Q-xxx --yes \
        --complete-linked-todos --apply-linked-changes --confirm-dod --json
+     # Agent-interpreted / MANUAL path (after supported `rig current` updates):
+     uv run rig reconcile finalize question Q-xxx --yes \
+       --confirm-current-reconciled \
+       --note "Updated CURRENT from final human answer via supported CLI" \
+       --complete-linked-todos --confirm-dod --json
 
 5. Validate
      uv run rig check
      uv run rig render --check
 ```
 
-`answer` / `resolve` records an answer only. It does **not** set `reconciled_at`
-or rewrite CURRENT. Human message: “Answer recorded. CURRENT reconciliation
-still required.” Finalize sets `reconciled_at` after verify MATCH (or
-`--no-current-change` with `--note`).
+`draft` keeps status OPEN (`answer_state=DRAFT`). `answer` / `resolve` create
+FINAL (`RESOLVED` + `resolved_at`). None of these set `reconciled_at` or rewrite
+CURRENT. Do not invent `verification_result` from answering alone. Finalize sets
+`reconciled_at` after verify MATCH, `--no-current-change` with `--note`, or
+`--confirm-current-reconciled` with `--note` (manual/agent-interpreted).
 
 ## Target completion workflow
 
@@ -309,11 +320,44 @@ The TUI is a **human editor** over the same services as the CLI. Agents should p
   blockers.
 - `rig tui reconcile`: plan/apply/verify/finalize; **e** Edit Target opens pair
   picker when `patchbay.mode` is missing `pair`.
-- Questions: **a** Answer (text stays visible), **A** Add, **r** Resolve,
-  **V** Verify, **C** Reconcile. Ctrl+r = Refresh.
+- Questions: **a** Answer (Save Draft / Answer & Resolve), **A** Add,
+  **R** Resolve draft, **V** Verify, **C** Reconcile. Ctrl+r = Refresh.
+  Labels: OPEN/UNANSWERED · OPEN/DRAFT · RESOLVED/UNRECONCILED ·
+  RESOLVED/RECONCILED. Default filter ACTIVE.
 - Vim-like modes for extenders: NORMAL / INSERT / COMMAND (`:w` apply, `:q` /
   `:q!`). See [docs/tui.md](docs/tui.md). Do not teach agents to drive Pilot/TUI.
 - `rig tui --debug` / `RIG_DEBUG=1` for pipeline diagnostics only.
+
+## Live Rig Data Changes During Development
+
+When the human provides real rig facts while you are working on a feature branch:
+
+1. Treat those facts as intentional production-state changes.
+2. Do not discard them as test pollution.
+3. Keep code fixes and real-data reconciliation distinguishable.
+4. Use `rig` CLI entrypoints for the data mutation.
+5. Run `rig check` / `rig render` / tests.
+6. Review `git diff` carefully.
+7. Do not silently mix unrelated implementation and data changes.
+
+## Blocking code bug during reconciliation workflow
+
+If a shared service bug blocks a legitimate reconciliation:
+
+1. Stop the reconciliation.
+2. Reproduce the bug.
+3. Add a regression test.
+4. Fix the service invariant.
+5. Validate (`pytest`, `rig check`, `rig render --check`).
+6. Resume reconciliation using the fixed CLI.
+7. Report the code fix separately from the factual rig update.
+
+## Do not ask redundant "preserve these?" after human asked to reconcile
+
+If the human explicitly asked to reconcile answers they entered, the real rig
+state changes from that reconciliation are intentional. Report them. Do **not**
+finish by asking whether to preserve them. Git commit/push remains a separate
+concern unless the human also requested repository delivery.
 
 ## Things Agents Must Never Do
 

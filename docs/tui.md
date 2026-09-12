@@ -59,22 +59,27 @@ Footer / banner shows `-- NORMAL --` / `-- INSERT --` / `-- COMMAND --`.
 
 | Key | Action |
 |---|---|
-| **a** | **Answer** (question text stays visible; may keep OPEN) |
+| **a** | **Answer** → Save Draft / Answer & Resolve |
 | **A** | **Add** question |
-| **r** / **R** | **Resolve** (answer required; status→RESOLVED) |
+| **r** / **R** | **Resolve** draft → FINAL (existing answer or Answer screen) |
 | **V** | Verify (observation / `verification_result` flow) |
 | **C** | Reconcile handoff |
 | d | Defer |
 | o | Reopen |
 | t | Open typed target |
+| f | Cycle ACTIVE / OPEN / RESOLVED / UNRECONCILED / DEFERRED / ALL |
 | Ctrl+r | Refresh |
 
-Answer-only save uses `update_question_fields` and may leave status OPEN.
-Resolve requires a non-empty answer and confirmation. Neither invents
-`verification_result`.
+**Save Draft** keeps status OPEN (`answer_state=DRAFT`). **Answer & Resolve**
+sets FINAL (`RESOLVED` + `resolved_at`); `reconciled_at` stays null. Neither
+invents `verification_result`.
 
-After resolve under filter=OPEN the row disappears; notification explains how to
-view RESOLVED/ALL.
+List labels: `OPEN/UNANSWERED`, `OPEN/DRAFT`, `RESOLVED/UNRECONCILED`,
+`RESOLVED/RECONCILED`. Default filter **ACTIVE** = OPEN + RESOLVED-unreconciled
+(excludes RECONCILED/DEFERRED).
+
+After Answer & Resolve under filter=OPEN the row leaves the OPEN view; notification
+explains reconciliation remains pending.
 
 ### Patchbay editor
 

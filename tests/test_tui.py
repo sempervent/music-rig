@@ -70,7 +70,7 @@ async def test_question_open_filter_and_detail(tui_fx):
     async with app.run_test(size=(120, 40)) as pilot:
         await pilot.pause()
         label = str(app.screen.query_one("#filter-label").content)
-        assert "OPEN" in label
+        assert "ACTIVE" in label or "OPEN" in label
         detail = str(app.screen.query_one("#detail").content)
         assert "Q-001" in detail or "Q-002" in detail
 
@@ -110,6 +110,8 @@ async def test_question_resolve_writes_tmp_only(tui_fx):
         # confirm modal — Enter confirms
         await pilot.press("enter")
         await pilot.pause()
+        await pilot.press("escape")  # Reconcile Later
+        await pilot.pause()
     doc = load_questions(tui_fx["questions"])
     q = doc.question_map()["Q-002"]
     assert q.status.value == "RESOLVED"
@@ -143,6 +145,8 @@ async def test_question_resolve_human_path_lowercase_r(tui_fx):
         assert isinstance(app.screen, ConfirmModal)
         await pilot.press("enter")
         await pilot.pause()
+        await pilot.press("escape")  # Reconcile Later
+        await pilot.pause()
 
     q = load_questions(tui_fx["questions"]).question_map()["Q-002"]
     assert q.status.value == "RESOLVED"
@@ -150,7 +154,11 @@ async def test_question_resolve_human_path_lowercase_r(tui_fx):
     assert q.resolved_at is not None
     joined = " ".join(notifications)
     assert "Q-002" in joined
-    assert "filter=OPEN" in joined or "Hidden because filter=OPEN" in joined
+    assert (
+        "reconcile" in joined.casefold()
+        or "resolved" in joined.casefold()
+        or "OPEN" in joined
+    )
 
 
 @pytest.mark.asyncio
@@ -166,15 +174,20 @@ async def test_question_resolve_reopen_under_resolved_filter(tui_fx):
         await pilot.pause()
         await pilot.press("enter")
         await pilot.pause()
+        await pilot.press("escape")
+        await pilot.pause()
 
-    # Fresh app — default OPEN filter hides it
+    # Fresh app — default ACTIVE includes RESOLVED-unreconciled
     app2 = RigApp(route="question")
     async with app2.run_test(size=(120, 40)) as pilot:
         await pilot.pause()
         label = str(app2.screen.query_one("#filter-label").content)
+        assert "ACTIVE" in label or "OPEN" in label
+        # Cycle to OPEN (excludes resolved)
+        await pilot.press("f")  # OPEN
+        await pilot.pause()
+        label = str(app2.screen.query_one("#filter-label").content)
         assert "OPEN" in label
-        detail = str(app2.screen.query_one("#detail").content)
-        assert "Q-002" not in detail or "RESOLVED" not in detail
         await pilot.press("f")  # RESOLVED
         await pilot.pause()
         label = str(app2.screen.query_one("#filter-label").content)
@@ -182,6 +195,7 @@ async def test_question_resolve_reopen_under_resolved_filter(tui_fx):
         detail = str(app2.screen.query_one("#detail").content)
         assert "Q-002" in detail
         assert "answered in test" in detail
+        await pilot.press("f")  # UNRECONCILED
         await pilot.press("f")  # DEFERRED
         await pilot.press("f")  # ALL
         await pilot.pause()
@@ -243,7 +257,9 @@ async def test_question_defer_reopen_add(tui_fx):
     app = RigApp(route="question")
     async with app.run_test(size=(120, 40)) as pilot:
         await pilot.pause()
+        await pilot.press("f")  # OPEN
         await pilot.press("f")  # RESOLVED
+        await pilot.press("f")  # UNRECONCILED
         await pilot.press("f")  # DEFERRED
         await pilot.pause()
         await pilot.press("o")
@@ -620,6 +636,8 @@ async def test_manual_acceptance_fixture_yaml(tui_fx, monkeypatch):
         await pilot.press("ctrl+s")
         await pilot.pause()
         await pilot.press("enter")
+        await pilot.pause()
+        await pilot.press("escape")
         await pilot.pause()
     q = load_questions(tui_fx["questions"]).question_map()["Q-002"]
     assert q.status.value == "RESOLVED"

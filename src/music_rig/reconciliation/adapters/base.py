@@ -48,7 +48,9 @@ class ReconciliationAdapter(ABC):
             return ReconciliationState.RECONCILED
         from music_rig.models import QuestionStatus
 
-        if question.status == QuestionStatus.OPEN and not question.answer.strip():
+        if question.status == QuestionStatus.OPEN:
+            if question.answer.strip():
+                return ReconciliationState.DRAFT_ANSWER
             return ReconciliationState.NEEDS_ANSWER
         p = plan or self.plan(question, paths=paths)
         return p.state

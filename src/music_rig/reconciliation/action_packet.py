@@ -15,6 +15,8 @@ def build_action_packet(
     postcondition: str,
     related_ids: dict[str, list[str]] | None = None,
     missing_capability: str | None = None,
+    requires_agent_interpretation: bool = True,
+    manual_finalize_allowed: bool = True,
 ) -> dict[str, Any]:
     """Enrich plan JSON for agent handoff after human observation/answer."""
     vr = question.verification_result
@@ -34,21 +36,33 @@ def build_action_packet(
             for k, v in question.target.model_dump().items()
             if v is not None
         }
+    finalize_template = (
+        f"uv run rig reconcile finalize question {question.id} "
+        f"--confirm-current-reconciled "
+        f'--note "…" --complete-linked-todos --confirm-dod --yes --json'
+    )
     packet: dict[str, Any] = {
         "artifact": {"type": "question", "id": question.id},
         "human_answer": question.answer,
+        "final_human_answer": question.answer,
         "observation": observation,
         "typed_target": target,
         "current_snapshot": current_snapshot,
+        "relevant_current_entities": current_snapshot,
         "related_ids": related_ids
         or {
             "todos": list(question.related_todos),
             "changes": list(question.related_changes),
         },
         "suggested_command_families": suggested_command_families,
+        "suggested_current_commands": list(suggested_command_families),
         "postcondition": postcondition,
         "linked_todos": list(question.related_todos),
         "linked_changes": list(question.related_changes),
+        "requires_agent_interpretation": requires_agent_interpretation,
+        "manual_finalize_allowed": manual_finalize_allowed,
+        "required_confirmation": "--confirm-current-reconciled",
+        "finalize_command_template": finalize_template,
     }
     if missing_capability:
         packet["missing_capability"] = missing_capability

@@ -84,6 +84,8 @@ class MidiClockAdapter(ReconciliationAdapter):
 
         if question.reconciled_at is not None:
             state = ReconciliationState.RECONCILED
+        elif question.status == QuestionStatus.OPEN and question.answer.strip():
+            state = ReconciliationState.DRAFT_ANSWER
         elif question.status != QuestionStatus.RESOLVED or not question.answer.strip():
             if vr and vr.outcome == VerificationOutcome.UNKNOWN:
                 state = ReconciliationState.NEEDS_ANSWER

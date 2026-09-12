@@ -348,12 +348,21 @@ class QuestionStatus(str, Enum):
 
 class ReconciliationState(str, Enum):
     NEEDS_ANSWER = "NEEDS_ANSWER"
+    DRAFT_ANSWER = "DRAFT_ANSWER"
     READY_TO_APPLY = "READY_TO_APPLY"
     NEEDS_AGENT_ACTION = "NEEDS_AGENT_ACTION"
     CURRENT_MATCHES = "CURRENT_MATCHES"
     READY_TO_FINALIZE = "READY_TO_FINALIZE"
     RECONCILED = "RECONCILED"
     BLOCKED = "BLOCKED"
+
+
+class AnswerState(str, Enum):
+    """Derived (not persisted) answer lifecycle for OPEN/RESOLVED questions."""
+
+    UNANSWERED = "UNANSWERED"
+    DRAFT = "DRAFT"
+    FINAL = "FINAL"
 
 
 class QuestionTarget(BaseModel):
