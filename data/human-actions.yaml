@@ -1,0 +1,101 @@
+items:
+- id: HAR-001
+  action_type: QUESTION_ANSWER
+  artifact_id: Q-008
+  prompt: What normalization mode is each populated PB-B pair set to?
+  proposed_value: All represented PB-B pairs are normal
+  explanation: BOT prepared this from your Stage 25 report, but BOT cannot create HUMAN authority.
+  source_actor: BOT
+  created_at: '2026-09-12T17:38:35.738062-04:00'
+  related_ids: []
+  consequences: Resolves Q-008 as HUMAN FINAL answer (reconciled_at still null until reconcile).
+  status: PENDING
+  proposed_value_original: All represented PB-B pairs are normal
+  accepted_value: null
+  accepted_by: null
+  accepted_at: null
+  rejected_at: null
+  superseded_reason: ''
+  verification_outcome: null
+  verification_note: null
+- id: HAR-002
+  action_type: QUESTION_ANSWER
+  artifact_id: Q-017
+  prompt: Which ReMOTE ZeRO SL templates are actually loaded on the device?
+  proposed_value: UNKNOWN — templates have no names
+  explanation: BOT drafted UNKNOWN from Stage 25 observation; HUMAN must finalize.
+  source_actor: BOT
+  created_at: '2026-09-12T17:38:35.982169-04:00'
+  related_ids: []
+  consequences: Resolves Q-017 answer as HUMAN. Observation may still be required separately.
+  status: PENDING
+  proposed_value_original: UNKNOWN — templates have no names
+  accepted_value: null
+  accepted_by: null
+  accepted_at: null
+  rejected_at: null
+  superseded_reason: ''
+  verification_outcome: null
+  verification_note: null
+- id: HAR-003
+  action_type: VERIFICATION_RESULT
+  artifact_id: Q-017
+  prompt: Record explicit observation for ZeRO template names (EXPLICIT_OBSERVATION_REQUIRED).
+  proposed_value: no named templates loaded
+  explanation: Q-017 policy requires verification_result, not answer text alone.
+  source_actor: BOT
+  created_at: '2026-09-12T17:38:36.230866-04:00'
+  related_ids: []
+  consequences: Writes HUMAN verification_result outcome=UNKNOWN on Q-017.
+  status: PENDING
+  proposed_value_original: no named templates loaded
+  accepted_value: null
+  accepted_by: null
+  accepted_at: null
+  rejected_at: null
+  superseded_reason: ''
+  verification_outcome: unknown
+  verification_note: no named templates loaded
+- id: HAR-004
+  action_type: TODO_DOD_CONFIRMATION
+  artifact_id: RIG-031
+  prompt: Confirm Definition of Done for RIG-031?
+  proposed_value: midi-clock.md states verified CURRENT behavior, not only intent
+  explanation: midi-clock.md already shows Ableton master VERIFIED; HUMAN must attest DoD
+    before DONE.
+  source_actor: BOT
+  created_at: '2026-09-12T17:38:36.484446-04:00'
+  related_ids: []
+  consequences: Marks RIG-031 DONE via todo lifecycle.
+  status: PENDING
+  proposed_value_original: midi-clock.md states verified CURRENT behavior, not only intent
+  accepted_value: null
+  accepted_by: null
+  accepted_at: null
+  rejected_at: null
+  superseded_reason: ''
+  verification_outcome: null
+  verification_note: null
+- id: HAR-005
+  action_type: HUMAN_CLARIFICATION
+  artifact_id: THRU5-OUT-MAP
+  prompt: Map Thru5 OUT 1–5 to SL-2, SR-18, miniKORG, KAOSS, or UNUSED.
+  proposed_value: OUT1=?; OUT2=?; OUT3=?; OUT4=?; OUT5=?  (choose among SL-2, SR-18, miniKORG,
+    KAOSS, UNUSED)
+  explanation: Stage 25 reported destination set only; OUT numbers were not supplied. Do not
+    invent typed MIDI links.
+  source_actor: BOT
+  created_at: '2026-09-12T17:38:36.750813-04:00'
+  related_ids: []
+  consequences: Records HUMAN OUT map text on Thru5 notes; does NOT invent typed OUT→device
+    links.
+  status: PENDING
+  proposed_value_original: OUT1=?; OUT2=?; OUT3=?; OUT4=?; OUT5=?  (choose among SL-2, SR-18,
+    miniKORG, KAOSS, UNUSED)
+  accepted_value: null
+  accepted_by: null
+  accepted_at: null
+  rejected_at: null
+  superseded_reason: ''
+  verification_outcome: null
+  verification_note: null
