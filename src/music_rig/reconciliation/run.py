@@ -1,4 +1,8 @@
-"""Unified `rig reconcile run` — dispatch-first, provider only when eligible."""
+"""END-TO-END ORCHESTRATION for `rig reconcile run`.
+
+Dispatch-first; invokes providers only when eligible. Uses ReconciliationContext
+as the path entrypoint and delegates plans/apply/finalize to the service façade.
+"""
 
 from __future__ import annotations
 
@@ -36,22 +40,9 @@ def reconcile_run(
     """
     ctx = ctx or ReconciliationContext.default()
     qid = question_id.upper()
-    paths = ctx.path_dict()
+    path_kw = ctx.path_kwargs()
 
-    plan = recon.plan_question(
-        qid,
-        questions_path=paths.get("questions"),
-        changes_path=paths.get("changes"),
-        todo_path=paths.get("todo"),
-        patchbays_path=paths.get("patchbays"),
-        routing_path=paths.get("routing"),
-        midi_path=paths.get("midi"),
-        controllers_path=paths.get("controllers"),
-        ableton_path=paths.get("ableton"),
-        docs_todo=paths.get("docs_todo"),
-        docs_wishlist=paths.get("docs_wishlist"),
-        docs_questions=paths.get("docs_questions"),
-    )
+    plan = recon.plan_question(qid, ctx=ctx)
     dispatch = classify_reconciliation_dispatch(plan)
     state = plan.state
     capability = plan.capability
@@ -74,14 +65,20 @@ def reconcile_run(
         }
 
     if dispatch.mode is DispatchMode.HUMAN_ANSWER:
+        from music_rig.reconciliation.suggestions import (
+            render_suggestion,
+            suggest_answer,
+        )
+
         return {
             **base,
             "ok": False,
             "mode": "needs_human",
             "message": (
                 f"{qid} needs a final human answer before reconciliation.\n"
-                f'  uv run rig question answer {qid} --answer "…"'
+                f"  {render_suggestion(suggest_answer(qid))}"
             ),
+            "suggestions": [suggest_answer(qid).to_dict()],
         }
 
     if dispatch.mode is DispatchMode.HUMAN_OBSERVATION:
@@ -91,12 +88,17 @@ def reconcile_run(
             dispatch=dispatch,
             apply=apply,
             yes=yes,
-            paths=paths,
+            path_kw=path_kw,
             interactive_verify=interactive_verify,
             base=base,
         )
 
     if dispatch.mode is DispatchMode.HUMAN_CLARIFICATION:
+        from music_rig.reconciliation.suggestions import (
+            render_suggestion,
+            suggest_answer,
+        )
+
         return {
             **base,
             "ok": False,
@@ -104,9 +106,10 @@ def reconcile_run(
             "message": (
                 f"{qid}: human clarification required — an agent cannot invent "
                 f"the missing fact.\n"
-                f'  uv run rig question answer {qid} --answer "…"'
+                f"  {render_suggestion(suggest_answer(qid))}"
             ),
             "blockers": list(plan.blockers or []),
+            "suggestions": [suggest_answer(qid).to_dict()],
         }
 
     if dispatch.mode is DispatchMode.DETERMINISTIC:
@@ -117,7 +120,7 @@ def reconcile_run(
                 plan=plan,
                 apply=apply,
                 yes=yes,
-                paths=paths,
+                path_kw=path_kw,
                 finalize=False,
             ),
         }
@@ -130,7 +133,7 @@ def reconcile_run(
                 plan=plan,
                 apply=apply,
                 yes=yes,
-                paths=paths,
+                path_kw=path_kw,
                 finalize=True,
             ),
         }
@@ -138,7 +141,19 @@ def reconcile_run(
     if dispatch.mode is DispatchMode.AGENT:
         status = provider_status(root=root)
         if not status.get("configured") and not provider:
+            from music_rig.reconciliation.suggestions import (
+                ActionSuggestion,
+                SuggestionKind,
+                render_suggestion,
+            )
+
             detected = detect_providers(root=root)
+            setup = ActionSuggestion(
+                kind=SuggestionKind.CLI_HINT,
+                intent="agent provider setup",
+                description="Configure agent provider",
+                code="provider_setup",
+            )
             return {
                 **base,
                 "ok": False,
@@ -146,7 +161,8 @@ def reconcile_run(
                 "provider_configured": False,
                 "detected": detected,
                 "message": _missing_provider_message(detected),
-                "setup_hint": "uv run rig agent provider setup",
+                "setup_hint": render_suggestion(setup),
+                "suggestions": [setup.to_dict()],
             }
 
         autonomy = AutonomyLevel.PLAN_ONLY
@@ -190,11 +206,18 @@ def _human_observation_path(
     dispatch,
     apply: bool,
     yes: bool,
-    paths: dict[str, Any],
+    path_kw: dict[str, Any],
     interactive_verify: bool | None,
     base: dict[str, Any],
 ) -> dict[str, Any]:
     """Human verification required — never invoke a provider."""
+    from music_rig.reconciliation.suggestions import (
+        SuggestionKind,
+        ActionSuggestion,
+        render_suggestions,
+        suggest_verify_record,
+    )
+
     current = plan.current
     desired = plan.desired
     match_line = (
@@ -209,17 +232,31 @@ def _human_observation_path(
         match_line=match_line,
     )
 
+    suggestions = [
+        suggest_verify_record(qid),
+        ActionSuggestion(
+            kind=SuggestionKind.VERIFY,
+            intent="tui verify",
+            description="Interactive verification TUI",
+            code="tui_verify",
+        ),
+        ActionSuggestion(
+            kind=SuggestionKind.VERIFY,
+            intent=f"verify question {qid}",
+            description="Guided verify for question",
+            code="verify_question",
+            params={"question_id": qid},
+        ),
+    ]
+
     out: dict[str, Any] = {
         **base,
         "ok": False,
         "mode": "needs_verification",
         "message": message,
         "blockers": list(plan.blockers or []),
-        "suggested_commands": [
-            f"uv run rig verify record {qid} --outcome confirmed --value … --yes --json",
-            f"uv run rig tui verify",
-            f"uv run rig verify question {qid}",
-        ],
+        "suggestions": [s.to_dict() for s in suggestions],
+        "suggested_commands": render_suggestions(suggestions),
     }
 
     # Interactive TTY --apply may offer observation confirmation.
@@ -248,12 +285,13 @@ def _human_observation_path(
             return out
 
     if apply and yes:
+        from music_rig.reconciliation.suggestions import render_suggestion
+
         out["message"] = (
             message
             + "\n\n--yes does not imply human observation. "
             "Record verification first:\n"
-            f"  uv run rig verify record {qid} --outcome confirmed "
-            f"--value … --yes --json"
+            f"  {render_suggestion(suggest_verify_record(qid))}"
         )
         out["ok"] = False
         return out
@@ -268,6 +306,13 @@ def _format_observation_message(
     desired: Any,
     match_line: str,
 ) -> str:
+    from music_rig.reconciliation.suggestions import (
+        ActionSuggestion,
+        SuggestionKind,
+        render_suggestion,
+        suggest_verify_record,
+    )
+
     current_lines = _format_current(current)
     return "\n".join(
         [
@@ -289,10 +334,10 @@ def _format_observation_message(
             "",
             "Next:",
             "  Verify the fact on the actual rig, then record the observation with:",
-            f"    uv run rig verify record {qid} --outcome confirmed --value … --yes --json",
+            f"    {render_suggestion(suggest_verify_record(qid))}",
             "",
             "  Or use:",
-            "    uv run rig tui verify",
+            f"    {render_suggestion(ActionSuggestion(kind=SuggestionKind.VERIFY, intent='tui verify', code='tui_verify'))}",
         ]
     )
 
@@ -322,7 +367,7 @@ def _deterministic_path(
     plan,
     apply: bool,
     yes: bool,
-    paths: dict[str, Any],
+    path_kw: dict[str, Any],
     finalize: bool,
 ) -> dict[str, Any]:
     state = plan.state
@@ -334,6 +379,7 @@ def _deterministic_path(
         "capability": plan.capability.value,
         "provider_invoked": False,
         "plan": plan.to_dict(),
+        "suggestions": plan.to_dict().get("suggestions") or [],
         "suggested_commands": list(plan.suggested_commands or []),
         "dry_run": True,
         "applied": False,
@@ -352,17 +398,17 @@ def _deterministic_path(
             note="deterministic reconcile run",
             complete_linked_todos=True,
             confirm_dod=True,
-            questions_path=paths.get("questions"),
-            changes_path=paths.get("changes"),
-            todo_path=paths.get("todo"),
-            patchbays_path=paths.get("patchbays"),
-            routing_path=paths.get("routing"),
-            midi_path=paths.get("midi"),
-            controllers_path=paths.get("controllers"),
-            ableton_path=paths.get("ableton"),
-            docs_todo=paths.get("docs_todo"),
-            docs_wishlist=paths.get("docs_wishlist"),
-            docs_questions=paths.get("docs_questions"),
+            questions_path=path_kw.get("questions_path"),
+            changes_path=path_kw.get("changes_path"),
+            todo_path=path_kw.get("todo_path"),
+            patchbays_path=path_kw.get("patchbays_path"),
+            routing_path=path_kw.get("routing_path"),
+            midi_path=path_kw.get("midi_path"),
+            controllers_path=path_kw.get("controllers_path"),
+            ableton_path=path_kw.get("ableton_path"),
+            docs_todo=path_kw.get("docs_todo"),
+            docs_wishlist=path_kw.get("docs_wishlist"),
+            docs_questions=path_kw.get("docs_questions"),
         )
         out["finalize"] = fin
         out["dry_run"] = fin.get("dry_run", True)
@@ -379,23 +425,36 @@ def _deterministic_path(
             qid,
             dry_run=False,
             yes=True,
-            questions_path=paths.get("questions"),
-            changes_path=paths.get("changes"),
-            patchbays_path=paths.get("patchbays"),
-            routing_path=paths.get("routing"),
-            midi_path=paths.get("midi"),
-            controllers_path=paths.get("controllers"),
-            ableton_path=paths.get("ableton"),
-            docs_todo=paths.get("docs_todo"),
-            docs_wishlist=paths.get("docs_wishlist"),
-            docs_questions=paths.get("docs_questions"),
+            questions_path=path_kw.get("questions_path"),
+            changes_path=path_kw.get("changes_path"),
+            patchbays_path=path_kw.get("patchbays_path"),
+            routing_path=path_kw.get("routing_path"),
+            midi_path=path_kw.get("midi_path"),
+            controllers_path=path_kw.get("controllers_path"),
+            ableton_path=path_kw.get("ableton_path"),
+            docs_todo=path_kw.get("docs_todo"),
+            docs_wishlist=path_kw.get("docs_wishlist"),
+            docs_questions=path_kw.get("docs_questions"),
         )
         out["apply_result"] = applied
         out["dry_run"] = False
         out["applied"] = True
         out["message"] = f"Applied deterministic reconciliation for {qid}."
     else:
+        from music_rig.reconciliation.suggestions import (
+            ActionSuggestion,
+            SuggestionKind,
+            render_suggestion,
+        )
+
         basis = (plan.details or {}).get("evidence_basis")
+        run_sug = ActionSuggestion(
+            kind=SuggestionKind.CLI_HINT,
+            intent=f"reconcile run {qid} --apply --yes",
+            description=f"Apply deterministic reconciliation for {qid}",
+            code="reconcile_run_apply",
+            params={"question_id": qid},
+        )
         out["message"] = (
             f"Deterministic apply available for {qid}.\n"
             + (
@@ -403,14 +462,38 @@ def _deterministic_path(
                 if basis
                 else ""
             )
-            + f"Review plan, then: uv run rig reconcile run {qid} --apply --yes"
+            + f"Review plan, then: {render_suggestion(run_sug)}"
         )
     return out
 
 
 def _missing_provider_message(detected: dict[str, Any]) -> str:
+    from music_rig.reconciliation.suggestions import (
+        ActionSuggestion,
+        SuggestionKind,
+        render_suggestion,
+    )
+
     cursor = detected.get("cursor") or {}
     ollama = detected.get("ollama") or {}
+    setup = ActionSuggestion(
+        kind=SuggestionKind.CLI_HINT,
+        intent="agent provider setup",
+        description="Configure agent provider",
+        code="provider_setup",
+    )
+    use_cursor = ActionSuggestion(
+        kind=SuggestionKind.CLI_HINT,
+        intent="agent provider use cursor",
+        description="Use Cursor provider",
+        code="provider_cursor",
+    )
+    use_ollama = ActionSuggestion(
+        kind=SuggestionKind.CLI_HINT,
+        intent="agent provider use ollama --model <model>",
+        description="Use Ollama provider",
+        code="provider_ollama",
+    )
     return "\n".join(
         [
             "Agent reconciliation is required.",
@@ -420,10 +503,10 @@ def _missing_provider_message(detected: dict[str, Any]) -> str:
             f"  Ollama {'✓' if ollama.get('available') else '✗'}",
             "",
             "Configure Provider:",
-            "  uv run rig agent provider setup",
+            f"  {render_suggestion(setup)}",
             "",
             "Or:",
-            "  uv run rig agent provider use cursor",
-            "  uv run rig agent provider use ollama --model <model>",
+            f"  {render_suggestion(use_cursor)}",
+            f"  {render_suggestion(use_ollama)}",
         ]
     )

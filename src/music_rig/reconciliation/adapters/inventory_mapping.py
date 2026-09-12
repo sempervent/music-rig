@@ -35,6 +35,13 @@ class InventoryMappingAdapter(ReconciliationAdapter):
         }
 
     def plan(self, question: OpenQuestion, *, paths: dict[str, Any]) -> Plan:
+        from music_rig.reconciliation.suggestions import (
+            ActionSuggestion,
+            SuggestionKind,
+            render_suggestions,
+            suggest_finalize,
+        )
+
         current = self.read_current(question, paths=paths)
         if question.reconciled_at is not None:
             state = ReconciliationState.RECONCILED
@@ -44,6 +51,54 @@ class InventoryMappingAdapter(ReconciliationAdapter):
             state = ReconciliationState.NEEDS_ANSWER
         else:
             state = ReconciliationState.NEEDS_AGENT_ACTION
+
+        suggestions = [
+            ActionSuggestion(
+                kind=SuggestionKind.INSPECT,
+                intent="patchbay list",
+                description="List patchbay units",
+                code="patchbay_list",
+            ),
+            ActionSuggestion(
+                kind=SuggestionKind.CLI_HINT,
+                intent=(
+                    f'current patchbay set-model PB-A "<observed model>" '
+                    f"--question {question.id}"
+                ),
+                description="Record observed hardware model on a PB letter",
+                code="set_model",
+                params={"question_id": question.id},
+            ),
+            suggest_finalize(
+                question.id, no_current_change=True, note="..."
+            ),
+        ]
+        blockers: list[Any] = []
+        if state == ReconciliationState.NEEDS_AGENT_ACTION:
+            blockers.append(
+                {
+                    "code": "manual_inventory_mapping",
+                    "field": "hardware_model",
+                    "message": (
+                        "Physical unit→PB letter mapping is MANUAL. "
+                        "Patchbays expose hardware_model (free text) only — "
+                        "no gear_ref field yet; APPLY_AND_VERIFY / "
+                        "rig current patchbay set-gear is not available. "
+                        "Record observed models via set-model then finalize."
+                    ),
+                    "candidates": sorted(
+                        [
+                            bid
+                            for bid, body in (
+                                (patchbay_state.load_raw(paths.get("patchbays")).get("patchbays") or {})
+                            ).items()
+                            if isinstance(body, dict)
+                        ]
+                    ),
+                    "suggestions": [s.to_dict() for s in suggestions],
+                    "suggested_commands": render_suggestions(suggestions),
+                }
+            )
         return Plan(
             artifact_type="question",
             artifact_id=question.id,
@@ -51,46 +106,8 @@ class InventoryMappingAdapter(ReconciliationAdapter):
             capability=self.capability,
             current=current,
             desired=question.answer.strip() or None,
-            blockers=(
-                []
-                if state != ReconciliationState.NEEDS_AGENT_ACTION
-                else [
-                    {
-                        "code": "manual_inventory_mapping",
-                        "field": "hardware_model",
-                        "message": (
-                            "Physical unit→PB letter mapping is MANUAL. "
-                            "Patchbays expose hardware_model (free text) only — "
-                            "no gear_ref field yet; APPLY_AND_VERIFY / "
-                            "rig current patchbay set-gear is not available. "
-                            "Record observed models via set-model then finalize."
-                        ),
-                        "candidates": sorted(
-                            [
-                                bid
-                                for bid, body in (
-                                    (patchbay_state.load_raw(paths.get("patchbays")).get("patchbays") or {})
-                                ).items()
-                                if isinstance(body, dict)
-                            ]
-                        ),
-                        "suggested_commands": [
-                            "uv run rig patchbay list",
-                            f"uv run rig current patchbay set-model PB-A "
-                            f"\"<observed model>\" --question {question.id}",
-                            f"uv run rig reconcile finalize question {question.id} "
-                            f"--no-current-change --note \"...\" --yes",
-                        ],
-                    }
-                ]
-            ),
-            suggested_commands=[
-                "uv run rig patchbay list",
-                f"uv run rig current patchbay set-model PB-A \"<observed model>\" "
-                f"--question {question.id}",
-                f"uv run rig reconcile finalize question {question.id} "
-                f"--no-current-change --note \"...\" --yes",
-            ],
+            blockers=blockers,
+            suggestions=suggestions,
             details={
                 "gap": (
                     "inventory.patchbay_mapping stays MANUAL until patchbay "

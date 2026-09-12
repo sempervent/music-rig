@@ -13,6 +13,11 @@ from music_rig.models import (
 )
 from music_rig.reconciliation.action_packet import build_action_packet, has_positive_observation
 from music_rig.reconciliation.adapters.base import ReconciliationAdapter
+from music_rig.reconciliation.suggestions import (
+    ActionSuggestion,
+    SuggestionKind,
+    suggest_finalize,
+)
 from music_rig.reconciliation.types import (
     Capability,
     Plan,
@@ -155,11 +160,24 @@ class MidiVerifyAdapter(ReconciliationAdapter):
                 )
                 else []
             ),
-            suggested_commands=[
-                "uv run rig current midi verify",
-                "uv run rig midi summary",
-                f"uv run rig reconcile finalize question {question.id} "
-                f"--no-current-change --note \"topology reviewed\" --yes",
+            suggestions=[
+                ActionSuggestion(
+                    kind=SuggestionKind.VERIFY,
+                    intent="current midi verify",
+                    description="Inspect MIDI topology evidence",
+                    code="midi_verify",
+                ),
+                ActionSuggestion(
+                    kind=SuggestionKind.INSPECT,
+                    intent="midi summary",
+                    description="Show MIDI summary",
+                    code="midi_summary",
+                ),
+                suggest_finalize(
+                    question.id,
+                    no_current_change=True,
+                    note="topology reviewed",
+                ),
             ],
             details=details,
         )

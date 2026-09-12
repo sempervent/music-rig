@@ -34,6 +34,8 @@ nav:
   - Troubleshooting: troubleshooting.md
   - Open Questions: open-questions.md
   - Interactive TUI: tui.md
+  - Reconciliation: reconciliation.md
+  - Testing: testing.md
 markdown_extensions:
   - admonition
   - toc:

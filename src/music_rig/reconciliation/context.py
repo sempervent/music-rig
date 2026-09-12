@@ -1,8 +1,14 @@
-"""Typed reconciliation path context — one place for production defaults."""
+"""STATE ACCESS / CONTEXT CONSTRUCTION.
+
+Typed path + request context for reconciliation. This is the normal entrypoint
+for production defaults, fixture roots, and legacy ``*_path`` overrides.
+
+Not: dispatch decisions, end-to-end orchestration, or CLI rendering.
+"""
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -94,9 +100,16 @@ class ReconciliationPaths:
 
 @dataclass(frozen=True, slots=True)
 class ReconciliationContext:
-    """Shared context for checks, plans, and agent packets."""
+    """Shared context for checks, plans, and agent packets.
+
+    Prefer ``default()`` / ``for_root()`` / ``from_overrides()`` as entrypoints.
+    Document loads may be cached for the lifetime of one request via
+    ``cached_load`` when instrumentation shows redundant I/O.
+    """
 
     paths: ReconciliationPaths
+    # Mutable request-scoped cache (contents change; identity is stable).
+    _doc_cache: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
 
     @classmethod
     def default(cls) -> ReconciliationContext:
@@ -143,5 +156,34 @@ class ReconciliationContext:
         return self.paths.questions
 
     def path_dict(self) -> dict[str, Any]:
-        """Legacy adapter-compatible dict."""
+        """Legacy adapter-compatible dict (short keys)."""
         return self.paths.as_dict()
+
+    def path_kwargs(self) -> dict[str, Path]:
+        """Legacy ``*_path`` kwargs for service façades still accepting them."""
+        p = self.paths
+        return {
+            "questions_path": p.questions,
+            "changes_path": p.changes,
+            "todo_path": p.todo,
+            "patchbays_path": p.patchbays,
+            "routing_path": p.routing,
+            "midi_path": p.midi,
+            "controllers_path": p.controllers,
+            "ableton_path": p.ableton,
+            "inventory_path": p.inventory,
+            "channels_path": p.channels,
+            "docs_todo": p.docs_todo,
+            "docs_wishlist": p.docs_wishlist,
+            "docs_questions": p.docs_questions,
+            "docs_patchbays": p.docs_patchbays,
+        }
+
+    def clear_cache(self) -> None:
+        self._doc_cache.clear()
+
+    def cached_load(self, key: str, loader) -> Any:
+        """Load a document once per context lifetime (request-scoped)."""
+        if key not in self._doc_cache:
+            self._doc_cache[key] = loader()
+        return self._doc_cache[key]

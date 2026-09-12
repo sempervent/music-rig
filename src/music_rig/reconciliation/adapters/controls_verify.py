@@ -129,18 +129,58 @@ class ControlsVerifyAdapter(ReconciliationAdapter):
                 )
             )
 
-        cmds = ["uv run rig controls summary"]
+        from music_rig.reconciliation.suggestions import (
+            ActionSuggestion,
+            SuggestionKind,
+            render_suggestions,
+            suggest_finalize,
+            suggest_verify_record,
+        )
+
+        suggestions: list[ActionSuggestion] = [
+            ActionSuggestion(
+                kind=SuggestionKind.INSPECT,
+                intent="controls summary",
+                description="Show controls summary",
+                code="controls_summary",
+            )
+        ]
         if gear:
-            cmds.append(f"uv run rig current controls verify {gear}")
-            cmds.append(f"uv run rig controls show {gear}")
-            if context:
-                cmds.append(
-                    f"uv run rig current controls set-evidence {gear} {context} "
-                    f"<control> VERIFIED"
+            suggestions.append(
+                ActionSuggestion(
+                    kind=SuggestionKind.VERIFY,
+                    intent=f"current controls verify {gear}",
+                    description=f"Verify controls for {gear}",
+                    code="controls_verify",
+                    params={"gear": gear},
                 )
-        cmds.append(
-            f"uv run rig reconcile finalize question {question.id} "
-            f"--no-current-change --note \"controls reviewed\" --yes"
+            )
+            suggestions.append(
+                ActionSuggestion(
+                    kind=SuggestionKind.INSPECT,
+                    intent=f"controls show {gear}",
+                    description=f"Show controls for {gear}",
+                    code="controls_show",
+                    params={"gear": gear},
+                )
+            )
+            if context:
+                suggestions.append(
+                    ActionSuggestion(
+                        kind=SuggestionKind.CLI_HINT,
+                        intent=(
+                            f"current controls set-evidence {gear} {context} "
+                            f"<control> VERIFIED"
+                        ),
+                        description="Set scoped control evidence VERIFIED",
+                        code="controls_set_evidence",
+                        params={"gear": gear, "context": context},
+                    )
+                )
+        suggestions.append(
+            suggest_finalize(
+                question.id, no_current_change=True, note="controls reviewed"
+            )
         )
 
         details: dict[str, Any] = {}
@@ -157,22 +197,35 @@ class ControlsVerifyAdapter(ReconciliationAdapter):
             ]
             if has_positive_observation(question) and gear and not context:
                 missing = "controls.verify requires target.context (and preferably control) for evidence apply"
+                target_sug = [
+                    ActionSuggestion(
+                        kind=SuggestionKind.TARGET,
+                        intent=(
+                            f"question target set {question.id} "
+                            f"--context <context-id> --yes"
+                        ),
+                        description="Set target.context for scoped evidence",
+                        code="missing_target_field",
+                        params={"question_id": question.id},
+                    )
+                ]
                 blockers.append(
                     {
                         "code": "missing_target_field",
                         "field": "context",
                         "message": missing,
-                        "suggested_commands": [
-                            f"uv run rig question target set {question.id} "
-                            f"--context <context-id> --yes"
-                        ],
+                        "suggestions": [s.to_dict() for s in target_sug],
+                        "suggested_commands": render_suggestions(target_sug),
                     }
                 )
             elif not has_positive_observation(question):
+                obs = [suggest_verify_record(question.id)]
                 blockers.append(
                     {
                         "code": "needs_human_observation",
                         "message": "Record CONFIRMED/CORRECTED/FAILED_TEST via verify record",
+                        "suggestions": [s.to_dict() for s in obs],
+                        "suggested_commands": render_suggestions(obs),
                     }
                 )
             details["action_packet"] = build_action_packet(
@@ -196,7 +249,7 @@ class ControlsVerifyAdapter(ReconciliationAdapter):
             desired=question.answer.strip() or None,
             operations=operations,
             blockers=blockers,
-            suggested_commands=cmds,
+            suggestions=suggestions,
             details=details,
             closable=list(question.related_todos) + list(question.related_changes),
         )

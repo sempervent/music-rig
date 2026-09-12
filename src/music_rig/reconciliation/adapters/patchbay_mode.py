@@ -72,11 +72,32 @@ class PatchbayModeAdapter(ReconciliationAdapter):
         }
 
     def plan(self, question: OpenQuestion, *, paths: dict[str, Any]) -> Plan:
+        from music_rig.reconciliation.suggestions import (
+            ActionSuggestion,
+            SuggestionKind,
+            render_suggestions,
+            suggest_answer,
+            suggest_finalize,
+            suggest_resolve,
+            suggest_target_pair,
+        )
+
         target = question.target
-        blockers: list[str] = []
+        blockers: list[Any] = []
         ops: list[dict[str, Any]] = []
-        suggested: list[str] = []
         if target is None or not target.bay:
+            bay_sug = [
+                ActionSuggestion(
+                    kind=SuggestionKind.TARGET,
+                    intent=(
+                        f"question target set {question.id} "
+                        f"--domain patchbay.mode --bay PB-B --yes"
+                    ),
+                    description="Set target.bay for patchbay.mode",
+                    code="missing_target_field",
+                    params={"question_id": question.id, "bay": "PB-B"},
+                )
+            ]
             return Plan(
                 artifact_type="question",
                 artifact_id=question.id,
@@ -88,12 +109,11 @@ class PatchbayModeAdapter(ReconciliationAdapter):
                         "field": "bay",
                         "message": "Missing target.bay for patchbay.mode",
                         "candidates": [],
-                        "suggested_commands": [
-                            f"uv run rig question target set {question.id} "
-                            f"--domain patchbay.mode --bay PB-B --yes"
-                        ],
+                        "suggestions": [s.to_dict() for s in bay_sug],
+                        "suggested_commands": render_suggestions(bay_sug),
                     }
                 ],
+                suggestions=bay_sug,
             )
         bay = target.bay.strip().upper()
         current = self.read_current(question, paths=paths)
@@ -112,9 +132,7 @@ class PatchbayModeAdapter(ReconciliationAdapter):
                         "message": "OPEN with draft answer — resolve before reconcile",
                     }
                 ],
-                suggested_commands=[
-                    f"uv run rig question resolve {question.id}",
-                ],
+                suggestions=[suggest_resolve(question.id)],
             )
 
         if question.status != QuestionStatus.RESOLVED or not question.answer.strip():
@@ -126,13 +144,14 @@ class PatchbayModeAdapter(ReconciliationAdapter):
                 current=current,
                 desired=None,
                 blockers=["Question must be RESOLVED with a non-empty answer"],
-                suggested_commands=[
-                    f"uv run rig question answer {question.id} --answer \"<mode>\" --json"
+                suggestions=[
+                    suggest_answer(question.id, placeholder="<mode>"),
                 ],
             )
 
         mode = normalize_mode(question.answer)
         if mode is None:
+            ans = [suggest_answer(question.id, placeholder="half-normal")]
             return Plan(
                 artifact_type="question",
                 artifact_id=question.id,
@@ -149,16 +168,11 @@ class PatchbayModeAdapter(ReconciliationAdapter):
                             "(normal | half-normal | thru)"
                         ),
                         "candidates": ["normal", "half-normal", "thru"],
-                        "suggested_commands": [
-                            f"uv run rig question answer {question.id} "
-                            f"--answer \"half-normal\" --json"
-                        ],
+                        "suggestions": [s.to_dict() for s in ans],
+                        "suggested_commands": render_suggestions(ans),
                     }
                 ],
-                suggested_commands=[
-                    f"uv run rig question answer {question.id} "
-                    f"--answer \"half-normal\" --json"
-                ],
+                suggestions=ans,
             )
 
         if not target.pair:
@@ -166,6 +180,7 @@ class PatchbayModeAdapter(ReconciliationAdapter):
             pairs = patchbay_state.list_pairs(bay, data)
             unknown = [p for p in pairs if p["mode"] == "unknown"]
             candidates: list[str] = []
+            suggestions: list[ActionSuggestion] = []
             for p in (unknown or pairs):
                 pair_label = (
                     f"{p['upper_n']}/{p['lower_n']}"
@@ -173,15 +188,27 @@ class PatchbayModeAdapter(ReconciliationAdapter):
                     else str(p["upper_n"])
                 )
                 candidates.append(pair_label)
-                suggested.append(
-                    f"uv run rig question target set {question.id} --pair {pair_label} --yes"
-                )
+                suggestions.append(suggest_target_pair(question.id, pair_label))
             # Prefer target-set for reconcile; keep one set-mode hint as fallback
             if candidates:
-                suggested.append(
-                    f"uv run rig current patchbay set-mode {bay} {candidates[0]} {mode} "
-                    f"--question {question.id}"
+                suggestions.append(
+                    ActionSuggestion(
+                        kind=SuggestionKind.CLI_HINT,
+                        intent=(
+                            f"current patchbay set-mode {bay} {candidates[0]} "
+                            f"{mode} --question {question.id}"
+                        ),
+                        description="Direct set-mode fallback",
+                        code="set_mode_fallback",
+                        params={
+                            "bay": bay,
+                            "pair": candidates[0],
+                            "mode": mode,
+                            "question_id": question.id,
+                        },
+                    )
                 )
+            pair_sug = [suggest_target_pair(question.id, c) for c in candidates[:8]]
             return Plan(
                 artifact_type="question",
                 artifact_id=question.id,
@@ -195,14 +222,11 @@ class PatchbayModeAdapter(ReconciliationAdapter):
                         "field": "pair",
                         "message": "target.pair missing — set pair before apply",
                         "candidates": candidates,
-                        "suggested_commands": [
-                            f"uv run rig question target set {question.id} "
-                            f"--pair {c} --yes"
-                            for c in candidates[:8]
-                        ],
+                        "suggestions": [s.to_dict() for s in pair_sug],
+                        "suggested_commands": render_suggestions(pair_sug),
                     }
                 ],
-                suggested_commands=suggested,
+                suggestions=suggestions,
                 details={
                     "unknown_pair_count": len(unknown),
                     "bay": bay,
@@ -246,11 +270,23 @@ class PatchbayModeAdapter(ReconciliationAdapter):
                 "message": preview.message,
             }
         )
-        suggested.append(
-            f"uv run rig reconcile apply question {question.id} --yes"
-        )
-        suggested.append(f"uv run rig reconcile verify question {question.id}")
-        suggested.append(f"uv run rig reconcile finalize question {question.id} --yes")
+        suggestions = [
+            ActionSuggestion(
+                kind=SuggestionKind.CLI_HINT,
+                intent=f"reconcile apply question {question.id} --yes",
+                description=f"Apply set-mode for {question.id}",
+                code="apply",
+                params={"question_id": question.id},
+            ),
+            ActionSuggestion(
+                kind=SuggestionKind.VERIFY,
+                intent=f"reconcile verify question {question.id}",
+                description=f"Verify {question.id} after apply",
+                code="verify",
+                params={"question_id": question.id},
+            ),
+            suggest_finalize(question.id),
+        ]
 
         return Plan(
             artifact_type="question",
@@ -263,7 +299,7 @@ class PatchbayModeAdapter(ReconciliationAdapter):
             postconditions=[f"{bay} {pair} mode == {mode}"],
             closable=list(question.related_todos) + list(question.related_changes),
             blockers=blockers,
-            suggested_commands=suggested,
+            suggestions=suggestions,
             details={"preview": preview.model_dump(mode="json")},
         )
 
