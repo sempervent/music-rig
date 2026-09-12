@@ -501,6 +501,61 @@ def prepare_finalize_manual(
     )
 
 
+def prepare_open_clarification(
+    op: RigOperation, ctx: ReconciliationContext, working: dict[str, Any]
+) -> PreparedOperation:
+    """Stage a new OPEN clarification Question linked to a parent."""
+    parent_id = str(op.args["parent_question_id"]).upper()
+    text = str(op.args.get("clarification") or "").strip()
+    if not text:
+        raise StoreError("clarification text required")
+
+    def load_q():
+        return load_questions(ctx.paths.questions)
+
+    qdoc = _ensure(working, "questions", load_q)
+    assert isinstance(qdoc, OpenQuestionsDocument)
+    parent = qdoc.question_map().get(parent_id)
+    if parent is None:
+        raise StoreError(f"unknown parent question {parent_id}")
+    for q in qdoc.questions:
+        if (
+            q.clarifies_question == parent_id
+            and q.status == QuestionStatus.OPEN
+            and q.question.strip() == text
+            and not q.answer.strip()
+        ):
+            raise StoreError(
+                f"Open clarification already exists as {q.id} for {parent_id}"
+            )
+    area = str(op.args.get("area") or parent.area).strip() or parent.area
+    new_id = qdoc.next_id()
+    child = OpenQuestion(
+        id=new_id,
+        question=text,
+        area=area,
+        status=QuestionStatus.OPEN,
+        related_todos=list(parent.related_todos),
+        related_changes=[],
+        answer="",
+        notes=f"Clarifies {parent_id}",
+        clarifies_question=parent_id,
+        resolved_at=None,
+    )
+    working["questions"] = OpenQuestionsDocument(
+        questions=[*qdoc.questions, child]
+    )
+    return PreparedOperation(
+        operation=op,
+        touched_documents=["questions"],
+        conflict_claims={f"question:{new_id}": "create"},
+        before={"parent": parent_id},
+        after={"question_id": new_id, "clarifies_question": parent_id},
+        preview_message=f"Open clarification {new_id} for {parent_id}",
+        postconditions=[f"{new_id} exists and clarifies {parent_id}"],
+    )
+
+
 def materialize_working_docs(
     working: dict[str, Any],
     ctx: ReconciliationContext,

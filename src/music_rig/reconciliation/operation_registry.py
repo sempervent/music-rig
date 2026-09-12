@@ -12,6 +12,7 @@ from music_rig.reconciliation.preparers import (
     prepare_channels_set_source,
     prepare_finalize_manual,
     prepare_gear_set_location,
+    prepare_open_clarification,
     prepare_patchbay_set_connection,
     prepare_patchbay_set_mode,
     prepare_patchbay_set_model,
@@ -345,6 +346,23 @@ def _bootstrap() -> None:
             description="Promote/resolve question answer (not agent-allowed)",
             dispatcher=None,
             preparer=None,
+        )
+    )
+    _register(
+        OperationSpec(
+            kind="question.open_clarification",
+            namespace="question",
+            action="open_clarification",
+            mutability=OperationMutability.MUTATING,
+            required_args=("parent_question_id", "clarification"),
+            optional_args=("area",),
+            domains=(),
+            documents_touched=("questions",),
+            autonomous_safe=True,
+            agent_allowed=True,
+            description="Open a linked clarification Question (human work; no CURRENT)",
+            dispatcher=_dispatch_via_prepare,
+            preparer=prepare_open_clarification,
         )
     )
     _register(
