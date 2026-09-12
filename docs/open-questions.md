@@ -125,6 +125,12 @@ Which physical unit is PB-A / PB-B / PB-C / PB-D (ART P48 vs Behringer PX3000)?
 
 **Reconciliation note:** [agent-interpreted / manually reconciled] Updated CURRENT hardware_model from final Q-007 answer: PB-A/B=ART P48, PB-C/D=Behringer PX3000 (model-level; unique unit IDs still unknown)
 
+### Q-008 — OPEN
+
+What normalization mode (normal / half-normal / thru) is each populated PB-B pair set to?
+
+**Answer:** All represented PB-B pairs are normal (HUMAN Stage 25 live validation).
+
 ### Q-009 — OPEN
 
 What are the rear-panel assignments for PB-A, PB-C, and PB-D?
@@ -178,6 +184,12 @@ What exact FCB1010 switch map is assigned in banks 00/01/02?
 **Reconciled at:** 2026-09-12T15:52:43.587639-04:00
 
 **Reconciliation note:** agent-interpreted HUMAN bank-00 FCB map into controllers.yaml notes. Banks 01/02 unobserved; RIG-035 left READY; no verify-record invented.
+
+### Q-017 — OPEN
+
+Which ReMOTE ZeRO SL templates are actually loaded on the device?
+
+**Answer:** UNKNOWN — device templates have no names visible (HUMAN Stage 25 live validation).
 
 ### Q-018 — RESOLVED
 

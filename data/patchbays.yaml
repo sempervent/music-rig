@@ -32,7 +32,7 @@ patchbays:
         port: L/MONO
         direction: source
         paired_with: 25
-        mode: unknown
+        mode: normal
         status: documented
       2:
         row: upper
@@ -41,7 +41,7 @@ patchbays:
         port: R
         direction: source
         paired_with: 26
-        mode: unknown
+        mode: normal
         status: documented
       3:
         row: upper
@@ -50,7 +50,7 @@ patchbays:
         port: MAIN L
         direction: source
         paired_with: 27
-        mode: unknown
+        mode: normal
         status: documented
       4:
         row: upper
@@ -59,7 +59,7 @@ patchbays:
         port: MAIN R
         direction: source
         paired_with: 28
-        mode: unknown
+        mode: normal
         status: documented
       7:
         row: upper
@@ -68,7 +68,7 @@ patchbays:
         port: L/MONO
         direction: source
         paired_with: 31
-        mode: unknown
+        mode: normal
         status: documented
       8:
         row: upper
@@ -77,31 +77,31 @@ patchbays:
         port: R
         direction: source
         paired_with: 32
-        mode: unknown
+        mode: normal
         status: documented
       9:
         row: upper
         connection: null
         paired_with: 33
-        mode: unknown
+        mode: normal
         status: unassigned
       10:
         row: upper
         connection: null
         paired_with: 34
-        mode: unknown
+        mode: normal
         status: unassigned
       11:
         row: upper
         connection: null
         paired_with: 35
-        mode: unknown
+        mode: normal
         status: unassigned
       12:
         row: upper
         connection: null
         paired_with: 36
-        mode: unknown
+        mode: normal
         status: unassigned
       25:
         row: lower
@@ -110,7 +110,7 @@ patchbays:
         port: input 3
         direction: destination
         paired_with: 1
-        mode: unknown
+        mode: normal
         status: documented
       26:
         row: lower
@@ -119,7 +119,7 @@ patchbays:
         port: input 4
         direction: destination
         paired_with: 2
-        mode: unknown
+        mode: normal
         status: documented
       27:
         row: lower
@@ -128,7 +128,7 @@ patchbays:
         port: input 11
         direction: destination
         paired_with: 3
-        mode: unknown
+        mode: normal
         status: documented
       28:
         row: lower
@@ -137,7 +137,7 @@ patchbays:
         port: input 12
         direction: destination
         paired_with: 4
-        mode: unknown
+        mode: normal
         status: documented
       31:
         row: lower
@@ -146,7 +146,7 @@ patchbays:
         port: CH 5/L
         direction: destination
         paired_with: 7
-        mode: unknown
+        mode: normal
         status: documented
       32:
         row: lower
@@ -155,7 +155,7 @@ patchbays:
         port: CH 6/R
         direction: destination
         paired_with: 8
-        mode: unknown
+        mode: normal
         status: documented
       33:
         row: lower
@@ -164,7 +164,7 @@ patchbays:
         port: CH 7/L
         direction: destination
         paired_with: 9
-        mode: unknown
+        mode: normal
         status: documented
         notes: Upper jack 9 is unassigned; no documented source for this destination.
       34:
@@ -174,7 +174,7 @@ patchbays:
         port: CH 8/R
         direction: destination
         paired_with: 10
-        mode: unknown
+        mode: normal
         status: documented
         notes: Upper jack 10 is unassigned; no documented source for this destination.
       35:
@@ -184,7 +184,7 @@ patchbays:
         port: AUDIO IN 1
         direction: destination
         paired_with: 11
-        mode: unknown
+        mode: normal
         status: documented
         notes: Upper jack 11 is unassigned; no documented source for this destination.
       36:
@@ -194,7 +194,7 @@ patchbays:
         port: AUDIO IN 2
         direction: destination
         paired_with: 12
-        mode: unknown
+        mode: normal
         status: documented
         notes: Upper jack 12 is unassigned; no documented source for this destination.
   PB-C:

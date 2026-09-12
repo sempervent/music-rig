@@ -33,4 +33,5 @@ The design goal is not purity. It is controllable chaos: clean captures availabl
 | [Testing](testing.md) | Suite layout, markers, coverage gate |
 | [Operational readiness](operational-readiness.md) | Stage 24 playability burn-down / human check batches |
 | [Known-good ops](known-good-ops.md) | Startup, shutdown, smoke test, reference jam |
+| [Stage 25 live validation](stage-25-live-validation.md) | Physical smoke / PB-B / MIDI / jam session |
 | [Inventory](inventory.md) | What is owned |

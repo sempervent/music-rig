@@ -55,9 +55,9 @@ Bot documents the procedure; **PASS is HUMAN-only**.
 
 Result log (fill when performed):
 
-- Date:
-- Result: PASS / FAIL / PARTIAL / NOT RUN
-- Notes:
+- Date: 2026-09-12
+- Result: PASS (HUMAN Stage 25 live validation — “All passes”)
+- Notes: Physical smoke A–H reported PASS by HUMAN in session.
 
 ## Reference jam recipe (~5–10 minutes)
 
@@ -84,15 +84,14 @@ play, path is RC-1 → KAOSS | RC-600, or instrument → RC-600 via Alesis mixer
 
 Result log:
 
-- Date:
-- Result: PASS / FAIL / NOT RUN
-- BPM / meter used:
-- Notes:
+- Date: 2026-09-12
+- Result: PASS (HUMAN Stage 25 — “All passes”)
+- BPM / meter used: (not specified)
+- Notes: Reference jam reported PASS by HUMAN in the same validation session.
 
 ## Still open (blocks “fully known” but not necessarily “can play”)
 
-- Q-008 PB-B normalization modes
-- Q-017 ZeRO templates loaded
-- Thru5 downstream fan-out (RIG-037 remainder)
-- RIG-031 HUMAN DoD for clock docs wording
-- Physical smoke / reference jam PASS checkboxes above
+- Q-008 PB-B modes — CURRENT set to `normal` for represented pairs; HUMAN answer still DRAFT (needs finalize without `--am-bot`)
+- Q-017 ZeRO templates — HUMAN: no names → UNKNOWN (BOT draft only; needs answer + verify-record)
+- Thru5 OUT destinations reported (SL-2, SR-18, miniKORG, KAOSS); OUT number → device map UNKNOWN (RIG-037)
+- RIG-031 DoD — HUMAN YES in chat; needs `rig todo done RIG-031` without `--am-bot`

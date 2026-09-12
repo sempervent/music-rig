@@ -62,7 +62,8 @@ controllers:
     coverage: PARTIAL
     related_todos: [RIG-036]
     notes: >-
-      Templates listed as design direction (RIG-036). Which templates are loaded is OPEN (Q-017).
+      Templates listed as design direction (RIG-036).
+      Stage 25 HUMAN observation for Q-017: templates have no names visible → UNKNOWN.
       Encoder #6 is physically broken — do not assign active mappings to it.
     contexts:
       - id: pfl-send-c

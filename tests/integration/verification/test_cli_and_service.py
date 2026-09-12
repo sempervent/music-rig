@@ -12,7 +12,7 @@ from typer.testing import CliRunner
 
 from music_rig import patchbay_state, question_service, store, verification_service
 from music_rig.cli import app
-from music_rig.models import QuestionStatus, ReconciliationState
+from music_rig.models import AnswerActor, QuestionStatus, ReconciliationState
 from music_rig.presentation import format_verify_queue_table, format_verify_summary_table
 from music_rig.reconciliation import service as reconcile_service
 from music_rig.reconciliation.types import Capability, VerificationStatus
@@ -398,6 +398,10 @@ _RECONCILED_PROD = frozenset(
 _FINAL_UNRECONCILED_PROD = frozenset()
 
 
+# OPEN Questions that may carry BOT draft answers (not HUMAN FINAL authority).
+_BOT_DRAFT_PROD = frozenset({"Q-008", "Q-017"})
+
+
 def test_production_questions_have_verification_metadata_answers_untouched():
     doc = load_questions()
     prod = [q for q in doc.questions if q.id.startswith("Q-") and int(q.id.split("-")[1]) <= 20]
@@ -417,6 +421,12 @@ def test_production_questions_have_verification_metadata_answers_untouched():
             assert q.status == QuestionStatus.RESOLVED
             assert q.answer.strip()
             assert q.resolved_at is not None
+            assert q.reconciled_at is None
+        elif q.id in _BOT_DRAFT_PROD:
+            assert q.status == QuestionStatus.OPEN
+            assert q.answer.strip()
+            assert q.answer_actor == AnswerActor.BOT
+            assert q.resolved_at is None
             assert q.reconciled_at is None
         else:
             assert q.status == QuestionStatus.OPEN
@@ -453,6 +463,9 @@ def test_production_readiness_matrix_no_answers():
             if row["id"] in _RECONCILED_PROD | _FINAL_UNRECONCILED_PROD:
                 assert row["answer"]
                 assert row["resolved_at"] is not None
+            elif row["id"] in _BOT_DRAFT_PROD:
+                assert row["answer"]
+                assert row["resolved_at"] is None
             else:
                 assert row["answer"] == ""
                 assert row["resolved_at"] is None

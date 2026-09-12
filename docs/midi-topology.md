@@ -3,9 +3,13 @@
 `data/midi.yaml` is the canonical structured source for MIDI endpoints, devices,
 physical links, channels, clock, and Ableton port state.
 
-Physical MIDI topology is currently **UNKNOWN**. No cable, USB port, DIN port, or
-Ableton preference is implied by an intended design. A link appears below only
-when it is explicitly represented in `connections`.
+Two DIN links are **VERIFIED** (Q-015): FCB1010 → U6MIDI Pro IN 1, and
+U6MIDI Pro OUT 1 → Thru5 WC IN 1. Stage 25 HUMAN: Thru5 OUT cables go to
+SL-2, SR-18, miniKORG, and KAOSS Replay; OUT number → device mapping and
+remaining U6MIDI ports are still UNKNOWN (RIG-037).
+
+A link appears in the generated table only when it is explicitly represented
+in `connections`.
 
 <!-- rig:midi-topology:start -->
 <!-- GENERATED FROM data/midi.yaml BY `uv run rig render`. DO NOT EDIT THIS SECTION DIRECTLY. -->
@@ -22,11 +26,12 @@ when it is explicitly represented in `connections`.
 | Gear ref | Role | Notes |
 |---|---|---|
 | cme-u6midi-pro | usb-midi-router | 3 in / 3 out; route / merge / filter / remap — OWNED. Q-015: receives FCB1010 on MIDI IN 1; sends to Thru5 WC on MIDI OUT 1. |
-| cme-midi-thru5-wc | midi-thru | Hardware thru distribution — OWNED; not a programmable remapper. Q-015: fed from U6MIDI Pro OUT 1 into Thru5 WC IN 1; other thru ports not fully traced. |
+| cme-midi-thru5-wc | midi-thru | Hardware thru distribution — OWNED; not a programmable remapper. Q-015: fed from U6MIDI Pro OUT 1 into Thru5 WC IN 1. Stage 25 HUMAN: OUT cables go to SL-2, SR-18, miniKORG, and KAOSS Replay; which Thru5 OUT number maps to which device is still UNKNOWN. |
 | tascam-us-16x08 | audio-interface-midi | May participate in MIDI paths; exact CURRENT use UNKNOWN |
-| korg-minikorg | synth | — |
-| kaoss-replay | sampler-effects | — |
-| boss-sl-2 | pedal | — |
+| korg-minikorg | synth | Stage 25 HUMAN — receives a Thru5 WC OUT (OUT number UNKNOWN) |
+| kaoss-replay | sampler-effects | Stage 25 HUMAN — receives a Thru5 WC OUT (OUT number UNKNOWN) |
+| boss-sl-2 | pedal | Stage 25 HUMAN — receives a Thru5 WC OUT (OUT number UNKNOWN) |
+| alesis-sr-18 | drum-machine | Stage 25 HUMAN — receives a Thru5 WC OUT (OUT number UNKNOWN) |
 | casio-privia | instrument | — |
 | korg-padkontrol | controller | — |
 | behringer-fcb1010 | foot-controller | USB Uno recognition unresolved (RIG-022); bank-00 map partially attested (Q-016) |
