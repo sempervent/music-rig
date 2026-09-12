@@ -1,7 +1,11 @@
-"""Reconciliation orchestration — queue / plan / apply / verify / finalize / sweep.
+"""PUBLIC FAÇADE (stable API for CLI/TUI).
 
-Adapters call existing CURRENT services (propose_* + commit_*). This module does
-not duplicate editors. Audit trail: OpenQuestion.reconciled_at + Change/TODO status
+Queue / plan / apply / verify / finalize / sweep. Adapters call existing CURRENT
+services (propose_* + commit_*). This module does not assemble fixture path trees
+(use ReconciliationContext), does not own provider transport, and does not own
+CLI syntax rendering (see operation_renderer / suggestions).
+
+Audit trail: OpenQuestion.reconciled_at + Change/TODO status
 (no separate reconciliation-log.yaml).
 """
 
@@ -100,29 +104,27 @@ def _render_planning_and_patchbay(paths: dict[str, Any]) -> None:
 
 def _default_paths(**overrides: Path | None) -> dict[str, Any]:
     """Resolve paths at call time so monkeypatched store.*_PATH is honored."""
-    base = {
-        "questions": store_mod.QUESTIONS_PATH,
-        "changes": store_mod.CHANGES_PATH,
-        "todo": store_mod.TODO_PATH,
-        "patchbays": store_mod.PATCHBAYS_PATH,
-        "routing": store_mod.ROUTING_PATH,
-        "midi": store_mod.MIDI_PATH,
-        "controllers": store_mod.CONTROLLERS_PATH,
-        "ableton": store_mod.ABLETON_PATH,
-        "inventory": store_mod.INVENTORY_PATH,
-        "docs_todo": store_mod.DOCS_TODO_PATH,
-        "docs_wishlist": store_mod.DOCS_WISHLIST_PATH,
-        "docs_questions": store_mod.DOCS_QUESTIONS_PATH,
-        "docs_patchbays": store_mod.DOCS_PATCHBAYS_PATH,
-    }
-    for key, value in overrides.items():
-        if value is not None:
-            base[key] = value
-    return base
+    from music_rig.reconciliation.context import ReconciliationContext
+
+    return ReconciliationContext.from_overrides(overrides).path_dict()
 
 
 def _paths(**overrides: Path | None) -> dict[str, Any]:
     return _default_paths(**overrides)
+
+
+def _ctx_from_kwargs(**kwargs: Any):
+    """Normalize façade kwargs into ReconciliationContext (boundary only)."""
+    from music_rig.reconciliation.context import ReconciliationContext
+
+    ctx = kwargs.pop("ctx", None)
+    if isinstance(ctx, ReconciliationContext):
+        if not kwargs:
+            return ctx
+        # Merge additional legacy overrides onto the provided context.
+        merged = {**ctx.path_dict(), **{k: v for k, v in kwargs.items() if v is not None}}
+        return ReconciliationContext.from_overrides(merged)
+    return ReconciliationContext.from_overrides(kwargs)
 
 
 def _adapter_for(question: OpenQuestion):
@@ -351,6 +353,7 @@ def show_question(
         "plan": plan.to_dict(),
         "related_todos": related_todos,
         "related_changes": related_changes,
+        "suggestions": plan.to_dict().get("suggestions") or [],
         "suggested_commands": plan.suggested_commands,
         "advisory": format_reconcile_question(
             q.id, questions_path=questions_path
@@ -391,30 +394,23 @@ def show_artifact(
     raise StoreError(f"Unknown artifact type {artifact_type!r}")
 
 
-def plan_question(question_id: str, **kwargs: Any) -> Plan:
-    paths = _paths(**{k: v for k, v in kwargs.items() if k.endswith("_path") or k in {
-        "questions", "changes", "todo", "patchbays", "routing", "midi",
-        "controllers", "ableton", "docs_todo", "docs_wishlist", "docs_questions",
-    }})
-    # Normalize kwargs into paths dict
-    path_map = {
-        "questions_path": "questions",
-        "changes_path": "changes",
-        "todo_path": "todo",
-        "patchbays_path": "patchbays",
-        "routing_path": "routing",
-        "midi_path": "midi",
-        "controllers_path": "controllers",
-        "ableton_path": "ableton",
-        "docs_todo": "docs_todo",
-        "docs_wishlist": "docs_wishlist",
-        "docs_questions": "docs_questions",
-    }
-    for src, dest in path_map.items():
-        if src in kwargs and kwargs[src] is not None:
-            paths[dest] = kwargs[src]
+def plan_question(
+    question_id: str,
+    *,
+    ctx=None,
+    **kwargs: Any,
+) -> Plan:
+    """Plan a question. Prefer ``ctx=ReconciliationContext…``; legacy ``*_path`` ok."""
+    from music_rig.reconciliation.context import ReconciliationContext
+
+    if ctx is not None and kwargs:
+        ctx = _ctx_from_kwargs(ctx=ctx, **kwargs)
+    elif ctx is None:
+        ctx = _ctx_from_kwargs(**kwargs)
+    assert isinstance(ctx, ReconciliationContext)
+    paths = ctx.path_dict()
     q = question_service.get_question(
-        question_id, questions_path=kwargs.get("questions_path")
+        question_id, questions_path=ctx.paths.questions
     )
     return _adapter_for(q).plan(q, paths=paths)
 
@@ -941,14 +937,29 @@ def sweep(
                 counts["blocked_by_dod"] += 1
                 counts["ready_to_finalize"] = max(0, counts["ready_to_finalize"] - 1)
 
-    suggested_next: list[str] = []
+    from music_rig.reconciliation.suggestions import (
+        ActionSuggestion,
+        SuggestionKind,
+        render_suggestions,
+        suggest_answer,
+        suggest_finalize,
+        suggest_resolve,
+        suggestions_asdicts,
+    )
+
+    suggested: list[ActionSuggestion] = []
     if counts["needs_answer"]:
-        suggested_next.append("uv run rig question list --open")
-        suggested_next.append(
-            'uv run rig question answer Q-xxx --answer "..." --json'
+        suggested.append(
+            ActionSuggestion(
+                kind=SuggestionKind.ADVISORY,
+                intent="question list --open",
+                description="List open questions needing answers",
+                code="list_open",
+            )
         )
+        suggested.append(suggest_answer("Q-xxx", placeholder="..."))
     if counts.get("draft_answer"):
-        suggested_next.append("uv run rig question resolve Q-xxx")
+        suggested.append(suggest_resolve("Q-xxx"))
     agent_candidates = sorted(
         {
             f.artifact_id
@@ -959,18 +970,41 @@ def sweep(
         }
     )
     if counts["needs_agent_action"]:
-        suggested_next.append("uv run rig agent packet Q-xxx --json")
-        suggested_next.append("uv run rig agent reconcile Q-xxx")
-        suggested_next.append(
-            "uv run rig reconcile queue --state NEEDS_AGENT_ACTION --json"
+        suggested.append(
+            ActionSuggestion(
+                kind=SuggestionKind.ADVISORY,
+                intent="agent packet Q-xxx --json",
+                description="Build agent action packet",
+                code="agent_packet",
+            )
         )
-        suggested_next.append(
-            "uv run rig reconcile finalize question Q-xxx "
-            '--confirm-current-reconciled --note "…" --yes --json'
+        suggested.append(
+            ActionSuggestion(
+                kind=SuggestionKind.ADVISORY,
+                intent="agent reconcile Q-xxx",
+                description="Run agent reconciliation",
+                code="agent_reconcile",
+            )
+        )
+        suggested.append(
+            ActionSuggestion(
+                kind=SuggestionKind.ADVISORY,
+                intent="reconcile queue --state NEEDS_AGENT_ACTION --json",
+                description="Queue agent-action questions",
+                code="queue_agent",
+            )
+        )
+        suggested.append(
+            suggest_finalize("Q-xxx", confirm_current_reconciled=True, note="…")
         )
     if counts["ready_to_finalize"]:
-        suggested_next.append(
-            "uv run rig reconcile sweep --write --yes --confirm-dod --json"
+        suggested.append(
+            ActionSuggestion(
+                kind=SuggestionKind.SWEEP,
+                intent="reconcile sweep --write --yes --confirm-dod --json",
+                description="Apply ready finalize plan",
+                code="sweep_write",
+            )
         )
 
     return {
@@ -984,12 +1018,43 @@ def sweep(
         "agent_candidates": agent_candidates,
         "checks": group_findings(findings),
         "plan": [op.to_dict() for op in plan_ops],
-        "suggested_next_commands": suggested_next,
+        "suggestions": suggestions_asdicts(suggested),
+        # DEPRECATED presentation compatibility.
+        "suggested_next_commands": render_suggestions(suggested),
     }
 
 
 def status_summary() -> str:
     return build_reconcile_summary()
+
+
+def _issue(
+    *,
+    severity: str,
+    code: str,
+    id: str,
+    detail: str,
+    suggestions: list | None = None,
+    **extra: Any,
+) -> dict[str, Any]:
+    """Build a cleanup issue with structured suggestions + rendered compat commands."""
+    from music_rig.reconciliation.suggestions import (
+        render_suggestions,
+        suggestions_asdicts,
+    )
+
+    sug = list(suggestions or [])
+    payload: dict[str, Any] = {
+        "severity": severity,
+        "code": code,
+        "id": id,
+        "detail": detail,
+        "suggestions": suggestions_asdicts(sug),
+        # DEPRECATED presentation compatibility.
+        "suggested_commands": render_suggestions(sug),
+    }
+    payload.update(extra)
+    return payload
 
 
 def cleanup_reconciliation_issues(
@@ -999,6 +1064,18 @@ def cleanup_reconciliation_issues(
     todo_path: Path | None = None,
 ) -> list[dict[str, Any]]:
     """Inspect cleanup extras for reconciliation hygiene."""
+    from music_rig.reconciliation.suggestions import (
+        ActionSuggestion,
+        SuggestionKind,
+        suggest_answer,
+        suggest_changes_apply,
+        suggest_finalize,
+        suggest_plan,
+        suggest_resolve,
+        suggest_target_pair,
+        suggest_todo_done,
+    )
+
     issues: list[dict[str, Any]] = []
     qdoc = load_questions(questions_path)
     cdoc = load_changes(changes_path)
@@ -1007,65 +1084,73 @@ def cleanup_reconciliation_issues(
     for q in qdoc.questions:
         if q.status == QuestionStatus.OPEN and q.answer.strip():
             issues.append(
-                {
-                    "severity": "info",
-                    "code": "question_draft_answer",
-                    "id": q.id,
-                    "detail": "OPEN with non-empty draft answer — resolve when final",
-                    "suggested_commands": [
-                        f"uv run rig question resolve {q.id}",
-                        f"uv run rig question answer {q.id} --answer \"…\" --json",
+                _issue(
+                    severity="info",
+                    code="question_draft_answer",
+                    id=q.id,
+                    detail="OPEN with non-empty draft answer — resolve when final",
+                    suggestions=[
+                        suggest_resolve(q.id),
+                        suggest_answer(q.id),
                     ],
-                }
+                )
             )
         if q.status == QuestionStatus.RESOLVED and q.reconciled_at is None:
             issues.append(
-                {
-                    "severity": "warning",
-                    "code": "resolved_not_reconciled",
-                    "id": q.id,
-                    "detail": "RESOLVED but reconciled_at is null",
-                    "suggested_commands": [
-                        f"uv run rig reconcile plan question {q.id} --json",
-                        f"uv run rig reconcile finalize question {q.id} --yes --json",
+                _issue(
+                    severity="warning",
+                    code="resolved_not_reconciled",
+                    id=q.id,
+                    detail="RESOLVED but reconciled_at is null",
+                    suggestions=[
+                        suggest_plan(q.id),
+                        ActionSuggestion(
+                            kind=SuggestionKind.FINALIZE,
+                            intent=f"reconcile finalize question {q.id} --yes --json",
+                            description=f"Finalize {q.id}",
+                            code="finalize",
+                        ),
                     ],
-                }
+                )
             )
             try:
                 plan = _adapter_for(q).plan(q, paths=paths)
                 if plan.state == ReconciliationState.CURRENT_MATCHES:
                     issues.append(
-                        {
-                            "severity": "info",
-                            "code": "current_matches",
-                            "id": q.id,
-                            "detail": "CURRENT already matches answer — ready to finalize",
-                            "suggested_commands": [
-                                f"uv run rig reconcile finalize question {q.id} "
-                                f"--yes --no-current-change --note \"matches\" --json"
+                        _issue(
+                            severity="info",
+                            code="current_matches",
+                            id=q.id,
+                            detail="CURRENT already matches answer — ready to finalize",
+                            suggestions=[
+                                suggest_finalize(
+                                    q.id,
+                                    no_current_change=True,
+                                    note="matches",
+                                )
                             ],
-                        }
+                        )
                     )
                 if plan.state == ReconciliationState.NEEDS_AGENT_ACTION:
                     issues.append(
-                        {
-                            "severity": "warning",
-                            "code": "manual_recon_waiting",
-                            "id": q.id,
-                            "detail": (
+                        _issue(
+                            severity="warning",
+                            code="manual_recon_waiting",
+                            id=q.id,
+                            detail=(
                                 "Needs agent reconciliation — interpret answer into "
                                 "CURRENT via rig CLI, then finalize with "
                                 "--confirm-current-reconciled"
                             ),
-                            "suggested_commands": [
-                                f"uv run rig reconcile plan question {q.id} --json",
-                                (
-                                    f"uv run rig reconcile finalize question {q.id} "
-                                    f"--confirm-current-reconciled --note \"…\" "
-                                    f"--yes --json"
+                            suggestions=[
+                                suggest_plan(q.id),
+                                suggest_finalize(
+                                    q.id,
+                                    confirm_current_reconciled=True,
+                                    note="…",
                                 ),
                             ],
-                        }
+                        )
                     )
                 for b in plan.blockers:
                     if isinstance(b, dict) and b.get("code") == "missing_target_field":
@@ -1078,6 +1163,7 @@ def cleanup_reconciliation_issues(
                                 "detail": b.get("message") or "missing target field",
                                 "candidates": b.get("candidates") or [],
                                 "suggested_commands": b.get("suggested_commands") or [],
+                                "suggestions": b.get("suggestions") or [],
                             }
                         )
             except Exception:
@@ -1087,15 +1173,13 @@ def cleanup_reconciliation_issues(
                 chg = cdoc.item_map().get(cid)
                 if chg and chg.status == ChangeStatus.OPEN:
                     issues.append(
-                        {
-                            "severity": "warning",
-                            "code": "reconciled_open_change",
-                            "id": q.id,
-                            "detail": f"reconciled but linked change {cid} still OPEN",
-                            "suggested_commands": [
-                                f"uv run rig changes apply {cid} --yes"
-                            ],
-                        }
+                        _issue(
+                            severity="warning",
+                            code="reconciled_open_change",
+                            id=q.id,
+                            detail=f"reconciled but linked change {cid} still OPEN",
+                            suggestions=[suggest_changes_apply(cid)],
+                        )
                     )
             for tid in q.related_todos:
                 task = tdoc.task_map().get(tid)
@@ -1105,13 +1189,15 @@ def cleanup_reconciliation_issues(
                     TodoStatus.DEFERRED,
                 }:
                     issues.append(
-                        {
-                            "severity": "warning",
-                            "code": "reconciled_unfinished_todo",
-                            "id": q.id,
-                            "detail": f"reconciled but linked TODO {tid} is {task.status.value}",
-                            "suggested_commands": [f"uv run rig todo done {tid}"],
-                        }
+                        _issue(
+                            severity="warning",
+                            code="reconciled_unfinished_todo",
+                            id=q.id,
+                            detail=(
+                                f"reconciled but linked TODO {tid} is {task.status.value}"
+                            ),
+                            suggestions=[suggest_todo_done(tid)],
+                        )
                     )
         # Incomplete targets on OPEN questions (RESOLVED covered via plan blockers above)
         if q.status == QuestionStatus.OPEN and q.reconciled_at is None:
@@ -1131,46 +1217,47 @@ def cleanup_reconciliation_issues(
                 except Exception:
                     candidates = []
                 issues.append(
-                    {
-                        "severity": "warning",
-                        "code": "missing_target_field",
-                        "id": q.id,
-                        "field": "pair",
-                        "detail": "patchbay.mode target missing pair",
-                        "candidates": candidates,
-                        "suggested_commands": [
-                            f"uv run rig question target set {q.id} --pair {c} --yes"
-                            for c in candidates[:5]
-                        ],
-                    }
+                    _issue(
+                        severity="warning",
+                        code="missing_target_field",
+                        id=q.id,
+                        detail="patchbay.mode target missing pair",
+                        suggestions=[suggest_target_pair(q.id, c) for c in candidates[:5]],
+                        field="pair",
+                        candidates=candidates,
+                    )
                 )
         # RESOLVED invariants (defensive — pydantic should already enforce)
         if q.status == QuestionStatus.RESOLVED:
             if not q.answer.strip() or q.resolved_at is None:
                 issues.append(
-                    {
-                        "severity": "error",
-                        "code": "resolved_invariant_broken",
-                        "id": q.id,
-                        "detail": "RESOLVED requires non-empty answer and resolved_at",
-                        "suggested_commands": [
-                            f"uv run rig question answer {q.id} --answer \"…\" --json"
-                        ],
-                    }
+                    _issue(
+                        severity="error",
+                        code="resolved_invariant_broken",
+                        id=q.id,
+                        detail="RESOLVED requires non-empty answer and resolved_at",
+                        suggestions=[suggest_answer(q.id)],
+                    )
                 )
     for tid in tdoc.next_session:
         task = tdoc.task_map().get(tid)
         if task and task.status.value in {"DONE", "CANCELLED", "DEFERRED"}:
             issues.append(
-                {
-                    "severity": "error",
-                    "code": "terminal_in_next_session",
-                    "id": tid,
-                    "detail": f"{task.status.value} TODO still listed in next_session",
-                    "suggested_commands": [
-                        f"uv run rig todo next remove {tid}"
+                _issue(
+                    severity="error",
+                    code="terminal_in_next_session",
+                    id=tid,
+                    detail=f"{task.status.value} TODO still listed in next_session",
+                    suggestions=[
+                        ActionSuggestion(
+                            kind=SuggestionKind.ADVISORY,
+                            intent=f"todo next remove {tid}",
+                            description=f"Remove terminal TODO {tid} from next_session",
+                            code="todo_next_remove",
+                            params={"todo_id": tid},
+                        )
                     ],
-                }
+                )
             )
 
     # Channel source/status contradictions (report only — no auto-fix)
@@ -1180,19 +1267,30 @@ def cleanup_reconciliation_issues(
         ch_data = channel_state.load_raw()
         for err in channel_state.validate_channel_map(ch_data):
             if "source/status" in err or "UNASSIGNED" in err or "CURRENT" in err:
-                # Parse device/channel from message when possible
                 issues.append(
-                    {
-                        "severity": "error",
-                        "code": "channel_source_status_contradiction",
-                        "id": "channel-map",
-                        "detail": err,
-                        "suggested_commands": [
-                            "uv run rig current channels set-source <device> <ch> "
-                            '"<source>" --yes',
-                            "uv run rig current channels clear-source <device> <ch> --yes",
+                    _issue(
+                        severity="error",
+                        code="channel_source_status_contradiction",
+                        id="channel-map",
+                        detail=err,
+                        suggestions=[
+                            ActionSuggestion(
+                                kind=SuggestionKind.ADVISORY,
+                                intent=(
+                                    'current channels set-source <device> <ch> '
+                                    '"<source>" --yes'
+                                ),
+                                description="Set channel source",
+                                code="set_source",
+                            ),
+                            ActionSuggestion(
+                                kind=SuggestionKind.ADVISORY,
+                                intent="current channels clear-source <device> <ch> --yes",
+                                description="Clear channel source",
+                                code="clear_source",
+                            ),
                         ],
-                    }
+                    )
                 )
     except Exception as exc:
         issues.append(

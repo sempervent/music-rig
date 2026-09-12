@@ -1,4 +1,8 @@
-"""Structured NEEDS_AGENT_ACTION handoff packets (no YAML-edit suggestions)."""
+"""HANDOFF PACKETS for NEEDS_AGENT_ACTION (structured ops first; CLI is presentation).
+
+Prefer ``candidate_operations`` / structured suggestions. ``finalize_command_template``
+and ``suggested_current_commands`` are rendered compatibility fields only.
+"""
 
 from __future__ import annotations
 
@@ -22,6 +26,12 @@ def build_action_packet(
     """Enrich plan JSON for agent handoff after human observation/answer."""
     from music_rig.reconciliation.operation_renderer import render_cli
     from music_rig.reconciliation.operations import RigOperation
+    from music_rig.reconciliation.suggestions import (
+        SuggestionKind,
+        ActionSuggestion,
+        render_suggestion,
+        suggest_finalize,
+    )
 
     vr = question.verification_result
     observation = None
@@ -40,7 +50,12 @@ def build_action_packet(
             for k, v in question.target.model_dump().items()
             if v is not None
         }
-    finalize_op = RigOperation(
+    finalize_suggestion = suggest_finalize(
+        question.id,
+        confirm_current_reconciled=True,
+        note="…",
+    )
+    finalize_op = finalize_suggestion.operation or RigOperation(
         namespace="question",
         action="finalize_manual",
         args={
@@ -51,7 +66,17 @@ def build_action_packet(
         },
         description="Manual/agent-interpreted finalize",
     )
+    # PRESENTATION ONLY — not the source of truth for intent.
     finalize_template = render_cli(finalize_op)
+    family_suggestions = [
+        ActionSuggestion(
+            kind=SuggestionKind.CLI_HINT,
+            intent=fam if fam.startswith("rig") else f"rig {fam}",
+            description="Suggested command family for agent interpretation",
+            code="command_family",
+        )
+        for fam in suggested_command_families
+    ]
     packet: dict[str, Any] = {
         "artifact": {"type": "question", "id": question.id},
         "human_answer": question.answer,
@@ -66,15 +91,21 @@ def build_action_packet(
             "changes": list(question.related_changes),
         },
         "suggested_command_families": suggested_command_families,
-        "suggested_current_commands": list(suggested_command_families),
+        # PRESENTATION: rendered from families for older agent JSON consumers.
+        "suggested_current_commands": [
+            render_suggestion(s) for s in family_suggestions
+        ],
+        "suggestions": [s.to_dict() for s in family_suggestions],
         "candidate_operations": candidate_operations or [],
         "finalize_operation": finalize_op.to_dict(),
+        "finalize_suggestion": finalize_suggestion.to_dict(),
         "postcondition": postcondition,
         "linked_todos": list(question.related_todos),
         "linked_changes": list(question.related_changes),
         "requires_agent_interpretation": requires_agent_interpretation,
         "manual_finalize_allowed": manual_finalize_allowed,
         "required_confirmation": "--confirm-current-reconciled",
+        # PRESENTATION ONLY.
         "finalize_command_template": finalize_template,
     }
     if missing_capability:

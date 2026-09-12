@@ -1,10 +1,15 @@
-"""Render RigOperation to human/CLI forms — never the reverse."""
+"""PRESENTATION of operations and suggestions.
+
+CLI syntax (``uv run rig`` / ``uv run rig --am-bot``) is rendered HERE — never
+stored as the source of truth for agent/planner intent.
+"""
 
 from __future__ import annotations
 
 import shlex
 from typing import Any
 
+from music_rig.actor import ActorKind
 from music_rig.reconciliation.operations import RigOperation
 
 
@@ -91,3 +96,12 @@ def operation_json_view(
         "operation": operation.to_dict(),
         "rendered_cli": render_cli(operation, prefix=prefix),
     }
+
+
+def render_suggestion(suggestion, *, actor: ActorKind | str = ActorKind.HUMAN) -> str:
+    """Actor-aware suggestion rendering (delegates to suggestions module)."""
+    from music_rig.reconciliation.suggestions import (
+        render_suggestion as _render,
+    )
+
+    return _render(suggestion, actor=actor)

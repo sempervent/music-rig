@@ -121,9 +121,14 @@ class UnsupportedAdapter(ReconciliationAdapter):
             details["required_confirmation"] = "--confirm-current-reconciled"
 
         if state == ReconciliationState.DRAFT_ANSWER:
-            suggested = [
-                f"uv run rig question resolve {question.id}",
-                f"uv run rig question answer {question.id} --answer \"…\" --json",
+            from music_rig.reconciliation.suggestions import (
+                suggest_answer,
+                suggest_resolve,
+            )
+
+            suggestions = [
+                suggest_resolve(question.id),
+                suggest_answer(question.id),
             ]
             blockers: list[Any] = [
                 {
@@ -134,11 +139,15 @@ class UnsupportedAdapter(ReconciliationAdapter):
                 }
             ]
         elif state == ReconciliationState.NEEDS_AGENT_ACTION:
-            suggested = [
-                f"uv run rig reconcile plan question {question.id} --json",
-                (
-                    f"uv run rig reconcile finalize question {question.id} "
-                    f"--confirm-current-reconciled --note \"…\" --yes --json"
+            from music_rig.reconciliation.suggestions import (
+                suggest_finalize,
+                suggest_plan,
+            )
+
+            suggestions = [
+                suggest_plan(question.id),
+                suggest_finalize(
+                    question.id, confirm_current_reconciled=True, note="…"
                 ),
             ]
             blockers = [
@@ -152,9 +161,9 @@ class UnsupportedAdapter(ReconciliationAdapter):
                 }
             ]
         else:
-            suggested = [
-                f"uv run rig reconcile plan question {question.id} --json",
-            ]
+            from music_rig.reconciliation.suggestions import suggest_plan
+
+            suggestions = [suggest_plan(question.id)]
             blockers = []
 
         return Plan(
@@ -171,7 +180,7 @@ class UnsupportedAdapter(ReconciliationAdapter):
             if state == ReconciliationState.NEEDS_AGENT_ACTION
             else [],
             blockers=blockers,
-            suggested_commands=suggested,
+            suggestions=suggestions,
             details=details,
         )
 

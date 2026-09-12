@@ -99,6 +99,8 @@ class PatchbayModeAdapter(ReconciliationAdapter):
         current = self.read_current(question, paths=paths)
 
         if question.status == QuestionStatus.OPEN and question.answer.strip():
+            from music_rig.reconciliation.suggestions import suggest_resolve
+
             return Plan(
                 artifact_type="question",
                 artifact_id=question.id,
@@ -112,12 +114,12 @@ class PatchbayModeAdapter(ReconciliationAdapter):
                         "message": "OPEN with draft answer — resolve before reconcile",
                     }
                 ],
-                suggested_commands=[
-                    f"uv run rig question resolve {question.id}",
-                ],
+                suggestions=[suggest_resolve(question.id)],
             )
 
         if question.status != QuestionStatus.RESOLVED or not question.answer.strip():
+            from music_rig.reconciliation.suggestions import suggest_answer
+
             return Plan(
                 artifact_type="question",
                 artifact_id=question.id,
@@ -126,8 +128,8 @@ class PatchbayModeAdapter(ReconciliationAdapter):
                 current=current,
                 desired=None,
                 blockers=["Question must be RESOLVED with a non-empty answer"],
-                suggested_commands=[
-                    f"uv run rig question answer {question.id} --answer \"<mode>\" --json"
+                suggestions=[
+                    suggest_answer(question.id, placeholder="<mode>"),
                 ],
             )
 

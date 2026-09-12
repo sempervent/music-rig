@@ -1,4 +1,8 @@
-"""Unified `rig reconcile run` — dispatch-first, provider only when eligible."""
+"""END-TO-END ORCHESTRATION for `rig reconcile run`.
+
+Dispatch-first; invokes providers only when eligible. Uses ReconciliationContext
+as the path entrypoint and delegates plans/apply/finalize to the service façade.
+"""
 
 from __future__ import annotations
 
@@ -36,22 +40,9 @@ def reconcile_run(
     """
     ctx = ctx or ReconciliationContext.default()
     qid = question_id.upper()
-    paths = ctx.path_dict()
+    path_kw = ctx.path_kwargs()
 
-    plan = recon.plan_question(
-        qid,
-        questions_path=paths.get("questions"),
-        changes_path=paths.get("changes"),
-        todo_path=paths.get("todo"),
-        patchbays_path=paths.get("patchbays"),
-        routing_path=paths.get("routing"),
-        midi_path=paths.get("midi"),
-        controllers_path=paths.get("controllers"),
-        ableton_path=paths.get("ableton"),
-        docs_todo=paths.get("docs_todo"),
-        docs_wishlist=paths.get("docs_wishlist"),
-        docs_questions=paths.get("docs_questions"),
-    )
+    plan = recon.plan_question(qid, ctx=ctx)
     dispatch = classify_reconciliation_dispatch(plan)
     state = plan.state
     capability = plan.capability
@@ -91,7 +82,7 @@ def reconcile_run(
             dispatch=dispatch,
             apply=apply,
             yes=yes,
-            paths=paths,
+            path_kw=path_kw,
             interactive_verify=interactive_verify,
             base=base,
         )
@@ -117,7 +108,7 @@ def reconcile_run(
                 plan=plan,
                 apply=apply,
                 yes=yes,
-                paths=paths,
+                path_kw=path_kw,
                 finalize=False,
             ),
         }
@@ -130,7 +121,7 @@ def reconcile_run(
                 plan=plan,
                 apply=apply,
                 yes=yes,
-                paths=paths,
+                path_kw=path_kw,
                 finalize=True,
             ),
         }
@@ -190,11 +181,18 @@ def _human_observation_path(
     dispatch,
     apply: bool,
     yes: bool,
-    paths: dict[str, Any],
+    path_kw: dict[str, Any],
     interactive_verify: bool | None,
     base: dict[str, Any],
 ) -> dict[str, Any]:
     """Human verification required — never invoke a provider."""
+    from music_rig.reconciliation.suggestions import (
+        SuggestionKind,
+        ActionSuggestion,
+        render_suggestions,
+        suggest_verify_record,
+    )
+
     current = plan.current
     desired = plan.desired
     match_line = (
@@ -209,17 +207,31 @@ def _human_observation_path(
         match_line=match_line,
     )
 
+    suggestions = [
+        suggest_verify_record(qid),
+        ActionSuggestion(
+            kind=SuggestionKind.VERIFY,
+            intent="tui verify",
+            description="Interactive verification TUI",
+            code="tui_verify",
+        ),
+        ActionSuggestion(
+            kind=SuggestionKind.VERIFY,
+            intent=f"verify question {qid}",
+            description="Guided verify for question",
+            code="verify_question",
+            params={"question_id": qid},
+        ),
+    ]
+
     out: dict[str, Any] = {
         **base,
         "ok": False,
         "mode": "needs_verification",
         "message": message,
         "blockers": list(plan.blockers or []),
-        "suggested_commands": [
-            f"uv run rig verify record {qid} --outcome confirmed --value … --yes --json",
-            f"uv run rig tui verify",
-            f"uv run rig verify question {qid}",
-        ],
+        "suggestions": [s.to_dict() for s in suggestions],
+        "suggested_commands": render_suggestions(suggestions),
     }
 
     # Interactive TTY --apply may offer observation confirmation.
@@ -322,7 +334,7 @@ def _deterministic_path(
     plan,
     apply: bool,
     yes: bool,
-    paths: dict[str, Any],
+    path_kw: dict[str, Any],
     finalize: bool,
 ) -> dict[str, Any]:
     state = plan.state
@@ -334,6 +346,7 @@ def _deterministic_path(
         "capability": plan.capability.value,
         "provider_invoked": False,
         "plan": plan.to_dict(),
+        "suggestions": plan.to_dict().get("suggestions") or [],
         "suggested_commands": list(plan.suggested_commands or []),
         "dry_run": True,
         "applied": False,
@@ -352,17 +365,17 @@ def _deterministic_path(
             note="deterministic reconcile run",
             complete_linked_todos=True,
             confirm_dod=True,
-            questions_path=paths.get("questions"),
-            changes_path=paths.get("changes"),
-            todo_path=paths.get("todo"),
-            patchbays_path=paths.get("patchbays"),
-            routing_path=paths.get("routing"),
-            midi_path=paths.get("midi"),
-            controllers_path=paths.get("controllers"),
-            ableton_path=paths.get("ableton"),
-            docs_todo=paths.get("docs_todo"),
-            docs_wishlist=paths.get("docs_wishlist"),
-            docs_questions=paths.get("docs_questions"),
+            questions_path=path_kw.get("questions_path"),
+            changes_path=path_kw.get("changes_path"),
+            todo_path=path_kw.get("todo_path"),
+            patchbays_path=path_kw.get("patchbays_path"),
+            routing_path=path_kw.get("routing_path"),
+            midi_path=path_kw.get("midi_path"),
+            controllers_path=path_kw.get("controllers_path"),
+            ableton_path=path_kw.get("ableton_path"),
+            docs_todo=path_kw.get("docs_todo"),
+            docs_wishlist=path_kw.get("docs_wishlist"),
+            docs_questions=path_kw.get("docs_questions"),
         )
         out["finalize"] = fin
         out["dry_run"] = fin.get("dry_run", True)
@@ -379,16 +392,16 @@ def _deterministic_path(
             qid,
             dry_run=False,
             yes=True,
-            questions_path=paths.get("questions"),
-            changes_path=paths.get("changes"),
-            patchbays_path=paths.get("patchbays"),
-            routing_path=paths.get("routing"),
-            midi_path=paths.get("midi"),
-            controllers_path=paths.get("controllers"),
-            ableton_path=paths.get("ableton"),
-            docs_todo=paths.get("docs_todo"),
-            docs_wishlist=paths.get("docs_wishlist"),
-            docs_questions=paths.get("docs_questions"),
+            questions_path=path_kw.get("questions_path"),
+            changes_path=path_kw.get("changes_path"),
+            patchbays_path=path_kw.get("patchbays_path"),
+            routing_path=path_kw.get("routing_path"),
+            midi_path=path_kw.get("midi_path"),
+            controllers_path=path_kw.get("controllers_path"),
+            ableton_path=path_kw.get("ableton_path"),
+            docs_todo=path_kw.get("docs_todo"),
+            docs_wishlist=path_kw.get("docs_wishlist"),
+            docs_questions=path_kw.get("docs_questions"),
         )
         out["apply_result"] = applied
         out["dry_run"] = False
