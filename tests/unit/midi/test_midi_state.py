@@ -108,7 +108,8 @@ def test_production_midi_is_conservative_and_valid():
     assert all(item.status == MidiEvidenceStatus.INTENDED for item in doc.channels)
     assert doc.clock.master is not None
     assert doc.clock.master.endpoint_ref == "ableton"
-    assert doc.clock.master.status == MidiEvidenceStatus.INTENDED
+    # Q-014 HUMAN answer reconciled: Ableton master clock is VERIFIED.
+    assert doc.clock.master.status == MidiEvidenceStatus.VERIFIED
     assert doc.ableton_ports == []
     questions = load_questions().question_map()
     assert questions["Q-014"].target.domain == "midi.clock_master"
