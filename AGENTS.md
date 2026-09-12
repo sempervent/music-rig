@@ -1,5 +1,33 @@
 # AGENTS.md
 
+**IMPORTANT: You are a bot.**
+
+Every invocation of the music-rig CLI MUST include the global `--am-bot`
+flag immediately after `rig`.
+
+Correct:
+
+```bash
+uv run rig --am-bot question show Q-014 --json
+```
+
+Incorrect:
+
+```bash
+uv run rig question show Q-014 --json
+```
+
+Before running any `rig` command, verify it begins:
+
+```text
+rig --am-bot
+```
+
+If not, correct the command before execution.
+
+Bots cannot supply HUMAN answer authority or HUMAN observation evidence.
+Prefer `question draft` for suggestions; humans Answer & Resolve / verify.
+
 Operational instructions for Codex sessions working in this repository.
 
 ## Role of this repository
@@ -12,7 +40,7 @@ Use the repository itself as the source of remembered state, not chat memory or 
 1. Inspect the existing repository documentation before answering questions, proposing changes, or modifying files.
 2. Treat the source-of-truth hierarchy below as authoritative for CURRENT physical state.
 3. Cross-check routing, inventory, diagrams, and YAML data before stating that a connection, device role, or channel assignment is current.
-4. **CLI-first for agents:** use `uv run rig …` (especially `rig reconcile`) for ordinary mutations — do not teach direct YAML edits. See [SKILLS.md](SKILLS.md).
+4. **CLI-first for agents:** use `uv run rig --am-bot …` (especially `rig reconcile`) for ordinary mutations — do not teach direct YAML edits. See [SKILLS.md](SKILLS.md).
 
 ## Source-of-truth hierarchy
 
@@ -35,108 +63,109 @@ Use the repository itself as the source of remembered state, not chat memory or 
 | Automation | [docs/automation-readiness.md](docs/automation-readiness.md) | Honest capability registry; simulate never executes |
 | Diagrams | [diagrams/](diagrams/) | Visual projections of the same authoritative state |
 | Todo (canonical) | [data/todo.yaml](data/todo.yaml) | Structured accepted work — edit this, not generated Markdown sections |
-| Todo (rendered) | [docs/todo.md](docs/todo.md) | Human-facing TODO view; generated section owned by `uv run rig render` |
+| Todo (rendered) | [docs/todo.md](docs/todo.md) | Human-facing TODO view; generated section owned by `uv run rig --am-bot render` |
 | Wishlist (canonical) | [data/wishlist.yaml](data/wishlist.yaml) | Structured speculative desires |
-| Wishlist (rendered) | [docs/wishlist.md](docs/wishlist.md) | Human-facing wishlist view; generated section owned by `uv run rig render` |
+| Wishlist (rendered) | [docs/wishlist.md](docs/wishlist.md) | Human-facing wishlist view; generated section owned by `uv run rig --am-bot render` |
 | Inbox | [data/inbox.yaml](data/inbox.yaml) | Uncategorized captures — observations only, not CURRENT truth |
 | Changes | [data/changes.yaml](data/changes.yaml) | Structured “reality may have changed” records — not auto-CURRENT |
 | Sessions | [data/sessions/](data/sessions/) | Studio session logs — operational history |
 | Open questions (canonical) | [data/open-questions.yaml](data/open-questions.yaml) | Unresolved factual uncertainties (`Q-*`) |
-| Open questions (rendered) | [docs/open-questions.md](docs/open-questions.md) | Human-facing questions; generated section owned by `uv run rig render` |
+| Open questions (rendered) | [docs/open-questions.md](docs/open-questions.md) | Human-facing questions; generated section owned by `uv run rig --am-bot render` |
 
 ### Planning CLI
 
 ```bash
 uv sync --extra dev --extra docs
-uv run rig status
-uv run rig now
-uv run rig now --play
-uv run rig doctor
-uv run rig reconcile
-uv run rig reconcile queue --json
-uv run rig reconcile plan question Q-008 --json
+uv run rig --am-bot status
+uv run rig --am-bot now
+uv run rig --am-bot now --play
+uv run rig --am-bot doctor
+uv run rig --am-bot reconcile
+uv run rig --am-bot reconcile queue --json
+uv run rig --am-bot reconcile plan question Q-008 --json
 
 # Questions
-uv run rig question list
-uv run rig question list --open
-uv run rig question list --unreconciled
-uv run rig question show Q-008
-uv run rig question answer Q-008 --answer "half-normal" --json
-uv run rig question target show Q-008 --json
-uv run rig question target set Q-008 --pair 1/25 --yes --json
-uv run rig question resolve Q-008
-uv run rig question todo Q-008
+uv run rig --am-bot question list
+uv run rig --am-bot question list --open
+uv run rig --am-bot question list --unreconciled
+uv run rig --am-bot question show Q-008
+uv run rig --am-bot question draft Q-008 --answer "half-normal" --json
+# Final HUMAN answers must be entered without --am-bot (or via TUI)
+uv run rig --am-bot question target show Q-008 --json
+uv run rig --am-bot question target set Q-008 --pair 1/25 --yes --json
+uv run rig --am-bot question resolve Q-008
+uv run rig --am-bot question todo Q-008
 
-# Interactive TUI
+# Interactive TUI (HUMAN only — do not use --am-bot)
 uv run rig tui
 uv run rig tui question Q-008
 uv run rig tui patchbay PB-B
 uv run rig tui reconcile
 
 # Inspection (agents)
-uv run rig inspect domains
-uv run rig inspect schema question
-uv run rig inspect cleanup --json
+uv run rig --am-bot inspect domains
+uv run rig --am-bot inspect schema question
+uv run rig --am-bot inspect cleanup --json
 
 # Work
-uv run rig todo start RIG-001
-uv run rig todo done RIG-001
+uv run rig --am-bot todo start RIG-001
+uv run rig --am-bot todo done RIG-001
 
 # Plan next studio session
-uv run rig todo next list
-uv run rig todo next set RIG-002 RIG-038 RIG-046
+uv run rig --am-bot todo next list
+uv run rig --am-bot todo next set RIG-002 RIG-038 RIG-046
 
 # Wishlist
-uv run rig wish list
-uv run rig wish promote "PFL Eurorack v1"
+uv run rig --am-bot wish list
+uv run rig --am-bot wish promote "PFL Eurorack v1"
 
 # Capture now, classify later
-uv run rig capture "RE-2 noisy after DD-8"
-uv run rig inbox list
-uv run rig inbox triage CAP-001
+uv run rig --am-bot capture "RE-2 noisy after DD-8"
+uv run rig --am-bot inbox list
+uv run rig --am-bot inbox triage CAP-001
 
 # Studio session
-uv run rig session start
-uv run rig session note "PH-3 confirmed before TR-2"
-uv run rig session discovery "RE-2 quiet on separate power"
-uv run rig session end
+uv run rig --am-bot session start
+uv run rig --am-bot session note "PH-3 confirmed before TR-2"
+uv run rig --am-bot session discovery "RE-2 quiet on separate power"
+uv run rig --am-bot session end
 
 # Read CURRENT wiring at the rack
-uv run rig channels
-uv run rig gear list
-uv run rig gear show boss-rc-1
-uv run rig gear usage boss-rc-1
-uv run rig patchbay PB-B
-uv run rig path list
-uv run rig path show space
-uv run rig midi summary
-uv run rig midi links
-uv run rig midi channels
-uv run rig midi clock
-uv run rig controls summary
-uv run rig ableton targets
-uv run rig performance summary
-uv run rig performance preflight
-uv run rig automation capabilities
-uv run rig snapshot create
-uv run rig backup plan
+uv run rig --am-bot channels
+uv run rig --am-bot gear list
+uv run rig --am-bot gear show boss-rc-1
+uv run rig --am-bot gear usage boss-rc-1
+uv run rig --am-bot patchbay PB-B
+uv run rig --am-bot path list
+uv run rig --am-bot path show space
+uv run rig --am-bot midi summary
+uv run rig --am-bot midi links
+uv run rig --am-bot midi channels
+uv run rig --am-bot midi clock
+uv run rig --am-bot controls summary
+uv run rig --am-bot ableton targets
+uv run rig --am-bot performance summary
+uv run rig --am-bot performance preflight
+uv run rig --am-bot automation capabilities
+uv run rig --am-bot snapshot create
+uv run rig --am-bot backup plan
 
 # Physical reality changed (does not edit CURRENT docs)
-uv run rig change "Moved TR-2 after PH-3" --category PEDAL_CHAIN
-uv run rig changes list
+uv run rig --am-bot change "Moved TR-2 after PH-3" --category PEDAL_CHAIN
+uv run rig --am-bot changes list
 
 # Supported CURRENT routing mutations (preview + confirm; inventory unchanged)
-uv run rig current path branches space
-uv run rig current path verify space
-uv run rig current path move space TR-2 --branch sy1-send --after PH-3 --dry-run
-uv run rig current path move space TR-2 --branch sy1-send --after PH-3
-uv run rig current gear set-condition big-muff ISSUE
-uv run rig current gear acquire "BOSS RC-600"
-uv run rig current midi verify
-uv run rig current controls verify behringer-fcb1010
+uv run rig --am-bot current path branches space
+uv run rig --am-bot current path verify space
+uv run rig --am-bot current path move space TR-2 --branch sy1-send --after PH-3 --dry-run
+uv run rig --am-bot current path move space TR-2 --branch sy1-send --after PH-3
+uv run rig --am-bot current gear set-condition big-muff ISSUE
+uv run rig --am-bot current gear acquire "BOSS RC-600"
+uv run rig --am-bot current midi verify
+uv run rig --am-bot current controls verify behringer-fcb1010
 
-uv run rig render --check
-uv run rig check
+uv run rig --am-bot render --check
+uv run rig --am-bot check
 ```
 
 - Canonical planning data: `data/todo.yaml`, `data/wishlist.yaml`, `data/inbox.yaml`, `data/open-questions.yaml`, `data/changes.yaml`.
@@ -182,7 +211,7 @@ uv run rig check
   - `rig backup create` embeds a snapshot and copies configured FILE/DIRECTORY items; MANUAL_EXPORT stays operator-driven.
   - `rig performance simulate` / `preflight` must never connect to OBS, Ableton, MIDI, Stream Deck, send keys, or execute effects.
   - Do not invent fake automation adapters that return success for unimplemented families.
-  - Broad `--snapshot-before` integration is deferred; use `uv run rig snapshot create` manually.
+  - Broad `--snapshot-before` integration is deferred; use `uv run rig --am-bot snapshot create` manually.
   - Absence of local config is advisory, not a CI failure.
 - Mutation commands write YAML and re-render docs unless `--no-render` is passed.
 - No CLI mutation command commits or pushes Git.
@@ -191,6 +220,7 @@ uv run rig check
 ### Interactive TUI (Stage 13+)
 
 - `uv run rig tui` is a Textual presentation layer over the same services as the CLI.
+  Do **not** launch `rig --am-bot tui` (rejected). Bots use noninteractive CLI only.
 - TUI widgets must not parse CLI output and must not write YAML directly.
 - Editable domains use FieldSpecs (`tui/fields.py`) + adapters under
   `tui/editable_domains/`; apply via Ctrl+S / :w review → service commit.
@@ -213,11 +243,11 @@ uv run rig check
   child screens return navigation intent (`AnswerResult`); the requester owns
   subsequent `push_screen` / `open_domain`. Never push a sibling then dismiss
   the child underneath it. See [docs/tui.md](docs/tui.md).
-- Agent reconciliation: `uv run rig agent packet|validate|apply` — agents propose
+- Agent reconciliation: `uv run rig --am-bot agent packet|validate|apply` — agents propose
   allowlisted `RigOperation`s; the rig validates and dispatches. No YAML edits,
   no shell, no invented VERIFIED evidence. See root `SKILLS.md`.
 - Agent guide: root `SKILLS.md` (CLI-first; do not automate TUI). Discovery:
-  `uv run rig inspect …`.
+  `uv run rig --am-bot inspect …`.
 - Do not implement OBS/Ableton/MIDI/Stream Deck/macOS automation from the TUI;
   those families remain `NOT_IMPLEMENTED`.
 
@@ -267,7 +297,7 @@ Canonical structured CURRENT sources include:
 - `data/channel-map.yaml`
 - `data/routing.yaml` (`named_paths` for pedal/audio topology)
 
-For supported CURRENT mutations, prefer `uv run rig current …` / the service layer.
+For supported CURRENT mutations, prefer `uv run rig --am-bot current …` / the service layer.
 
 OPEN Changes and Question answers are evidence.
 They do not become CURRENT until reconciled.

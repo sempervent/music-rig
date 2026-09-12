@@ -88,9 +88,38 @@ err_console = Console(stderr=True)
 
 app = typer.Typer(
     name="rig",
-    help="Music-rig planning and studio-ops CLI. Canonical data lives in data/*.yaml.",
+    help=(
+        "Music-rig planning and studio-ops CLI. Canonical data lives in data/*.yaml.\n\n"
+        "Automated agents must always pass --am-bot immediately after `rig`."
+    ),
     no_args_is_help=True,
 )
+
+
+@app.callback()
+def _root_callback(
+    ctx: typer.Context,
+    am_bot: bool = typer.Option(
+        False,
+        "--am-bot",
+        help=(
+            "Mark this CLI invocation as originating from an automated agent. "
+            "Bots must always set this flag. Humans should omit it."
+        ),
+    ),
+) -> None:
+    """Global options for every `rig` invocation."""
+    from music_rig.actor import ActorKind, set_actor
+
+    set_actor(ActorKind.BOT if am_bot else ActorKind.HUMAN)
+    # Reject bot-driven TUI — answers would be mislabeled as HUMAN otherwise.
+    if am_bot and ctx.invoked_subcommand == "tui":
+        raise typer.BadParameter(
+            "rig --am-bot tui is not supported. "
+            "The TUI is a human interface; bots must use noninteractive CLI commands."
+        )
+
+
 todo_app = typer.Typer(help="Accepted work queue (data/todo.yaml).", no_args_is_help=True)
 wish_app = typer.Typer(
     help="Speculative wishlist (data/wishlist.yaml).", no_args_is_help=True
@@ -5679,6 +5708,8 @@ def question_show_cmd(
     console.print(f"Area: {q.area}")
     console.print(f"Status: {q.status.value}")
     console.print(f"Answer state: {fields['answer_state']}")
+    if fields.get("answer_source"):
+        console.print(f"Answer source: {fields['answer_source']}")
     console.print(f"Lifecycle: {fields['lifecycle_label']}")
     console.print("")
     console.print("Related TODOs:")
