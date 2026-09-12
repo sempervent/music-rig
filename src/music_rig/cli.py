@@ -119,6 +119,14 @@ todo_app = typer.Typer(help="Accepted work queue (data/todo.yaml).", no_args_is_
 wish_app = typer.Typer(help="Speculative wishlist (data/wishlist.yaml).", no_args_is_help=True)
 next_app = typer.Typer(help="Next Session queue (max 3).", no_args_is_help=True)
 inbox_app = typer.Typer(help="Low-friction capture inbox.", no_args_is_help=True)
+human_app = typer.Typer(
+    help=(
+        "Pending HUMAN authority inbox (data/human-actions.yaml). "
+        "BOT prepares proposals; only HUMAN may accept/reject. "
+        "Prefer `rig human review` over copying shell commands."
+    ),
+    no_args_is_help=True,
+)
 session_app = typer.Typer(help="Studio session logging.", no_args_is_help=True)
 changes_app = typer.Typer(help="Structured change records.", no_args_is_help=True)
 question_app = typer.Typer(
@@ -217,6 +225,7 @@ app.add_typer(todo_app, name="todo")
 app.add_typer(wish_app, name="wish")
 todo_app.add_typer(next_app, name="next")
 app.add_typer(inbox_app, name="inbox")
+app.add_typer(human_app, name="human")
 app.add_typer(session_app, name="session")
 app.add_typer(changes_app, name="changes")
 app.add_typer(question_app, name="question")
@@ -837,6 +846,203 @@ def inbox_show(cap_id: str) -> None:
     console.print(item.text)
     if item.notes:
         console.print(f"Notes: {item.notes}")
+
+
+# --- human authority handoff queue -------------------------------------------------
+
+
+@human_app.command("pending")
+@human_app.command("list")
+def human_pending(
+    all_items: bool = typer.Option(False, "--all", help="Include non-pending"),
+) -> None:
+    """List pending HUMAN authority requests."""
+    from music_rig import human_action_service
+
+    try:
+        items = human_action_service.list_actions(pending_only=not all_items)
+    except StoreError as exc:
+        _fail(str(exc))
+    if not items:
+        console.print("(no pending human actions)")
+        return
+    table = Table(title="Human actions")
+    table.add_column("ID", style="cyan", no_wrap=True)
+    table.add_column("Type", no_wrap=True)
+    table.add_column("Artifact", no_wrap=True)
+    table.add_column("Status", no_wrap=True)
+    table.add_column("Proposed")
+    for item in items:
+        proposed = item.proposed_value.replace("\n", " ")
+        if len(proposed) > 48:
+            proposed = proposed[:45] + "…"
+        table.add_row(
+            item.id,
+            item.action_type.value,
+            item.artifact_id,
+            item.status.value,
+            proposed,
+        )
+    console.print(table)
+    pending_n = sum(1 for i in items if i.status.value == "PENDING")
+    console.print(f"[dim]{pending_n} pending — review with: uv run rig human review[/dim]")
+
+
+@human_app.command("show")
+def human_show(action_id: str) -> None:
+    from music_rig import human_action_service
+
+    try:
+        item = human_action_service.get_action(action_id)
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(human_action_service.format_review(item))
+
+
+@human_app.command("review")
+def human_review() -> None:
+    """Interactive one-at-a-time HUMAN review (accept / edit / reject / skip)."""
+    from music_rig import human_action_service
+    from music_rig.models import HumanActionStatus
+
+    try:
+        items = human_action_service.list_actions(pending_only=True)
+    except StoreError as exc:
+        _fail(str(exc))
+    if not items:
+        console.print("No pending human actions.")
+        return
+    console.print(f"[bold]{len(items)} human review(s) waiting[/bold]\n")
+    for item in items:
+        # May have been superseded mid-loop
+        try:
+            fresh = human_action_service.get_action(item.id)
+        except StoreError:
+            continue
+        if fresh.status is not HumanActionStatus.PENDING:
+            continue
+        console.print(human_action_service.format_review(fresh))
+        console.print()
+        choice = (
+            typer.prompt(
+                "Accept / Edit / Reject / Skip / Quit",
+                default="Skip",
+            )
+            .strip()
+            .lower()
+        )
+        if choice in {"q", "quit"}:
+            break
+        if choice in {"s", "skip", ""}:
+            console.print("[dim]Skipped (still pending).[/dim]\n")
+            continue
+        if choice in {"r", "reject"}:
+            try:
+                human_action_service.reject(fresh.id)
+            except StoreError as exc:
+                _fail(str(exc))
+            console.print(f"[yellow]{fresh.id} rejected.[/yellow]\n")
+            continue
+        edited: str | None = None
+        if choice in {"e", "edit"}:
+            edited = typer.prompt("Edited value", default=fresh.proposed_value)
+            choice = "accept"
+        if choice in {"a", "accept", "y", "yes"}:
+            try:
+                result = human_action_service.accept(fresh.id, edited_value=edited, render=True)
+            except StoreError as exc:
+                _fail(str(exc))
+            console.print(f"[green]{result['message']}[/green]")
+            if result.get("reconcile_prompt"):
+                console.print(result["reconcile_prompt"])
+                if typer.confirm("Reconcile now?", default=True):
+                    qid = fresh.artifact_id
+                    console.print(f"Next: uv run rig reconcile plan question {qid}")
+                    try:
+                        from music_rig.reconciliation import service as reconcile_service
+
+                        plan = reconcile_service.plan_question(qid)
+                        console.print(
+                            f"Plan state: {plan.state.value} / capability={plan.capability.value}"
+                        )
+                    except Exception as exc:  # noqa: BLE001 — show plan failure, stay in review
+                        console.print(f"[yellow]Reconcile plan: {exc}[/yellow]")
+            console.print()
+            continue
+        console.print("[dim]Unrecognized choice — skipped.[/dim]\n")
+
+
+@human_app.command("accept")
+def human_accept(
+    action_id: str,
+    value: str | None = typer.Option(
+        None, "--value", help="Optional edited value (HUMAN-authored)"
+    ),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    """Accept a pending request as HUMAN. Forbidden under --am-bot."""
+    from music_rig import human_action_service
+
+    try:
+        result = human_action_service.accept(
+            action_id,
+            edited_value=value,
+            render=not no_render,
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(result["message"])
+    if result.get("reconcile_prompt"):
+        console.print(result["reconcile_prompt"])
+        if result.get("suggested_next"):
+            console.print(f"Suggested: {result['suggested_next']}")
+
+
+@human_app.command("reject")
+def human_reject(action_id: str) -> None:
+    """Reject a pending request without mutating the target artifact."""
+    from music_rig import human_action_service
+
+    try:
+        item = human_action_service.reject(action_id)
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"{item.id} rejected (target unchanged).")
+
+
+@human_app.command("prepare")
+def human_prepare(
+    action_type: str = typer.Argument(
+        help="QUESTION_ANSWER|VERIFICATION_RESULT|TODO_DOD_CONFIRMATION|HUMAN_CLARIFICATION"
+    ),
+    artifact_id: str = typer.Argument(help="Q-xxx / RIG-xxx / clarification target"),
+    proposed_value: str = typer.Option(..., "--value", help="Proposed assertion"),
+    prompt: str = typer.Option(..., "--prompt", help="Human-facing prompt"),
+    explanation: str = typer.Option(..., "--why", help="Why this is pending"),
+    consequences: str = typer.Option("", "--consequences", help="What accept changes"),
+    verification_outcome: str | None = typer.Option(
+        None, "--outcome", help="For VERIFICATION_RESULT"
+    ),
+    verification_note: str | None = typer.Option(None, "--note"),
+) -> None:
+    """Prepare a pending HUMAN action (BOT-safe). Does not grant HUMAN authority."""
+    from music_rig import human_action_service
+
+    try:
+        req = human_action_service.create_request(
+            action_type=action_type.strip().upper(),
+            artifact_id=artifact_id,
+            prompt=prompt,
+            proposed_value=proposed_value,
+            explanation=explanation,
+            consequences=consequences,
+            verification_outcome=verification_outcome,
+            verification_note=verification_note,
+        )
+    except (StoreError, ValueError) as exc:
+        _fail(str(exc))
+    console.print(f"Prepared [bold]{req.id}[/bold] ({req.action_type.value})")
+    console.print("1 human review is waiting — uv run rig human review")
 
 
 @inbox_app.command("dismiss")

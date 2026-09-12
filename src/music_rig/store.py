@@ -12,6 +12,7 @@ from music_rig.models import (
     ChangesDocument,
     ControllersDocument,
     ControlSurfacesDocument,
+    HumanActionsDocument,
     InboxDocument,
     InventoryDocument,
     MidiDocument,
@@ -30,6 +31,7 @@ WISHLIST_PATH = DATA_DIR / "wishlist.yaml"
 INBOX_PATH = DATA_DIR / "inbox.yaml"
 CHANGES_PATH = DATA_DIR / "changes.yaml"
 QUESTIONS_PATH = DATA_DIR / "open-questions.yaml"
+HUMAN_ACTIONS_PATH = DATA_DIR / "human-actions.yaml"
 SESSIONS_DIR = DATA_DIR / "sessions"
 CHANNEL_MAP_PATH = DATA_DIR / "channel-map.yaml"
 PATCHBAYS_PATH = DATA_DIR / "patchbays.yaml"
@@ -157,6 +159,17 @@ def load_inbox(path: Path | None = None) -> InboxDocument:
         raise StoreError(f"Inbox schema validation failed: {exc}") from exc
 
 
+def load_human_actions(path: Path | None = None) -> HumanActionsDocument:
+    target = path or HUMAN_ACTIONS_PATH
+    if not target.exists():
+        return HumanActionsDocument(items=[])
+    raw = _load_mapping(target, "human-actions")
+    try:
+        return HumanActionsDocument.model_validate(raw)
+    except Exception as exc:
+        raise StoreError(f"Human actions schema validation failed: {exc}") from exc
+
+
 def save_todo(doc: TodoDocument, path: Path | None = None) -> None:
     target = path or TODO_PATH
     TodoDocument.model_validate(doc.model_dump())
@@ -172,6 +185,12 @@ def save_wishlist(doc: WishlistDocument, path: Path | None = None) -> None:
 def save_inbox(doc: InboxDocument, path: Path | None = None) -> None:
     target = path or INBOX_PATH
     InboxDocument.model_validate(doc.model_dump())
+    _atomic_write(target, _dump_yaml(doc.model_dump(mode="json")))
+
+
+def save_human_actions(doc: HumanActionsDocument, path: Path | None = None) -> None:
+    target = path or HUMAN_ACTIONS_PATH
+    HumanActionsDocument.model_validate(doc.model_dump())
     _atomic_write(target, _dump_yaml(doc.model_dump(mode="json")))
 
 
@@ -359,11 +378,13 @@ def write_documents(
     inbox: InboxDocument | None = None,
     changes: ChangesDocument | None = None,
     questions: OpenQuestionsDocument | None = None,
+    human_actions: HumanActionsDocument | None = None,
     todo_path: Path | None = None,
     wishlist_path: Path | None = None,
     inbox_path: Path | None = None,
     changes_path: Path | None = None,
     questions_path: Path | None = None,
+    human_actions_path: Path | None = None,
 ) -> None:
     """Validate all provided docs, then write them. Fail before any write on error."""
     payloads: list[tuple[Path, str]] = []
@@ -395,6 +416,14 @@ def write_documents(
             (
                 questions_path or QUESTIONS_PATH,
                 _dump_yaml(questions.model_dump(mode="json", exclude_none=True)),
+            )
+        )
+    if human_actions is not None:
+        HumanActionsDocument.model_validate(human_actions.model_dump())
+        payloads.append(
+            (
+                human_actions_path or HUMAN_ACTIONS_PATH,
+                _dump_yaml(human_actions.model_dump(mode="json")),
             )
         )
     write_text_files(payloads)
