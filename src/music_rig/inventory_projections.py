@@ -44,17 +44,8 @@ def render_inventory_section(doc: InventoryDocument | dict | None = None) -> str
         )
         for item in items:
             lines.append(
-                "| {id} | {name} | {manufacturer} | {model} | {qty} | "
-                "{status} | {condition} | {notes} |".format(
-                    id=_cell(item.id),
-                    name=_cell(item.name),
-                    manufacturer=_cell(item.manufacturer),
-                    model=_cell(item.model),
-                    qty=item.quantity,
-                    status=item.ownership_status.value,
-                    condition=item.condition.value,
-                    notes=_cell(item.notes),
-                )
+                f"| {_cell(item.id)} | {_cell(item.name)} | {_cell(item.manufacturer)} | {_cell(item.model)} | {item.quantity} | "
+                f"{item.ownership_status.value} | {item.condition.value} | {_cell(item.notes)} |"
             )
         lines.append("")
     if not categories:

@@ -19,9 +19,6 @@ from music_rig.models import (
     ReadinessResult,
 )
 from music_rig.store import (
-    ABLETON_PATH,
-    CONTROLLERS_PATH,
-    CONTROL_SURFACES_PATH,
     PERFORMANCE_PATH,
     StoreError,
     _dump_yaml,
@@ -102,9 +99,7 @@ def validate_performance_doc(
             midi_path=midi_path,
             ableton_path=ableton_path,
         )
-        surfaces = control_surface_state.load_document(
-            surfaces_path, inventory_path=inventory_path
-        )
+        surfaces = control_surface_state.load_document(surfaces_path, inventory_path=inventory_path)
         ableton = ableton_state.load_document(ableton_path)
     except Exception as exc:
         return [str(exc)]
@@ -115,9 +110,7 @@ def validate_performance_doc(
     for action in doc.actions:
         for effect in action.effects:
             if effect.action_ref and effect.action_ref not in ableton_actions:
-                errors.append(
-                    f"{action.id}: unknown Ableton action {effect.action_ref!r}"
-                )
+                errors.append(f"{action.id}: unknown Ableton action {effect.action_ref!r}")
     for binding in doc.bindings:
         key = (
             binding.controller_ref or binding.surface_ref or "",
@@ -127,9 +120,7 @@ def validate_performance_doc(
         controls = controller_map if binding.controller_ref else surface_map
         if key not in controls:
             source = "controller" if binding.controller_ref else "surface"
-            errors.append(
-                f"{binding.id}: unknown {source} control {'/'.join(key)}"
-            )
+            errors.append(f"{binding.id}: unknown {source} control {'/'.join(key)}")
     for template in ableton.templates:
         for requirement in template.requirements:
             if requirement not in requirements:
@@ -193,9 +184,7 @@ def evaluate_readiness(
         midi_path=midi_path,
         ableton_path=ableton_path,
     )
-    surfaces = control_surface_state.load_document(
-        surfaces_path, inventory_path=inventory_path
-    )
+    surfaces = control_surface_state.load_document(surfaces_path, inventory_path=inventory_path)
     controller_map, surface_map = _control_maps(controllers, surfaces)
     actions = {item.id: item for item in doc.actions}
     bindings_by_action: dict[str, list[PerformanceBinding]] = {}
@@ -219,61 +208,45 @@ def evaluate_readiness(
                 }
                 for effect in action.effects
             )
-            effect_ids = {
-                effect.effect_id for effect in action.effects if effect.effect_id
-            }
+            effect_ids = {effect.effect_id for effect in action.effects if effect.effect_id}
             indirect = any(
                 other.id != action_id
                 and bindings_by_action.get(other.id)
                 and any(
-                    effect.effect_id in effect_ids
-                    for effect in other.effects
-                    if effect.effect_id
+                    effect.effect_id in effect_ids for effect in other.effects if effect.effect_id
                 )
                 for other in doc.actions
             )
             if procedural:
-                partial.append(
-                    f"{action_id}: procedure exists but has zero control bindings"
-                )
+                partial.append(f"{action_id}: procedure exists but has zero control bindings")
                 if action.evidence != MidiEvidenceStatus.VERIFIED:
-                    partial.append(
-                        f"{action_id}: action evidence is {action.evidence.value}"
-                    )
+                    partial.append(f"{action_id}: action evidence is {action.evidence.value}")
                 continue
             if indirect:
-                partial.append(
-                    f"{action_id}: reachable only through another bound action"
-                )
+                partial.append(f"{action_id}: reachable only through another bound action")
                 if action.evidence != MidiEvidenceStatus.VERIFIED:
-                    partial.append(
-                        f"{action_id}: action evidence is {action.evidence.value}"
-                    )
+                    partial.append(f"{action_id}: action evidence is {action.evidence.value}")
                 continue
             fatal.append(f"{action_id}: required action has zero bindings")
             continue
-        controls = [
-            _binding_control(binding, controller_map, surface_map)
-            for binding in bindings
-        ]
-        if len(bindings) == 1 and controls[0] is not None and (
-            controls[0].availability == ControlAvailability.BROKEN
+        controls = [_binding_control(binding, controller_map, surface_map) for binding in bindings]
+        if (
+            len(bindings) == 1
+            and controls[0] is not None
+            and (controls[0].availability == ControlAvailability.BROKEN)
         ):
             fatal.append(f"{action_id}: sole binding uses a BROKEN control")
             continue
         available = [
             binding
             for binding, control in zip(bindings, controls)
-            if control is not None
-            and control.availability == ControlAvailability.AVAILABLE
+            if control is not None and control.availability == ControlAvailability.AVAILABLE
         ]
         if not available:
             partial.append(f"{action_id}: no AVAILABLE binding")
         if action.evidence != MidiEvidenceStatus.VERIFIED:
             partial.append(f"{action_id}: action evidence is {action.evidence.value}")
-        if not any(
-            binding.evidence == MidiEvidenceStatus.VERIFIED for binding in available
-        ):
+        if not any(binding.evidence == MidiEvidenceStatus.VERIFIED for binding in available):
             partial.append(f"{action_id}: missing VERIFIED AVAILABLE binding")
         if any("imperfect" in binding.notes.casefold() for binding in bindings):
             partial.append(f"{action_id}: binding has known imperfect behavior")
@@ -288,10 +261,7 @@ def evaluate_readiness(
         reason = f"{action.id}: critical action is not VERIFIED"
         if action.evidence != MidiEvidenceStatus.VERIFIED and reason not in partial:
             partial.append(reason)
-        if any(
-            effect.evidence != MidiEvidenceStatus.VERIFIED
-            for effect in action.effects
-        ):
+        if any(effect.evidence != MidiEvidenceStatus.VERIFIED for effect in action.effects):
             reason = f"{action.id}: critical effects are not fully VERIFIED"
             if reason not in partial:
                 partial.append(reason)
@@ -306,9 +276,7 @@ def evaluate_readiness(
         if scenario.keyboard_mouse_required is True:
             partial.append(f"{scenario.id}: emergency recovery requires keyboard/mouse")
         elif scenario.keyboard_mouse_required == "unknown":
-            partial.append(
-                f"{scenario.id}: emergency keyboard/mouse requirement is unknown"
-            )
+            partial.append(f"{scenario.id}: emergency keyboard/mouse requirement is unknown")
 
     if fatal:
         return PerformanceReadiness(ReadinessResult.NOT_READY, fatal + partial)
@@ -352,17 +320,13 @@ def find_conflicts(
         midi_path=midi_path,
         ableton_path=ableton_path,
     )
-    surfaces = control_surface_state.load_document(
-        surfaces_path, inventory_path=inventory_path
-    )
+    surfaces = control_surface_state.load_document(surfaces_path, inventory_path=inventory_path)
     controller_map, surface_map = _control_maps(controllers, surfaces)
     conflicts = []
     for binding in doc.bindings:
         control = _binding_control(binding, controller_map, surface_map)
         if control and control.availability == ControlAvailability.BROKEN:
-            conflicts.append(
-                {"binding": binding.id, "conflict": "binding uses BROKEN control"}
-            )
+            conflicts.append({"binding": binding.id, "conflict": "binding uses BROKEN control"})
     return conflicts
 
 

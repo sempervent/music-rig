@@ -27,9 +27,9 @@ from music_rig.models import (
     TodoPriority,
     TodoStatus,
     TodoTask,
+    WishlistItem,
     WishPriority,
     WishStatus,
-    WishlistItem,
 )
 from music_rig.store import StoreError, load_questions, load_todo
 from music_rig.tui.debug import format_error
@@ -131,9 +131,7 @@ class AddQuestionModal(AddRecordModal):
         )
 
     def create(self, values: dict[str, str]) -> str:
-        item = question_service.add_question(
-            values["question"], area=values["area"], render=True
-        )
+        item = question_service.add_question(values["question"], area=values["area"], render=True)
         return item.id
 
 

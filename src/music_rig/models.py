@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -23,14 +23,14 @@ QuestionId = Annotated[str, Field(pattern=r"^Q-\d{3}$")]
 TERMINAL_FOR_NEXT = frozenset({"DONE", "CANCELLED", "DEFERRED"})
 
 
-class TodoPriority(str, Enum):
+class TodoPriority(StrEnum):
     P0 = "P0"
     P1 = "P1"
     P2 = "P2"
     P3 = "P3"
 
 
-class TodoStatus(str, Enum):
+class TodoStatus(StrEnum):
     READY = "READY"
     BLOCKED = "BLOCKED"
     IN_PROGRESS = "IN PROGRESS"
@@ -40,14 +40,14 @@ class TodoStatus(str, Enum):
     CANCELLED = "CANCELLED"
 
 
-class WishPriority(str, Enum):
+class WishPriority(StrEnum):
     P0 = "P0"
     P1 = "P1"
     P2 = "P2"
     P3 = "P3"
 
 
-class WishStatus(str, Enum):
+class WishStatus(StrEnum):
     IDEA = "IDEA"
     RESEARCH = "RESEARCH"
     BORROW_FIRST = "BORROW FIRST"
@@ -60,7 +60,7 @@ class WishStatus(str, Enum):
     DEFERRED = "DEFERRED"
 
 
-class InboxStatus(str, Enum):
+class InboxStatus(StrEnum):
     OPEN = "OPEN"
     TRIAGED = "TRIAGED"
     DISMISSED = "DISMISSED"
@@ -169,9 +169,7 @@ class WishlistItem(BaseModel):
         if self.status == WishStatus.ACQUIRED and not (
             self.inventory_ref and self.inventory_ref.strip()
         ):
-            raise ValueError(
-                f"Wishlist item {self.item!r} ACQUIRED requires inventory_ref"
-            )
+            raise ValueError(f"Wishlist item {self.item!r} ACQUIRED requires inventory_ref")
         return self
 
 
@@ -235,13 +233,13 @@ class InboxDocument(BaseModel):
         return f"CAP-{nxt:03d}"
 
 
-class SessionStatus(str, Enum):
+class SessionStatus(StrEnum):
     ACTIVE = "ACTIVE"
     COMPLETED = "COMPLETED"
     ABORTED = "ABORTED"
 
 
-class SessionEventType(str, Enum):
+class SessionEventType(StrEnum):
     NOTE = "NOTE"
     DISCOVERY = "DISCOVERY"
     TODO_STARTED = "TODO_STARTED"
@@ -280,13 +278,13 @@ class SessionLog(BaseModel):
         return self
 
 
-class ChangeStatus(str, Enum):
+class ChangeStatus(StrEnum):
     OPEN = "OPEN"
     APPLIED = "APPLIED"
     DISMISSED = "DISMISSED"
 
 
-class ChangeCategory(str, Enum):
+class ChangeCategory(StrEnum):
     AUDIO_ROUTING = "AUDIO_ROUTING"
     PEDAL_CHAIN = "PEDAL_CHAIN"
     PATCHBAY = "PATCHBAY"
@@ -340,13 +338,13 @@ class ChangesDocument(BaseModel):
         return f"CHG-{nxt:03d}"
 
 
-class QuestionStatus(str, Enum):
+class QuestionStatus(StrEnum):
     OPEN = "OPEN"
     RESOLVED = "RESOLVED"
     DEFERRED = "DEFERRED"
 
 
-class ReconciliationState(str, Enum):
+class ReconciliationState(StrEnum):
     NEEDS_ANSWER = "NEEDS_ANSWER"
     DRAFT_ANSWER = "DRAFT_ANSWER"
     READY_TO_APPLY = "READY_TO_APPLY"
@@ -357,7 +355,7 @@ class ReconciliationState(str, Enum):
     BLOCKED = "BLOCKED"
 
 
-class AnswerState(str, Enum):
+class AnswerState(StrEnum):
     """Derived (not persisted) answer lifecycle for OPEN/RESOLVED questions."""
 
     UNANSWERED = "UNANSWERED"
@@ -399,9 +397,7 @@ class QuestionVerification(BaseModel):
     def _answer_type_rules(self) -> QuestionVerification:
         at = self.answer_type.strip().upper()
         if at not in {"ENUM", "BOOL", "REF", "TEXT"}:
-            raise ValueError(
-                f"answer_type must be ENUM|BOOL|REF|TEXT, got {self.answer_type!r}"
-            )
+            raise ValueError(f"answer_type must be ENUM|BOOL|REF|TEXT, got {self.answer_type!r}")
         object.__setattr__(self, "answer_type", at)
         if at in {"ENUM", "BOOL"} and not self.choices:
             raise ValueError(f"{at} verification requires non-empty choices")
@@ -410,7 +406,7 @@ class QuestionVerification(BaseModel):
         return self
 
 
-class VerificationOutcome(str, Enum):
+class VerificationOutcome(StrEnum):
     """Explicit human observation outcome (distinct from Question answer)."""
 
     CONFIRMED = "CONFIRMED"
@@ -435,7 +431,7 @@ class VerificationResult(BaseModel):
     source: str = "HUMAN"
 
 
-class OwnershipStatus(str, Enum):
+class OwnershipStatus(StrEnum):
     OWNED = "OWNED"
     RETIRED = "RETIRED"
     SOLD = "SOLD"
@@ -443,7 +439,7 @@ class OwnershipStatus(str, Enum):
     UNKNOWN = "UNKNOWN"
 
 
-class GearCondition(str, Enum):
+class GearCondition(StrEnum):
     WORKING = "WORKING"
     ISSUE = "ISSUE"
     BROKEN = "BROKEN"
@@ -485,8 +481,7 @@ class InventoryItem(BaseModel):
     def _units_match_quantity(self) -> InventoryItem:
         if self.units and len(self.units) != self.quantity:
             raise ValueError(
-                f"{self.id}: units length ({len(self.units)}) must equal quantity "
-                f"({self.quantity})"
+                f"{self.id}: units length ({len(self.units)}) must equal quantity ({self.quantity})"
             )
         return self
 
@@ -506,9 +501,7 @@ class InventoryDocument(BaseModel):
             for unit in item.units:
                 unit_ids.append(unit.id)
                 if unit.id in ids:
-                    raise ValueError(
-                        f"unit id {unit.id!r} collides with inventory item id"
-                    )
+                    raise ValueError(f"unit id {unit.id!r} collides with inventory item id")
         if len(unit_ids) != len(set(unit_ids)):
             raise ValueError("inventory unit IDs must be unique")
         return self
@@ -528,7 +521,7 @@ class InventoryDocument(BaseModel):
         return None
 
 
-class AnswerActor(str, Enum):
+class AnswerActor(StrEnum):
     """Provenance of a Question's answer text."""
 
     HUMAN = "HUMAN"
@@ -579,13 +572,9 @@ class OpenQuestion(BaseModel):
             raise ValueError(f"{self.id} OPEN must not have reconciled_at")
         if self.reconciled_at is not None:
             if self.status != QuestionStatus.RESOLVED:
-                raise ValueError(
-                    f"{self.id} reconciled_at requires status RESOLVED"
-                )
+                raise ValueError(f"{self.id} reconciled_at requires status RESOLVED")
             if not self.answer.strip():
-                raise ValueError(
-                    f"{self.id} reconciled_at requires a non-empty answer"
-                )
+                raise ValueError(f"{self.id} reconciled_at requires a non-empty answer")
         if not self.answer.strip() and self.answer_actor is not None:
             raise ValueError(f"{self.id} answer_actor requires non-empty answer")
         if self.clarifies_question is not None:
@@ -596,33 +585,33 @@ class OpenQuestion(BaseModel):
         return self
 
 
-class PatchbayMode(str, Enum):
+class PatchbayMode(StrEnum):
     NORMAL = "normal"
     HALF_NORMAL = "half-normal"
     THRU = "thru"
     UNKNOWN = "unknown"
 
 
-class MidiEvidenceStatus(str, Enum):
+class MidiEvidenceStatus(StrEnum):
     VERIFIED = "VERIFIED"
     INTENDED = "INTENDED"
     UNKNOWN = "UNKNOWN"
 
 
-class ControlCoverage(str, Enum):
+class ControlCoverage(StrEnum):
     PARTIAL = "PARTIAL"
     COMPLETE = "COMPLETE"
     UNKNOWN = "UNKNOWN"
 
 
-class ContextKind(str, Enum):
+class ContextKind(StrEnum):
     BANK = "BANK"
     TEMPLATE = "TEMPLATE"
     MODE = "MODE"
     GLOBAL = "GLOBAL"
 
 
-class PhysicalControlType(str, Enum):
+class PhysicalControlType(StrEnum):
     BUTTON = "BUTTON"
     SWITCH = "SWITCH"
     FOOTSWITCH = "FOOTSWITCH"
@@ -634,32 +623,32 @@ class PhysicalControlType(str, Enum):
     OTHER = "OTHER"
 
 
-class ControlAvailability(str, Enum):
+class ControlAvailability(StrEnum):
     AVAILABLE = "AVAILABLE"
     BROKEN = "BROKEN"
     UNKNOWN = "UNKNOWN"
 
 
-class MidiMessageType(str, Enum):
+class MidiMessageType(StrEnum):
     CC = "CC"
     NOTE = "NOTE"
     PROGRAM_CHANGE = "PROGRAM_CHANGE"
 
 
-class ValueBehavior(str, Enum):
+class ValueBehavior(StrEnum):
     FIXED = "fixed"
     TOGGLE = "toggle"
     RANGE = "range"
     MOMENTARY = "momentary"
 
 
-class TargetState(str, Enum):
+class TargetState(StrEnum):
     MAPPED = "MAPPED"
     UNASSIGNED = "UNASSIGNED"
     UNKNOWN = "UNKNOWN"
 
 
-class TargetKind(str, Enum):
+class TargetKind(StrEnum):
     ABLETON_TRACK = "ABLETON_TRACK"
     ABLETON_SEND = "ABLETON_SEND"
     ABLETON_ACTION = "ABLETON_ACTION"
@@ -891,13 +880,13 @@ class AbletonDocument(BaseModel):
         return self
 
 
-class PerformanceCriticality(str, Enum):
+class PerformanceCriticality(StrEnum):
     NORMAL = "NORMAL"
     IMPORTANT = "IMPORTANT"
     EMERGENCY = "EMERGENCY"
 
 
-class PerformanceActionCategory(str, Enum):
+class PerformanceActionCategory(StrEnum):
     RECOVERY = "RECOVERY"
     RECORDING = "RECORDING"
     LOOPING = "LOOPING"
@@ -906,7 +895,7 @@ class PerformanceActionCategory(str, Enum):
     AUDIO = "AUDIO"
 
 
-class PerformanceEffectKind(str, Enum):
+class PerformanceEffectKind(StrEnum):
     ABLETON_ACTION = "ABLETON_ACTION"
     OBS_ACTION = "OBS_ACTION"
     MIDI_ACTION = "MIDI_ACTION"
@@ -1107,13 +1096,13 @@ class ControlSurfacesDocument(BaseModel):
         return self
 
 
-class ReadinessResult(str, Enum):
+class ReadinessResult(StrEnum):
     READY = "READY"
     PARTIAL = "PARTIAL"
     NOT_READY = "NOT_READY"
 
 
-class BackupCategory(str, Enum):
+class BackupCategory(StrEnum):
     ABLETON = "Ableton"
     CONTROLLERS = "Controllers"
     OBS = "OBS"
@@ -1124,7 +1113,7 @@ class BackupCategory(str, Enum):
     PROJECTS = "Projects"
 
 
-class BackupKind(str, Enum):
+class BackupKind(StrEnum):
     REPOSITORY_STATE = "REPOSITORY_STATE"
     FILE_COPY = "FILE_COPY"
     DIRECTORY_COPY = "DIRECTORY_COPY"
@@ -1132,7 +1121,7 @@ class BackupKind(str, Enum):
     UNKNOWN = "UNKNOWN"
 
 
-class BackupImportance(str, Enum):
+class BackupImportance(StrEnum):
     CRITICAL = "CRITICAL"
     IMPORTANT = "IMPORTANT"
     OPTIONAL = "OPTIONAL"
@@ -1252,13 +1241,13 @@ class LocalConfig(BaseModel):
     agent: AgentLocalConfig = Field(default_factory=AgentLocalConfig)
 
 
-class MidiTransport(str, Enum):
+class MidiTransport(StrEnum):
     DIN = "DIN"
     USB = "USB"
     VIRTUAL = "VIRTUAL"
 
 
-class MidiTriState(str, Enum):
+class MidiTriState(StrEnum):
     ON = "on"
     OFF = "off"
     UNKNOWN = "unknown"
@@ -1341,9 +1330,7 @@ class MidiClockDestination(BaseModel):
     @model_validator(mode="after")
     def _one_reference(self) -> MidiClockDestination:
         if bool(self.endpoint_ref) == bool(self.gear_ref):
-            raise ValueError(
-                "clock destination requires exactly one endpoint_ref or gear_ref"
-            )
+            raise ValueError("clock destination requires exactly one endpoint_ref or gear_ref")
         return self
 
 
@@ -1527,7 +1514,7 @@ class RoutingDocument(BaseModel):
     named_paths: dict[str, NamedPath] = Field(default_factory=dict)
 
 
-class NowKind(str, Enum):
+class NowKind(StrEnum):
     ACTIVE_SESSION = "ACTIVE_SESSION"
     IN_PROGRESS = "IN_PROGRESS"
     NEXT_SESSION = "NEXT_SESSION"

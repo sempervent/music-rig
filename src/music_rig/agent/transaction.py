@@ -8,7 +8,7 @@ commits. Projection/postcondition failure rolls canonical files back.
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -17,7 +17,6 @@ from music_rig.agent.errors import (
     ConcurrentModificationError,
     PlanConflictError,
 )
-from music_rig.reconciliation.preparers import PreparedOperation, materialize_working_docs
 from music_rig.models import QuestionStatus
 from music_rig.reconciliation.context import ReconciliationContext
 from music_rig.reconciliation.operation_registry import (
@@ -26,6 +25,7 @@ from music_rig.reconciliation.operation_registry import (
     validate_operation_shape,
 )
 from music_rig.reconciliation.operations import OperationMutability, RigOperation
+from music_rig.reconciliation.preparers import PreparedOperation, materialize_working_docs
 from music_rig.store import StoreError, write_text_files
 
 
@@ -100,8 +100,7 @@ def prepare_transaction(
             if key in claimed and claimed[key][1] != value:
                 other_id = claimed[key][0]
                 raise PlanConflictError(
-                    f"conflicting operations on {key}: "
-                    f"{other_id} vs {op.operation_id}",
+                    f"conflicting operations on {key}: {other_id} vs {op.operation_id}",
                     operation_ids=(other_id, op.operation_id),
                     conflict_key=key,
                 )
@@ -162,8 +161,7 @@ def check_concurrency(prepared: PreparedTransaction) -> None:
 
 def rollback_canonical(prepared: PreparedTransaction) -> None:
     restore = [
-        (Path(p), data.decode("utf-8") if data else "")
-        for p, data in prepared.originals.items()
+        (Path(p), data.decode("utf-8") if data else "") for p, data in prepared.originals.items()
     ]
     # Only restore paths that exist in originals (may include empty new files)
     write_text_files([(path, text) for path, text in restore if path.parent.exists() or True])
@@ -243,8 +241,7 @@ def commit_transaction(
             "rolled_back": True,
             "postconditions": post,
             "message": (
-                "Postconditions failed; canonical state rolled back. "
-                "Question was NOT finalized."
+                "Postconditions failed; canonical state rolled back. Question was NOT finalized."
             ),
             "code": "POSTCONDITION_FAILURE",
         }

@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import shutil
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Callable
 from zoneinfo import ZoneInfo
 
 import yaml
@@ -24,7 +24,7 @@ def default_clock() -> datetime:
     try:
         return datetime.now(ZoneInfo("America/New_York"))
     except Exception:
-        return datetime.now(timezone.utc)
+        return datetime.now(UTC)
 
 
 @dataclass(frozen=True)
@@ -52,8 +52,7 @@ class SnapshotManifest:
             "git_branch": self.git_branch,
             "working_tree_clean": self.working_tree_clean,
             "canonical_files": [
-                {"path": item.path, "sha256": item.sha256}
-                for item in self.canonical_files
+                {"path": item.path, "sha256": item.sha256} for item in self.canonical_files
             ],
             "generated_docs_synchronized": self.generated_docs_synchronized,
             "tool_version": self.tool_version,
@@ -276,10 +275,7 @@ def verify_snapshot(
 
 
 def _current_file_hashes(data_dir: Path | None = None) -> dict[str, str]:
-    return {
-        f"data/{path.name}": sha256_file(path)
-        for path in discover_canonical_yaml(data_dir)
-    }
+    return {f"data/{path.name}": sha256_file(path) for path in discover_canonical_yaml(data_dir)}
 
 
 def _manifest_hashes(manifest: SnapshotManifest) -> dict[str, str]:
@@ -307,9 +303,7 @@ def diff_snapshots(
     only_left = sorted(set(left_map) - set(right_map))
     only_right = sorted(set(right_map) - set(left_map))
     changed = sorted(
-        path
-        for path in set(left_map) & set(right_map)
-        if left_map[path] != right_map[path]
+        path for path in set(left_map) & set(right_map) if left_map[path] != right_map[path]
     )
     return {
         "left": left.snapshot_id,

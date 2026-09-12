@@ -54,11 +54,7 @@ class MidiVerifyAdapter(ReconciliationAdapter):
         }
         if link_id and isinstance(links, list):
             match = next(
-                (
-                    L
-                    for L in links
-                    if isinstance(L, dict) and L.get("id") == link_id
-                ),
+                (L for L in links if isinstance(L, dict) and L.get("id") == link_id),
                 None,
             )
             snapshot["link_id"] = link_id
@@ -86,9 +82,7 @@ class MidiVerifyAdapter(ReconciliationAdapter):
 
         operations: list[dict[str, Any]] = []
         if vr and vr.outcome == VerificationOutcome.FAILED_TEST:
-            operations.append(
-                op(PlanOperationKind.RECORD_FAILED_VERIFICATION, note=vr.note or "")
-            )
+            operations.append(op(PlanOperationKind.RECORD_FAILED_VERIFICATION, note=vr.note or ""))
         elif has_positive_observation(question) and not link_id:
             operations.append(
                 op(

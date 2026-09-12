@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 from music_rig.local_config import load_local_config
 from music_rig.models import (
@@ -16,7 +16,7 @@ from music_rig.performance_state import evaluate_readiness
 from music_rig.store import StoreError, load_performance
 
 
-class AdapterFamily(str, Enum):
+class AdapterFamily(StrEnum):
     MANUAL = "MANUAL"
     REPOSITORY_SNAPSHOT = "REPOSITORY_SNAPSHOT"
     FILE_BACKUP = "FILE_BACKUP"
@@ -26,25 +26,25 @@ class AdapterFamily(str, Enum):
     MACOS = "MACOS"
 
 
-class CapabilityStatus(str, Enum):
+class CapabilityStatus(StrEnum):
     AVAILABLE = "AVAILABLE"
     NOT_IMPLEMENTED = "NOT_IMPLEMENTED"
 
 
-class PlanExecutionState(str, Enum):
+class PlanExecutionState(StrEnum):
     AUTOMATABLE = "AUTOMATABLE"
     MANUAL = "MANUAL"
     UNIMPLEMENTED = "UNIMPLEMENTED"
     UNKNOWN = "UNKNOWN"
 
 
-class SimulateResult(str, Enum):
+class SimulateResult(StrEnum):
     SIMULATABLE = "SIMULATABLE"
     PARTIAL = "PARTIAL"
     BLOCKED = "BLOCKED"
 
 
-class PreflightSeverity(str, Enum):
+class PreflightSeverity(StrEnum):
     PASS = "PASS"
     ADVISORY = "ADVISORY"
     BLOCKER = "BLOCKER"
@@ -189,10 +189,7 @@ def compile_effect(effect: PerformanceEffect, index: int) -> PlannedStep:
 
 
 def compile_action_plan(action: PerformanceAction) -> ActionPlan:
-    steps = [
-        compile_effect(effect, index)
-        for index, effect in enumerate(action.effects, start=1)
-    ]
+    steps = [compile_effect(effect, index) for index, effect in enumerate(action.effects, start=1)]
     return ActionPlan(action_id=action.id, label=action.label, steps=steps)
 
 
@@ -206,21 +203,15 @@ def get_action(doc: PerformanceDocument, action_id: str) -> PerformanceAction:
 def simulate_action(action: PerformanceAction) -> SimulationReport:
     plan = compile_action_plan(action)
     notes: list[str] = []
-    unimplemented = [
-        step for step in plan.steps if step.state == PlanExecutionState.UNIMPLEMENTED
-    ]
+    unimplemented = [step for step in plan.steps if step.state == PlanExecutionState.UNIMPLEMENTED]
     manual = [step for step in plan.steps if step.state == PlanExecutionState.MANUAL]
     if unimplemented and not manual and len(unimplemented) == len(plan.steps):
         result = SimulateResult.BLOCKED
         notes.append("All effects require unimplemented adapters; nothing can run.")
     elif unimplemented:
         result = SimulateResult.PARTIAL
-        notes.append(
-            f"{len(unimplemented)} effect(s) blocked by unimplemented adapters."
-        )
-    elif manual and not any(
-        step.state == PlanExecutionState.AUTOMATABLE for step in plan.steps
-    ):
+        notes.append(f"{len(unimplemented)} effect(s) blocked by unimplemented adapters.")
+    elif manual and not any(step.state == PlanExecutionState.AUTOMATABLE for step in plan.steps):
         result = SimulateResult.SIMULATABLE
         notes.append("Plan is manual-only; simulation lists steps without executing.")
     else:
@@ -284,9 +275,7 @@ def preflight(
             )
         )
         for reason in readiness.reasons[:5]:
-            findings.append(
-                PreflightFinding(PreflightSeverity.ADVISORY, "Readiness", reason)
-            )
+            findings.append(PreflightFinding(PreflightSeverity.ADVISORY, "Readiness", reason))
     else:
         findings.append(
             PreflightFinding(
@@ -296,9 +285,7 @@ def preflight(
             )
         )
         for reason in readiness.reasons[:5]:
-            findings.append(
-                PreflightFinding(PreflightSeverity.ADVISORY, "Readiness", reason)
-            )
+            findings.append(PreflightFinding(PreflightSeverity.ADVISORY, "Readiness", reason))
 
     config = load_local_config(root=root)
     if config is None:

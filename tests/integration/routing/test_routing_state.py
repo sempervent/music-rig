@@ -103,9 +103,7 @@ def test_production_routing_loads_and_validates():
     ],
 )
 def test_dirty_linear_move_placements(routing_file, kwargs, expected):
-    preview, data = routing_state.propose_move(
-        "dirty", "d", routing_path=routing_file, **kwargs
-    )
+    preview, data = routing_state.propose_move("dirty", "d", routing_path=routing_file, **kwargs)
     assert preview.changed == (expected != ["a", "b", "c", "d"])
     assert _ids(data, "dirty") == expected
 
@@ -128,9 +126,7 @@ def test_insert_remove_duplicate_invalid_and_dry_run(routing_file):
     )
     assert routing_file.read_text(encoding="utf-8") == before
 
-    current_service.commit_routing(
-        inserted, preview, render=False, routing_path=routing_file
-    )
+    current_service.commit_routing(inserted, preview, render=False, routing_path=routing_file)
     assert _ids(routing_state.load_raw(routing_file), "dirty") == [
         "a",
         "b",
@@ -141,19 +137,13 @@ def test_insert_remove_duplicate_invalid_and_dry_run(routing_file):
     remove_preview, removed = routing_state.propose_remove(
         "dirty", "new-node", routing_path=routing_file
     )
-    current_service.commit_routing(
-        removed, remove_preview, render=False, routing_path=routing_file
-    )
+    current_service.commit_routing(removed, remove_preview, render=False, routing_path=routing_file)
     assert _ids(routing_state.load_raw(routing_file), "dirty") == ["a", "b", "c", "d"]
 
     with pytest.raises(StoreError, match="already exists"):
-        routing_state.propose_insert(
-            "dirty", "a", last=True, routing_path=routing_file
-        )
+        routing_state.propose_insert("dirty", "a", last=True, routing_path=routing_file)
     with pytest.raises(StoreError, match="Invalid node id"):
-        routing_state.propose_insert(
-            "dirty", "bad id", last=True, routing_path=routing_file
-        )
+        routing_state.propose_insert("dirty", "bad id", last=True, routing_path=routing_file)
     with pytest.raises(StoreError, match="exactly one"):
         routing_state.propose_move("dirty", "a", routing_path=routing_file)
 
@@ -271,15 +261,11 @@ def test_verify_batch_does_not_write_until_commit(routing_file):
     )
     assert preview.changed
     assert routing_file.read_text(encoding="utf-8") == before
-    current_service.commit_routing(
-        data, preview, render=False, routing_path=routing_file
-    )
+    current_service.commit_routing(data, preview, render=False, routing_path=routing_file)
     assert _ids(routing_state.load_raw(routing_file), "dirty") == ["d", "a", "x", "c"]
 
 
-def test_evidence_resolution_apply_and_failed_validation_are_atomic(
-    tmp_path, routing_file
-):
+def test_evidence_resolution_apply_and_failed_validation_are_atomic(tmp_path, routing_file):
     questions = tmp_path / "questions.yaml"
     changes = tmp_path / "changes.yaml"
     questions.write_text(
@@ -309,9 +295,7 @@ def test_evidence_resolution_apply_and_failed_validation_are_atomic(
         changes_path=changes,
         link_session=False,
     )
-    preview, data = routing_state.propose_move(
-        "dirty", "b", first=True, routing_path=routing_file
-    )
+    preview, data = routing_state.propose_move("dirty", "b", first=True, routing_path=routing_file)
     current_service.commit_routing(
         data,
         preview,

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from music_rig import current_service, snapshot_service
+from music_rig import store as store_mod
 from music_rig.models import CurrentPreview, QuestionStatus
 from music_rig.patchbay_state import (
     list_pairs,
@@ -15,10 +16,8 @@ from music_rig.patchbay_state import (
     propose_set_modes_batch,
 )
 from music_rig.store import load_questions
-from music_rig import store as store_mod
-from music_rig.tui.fields import FieldSpec, FieldType, enum_spec, text_spec
+from music_rig.tui.fields import FieldSpec, enum_spec, text_spec
 from music_rig.tui.working import ConcurrentModificationError, WorkingDocument
-
 
 PAIR_FIELD_SPECS: list[FieldSpec] = [
     text_spec("upper_connection", "Upper connection"),

@@ -11,16 +11,18 @@ Audit trail: OpenQuestion.reconciled_at + Change/TODO status
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from music_rig import change_service, question_service, snapshot_service, todo_service
+from music_rig import store as store_mod
 from music_rig.inbox_service import default_clock
 from music_rig.models import (
     ChangeRecord,
-    ChangeStatus,
     ChangesDocument,
+    ChangeStatus,
     OpenQuestion,
     OpenQuestionsDocument,
     QuestionStatus,
@@ -41,7 +43,6 @@ from music_rig.reconciliation.types import (
     Plan,
     QueueItem,
     VerificationStatus,
-    VerifyResult,
 )
 from music_rig.store import (
     StoreError,
@@ -50,7 +51,6 @@ from music_rig.store import (
     load_todo,
     write_documents,
 )
-from music_rig import store as store_mod
 
 Clock = Callable[[], datetime]
 
@@ -355,9 +355,7 @@ def show_question(
         "related_changes": related_changes,
         "suggestions": plan.to_dict().get("suggestions") or [],
         "suggested_commands": plan.suggested_commands,
-        "advisory": format_reconcile_question(
-            q.id, questions_path=questions_path
-        ).rstrip(),
+        "advisory": format_reconcile_question(q.id, questions_path=questions_path).rstrip(),
     }
 
 
@@ -409,9 +407,7 @@ def plan_question(
         ctx = _ctx_from_kwargs(**kwargs)
     assert isinstance(ctx, ReconciliationContext)
     paths = ctx.path_dict()
-    q = question_service.get_question(
-        question_id, questions_path=ctx.paths.questions
-    )
+    q = question_service.get_question(question_id, questions_path=ctx.paths.questions)
     return _adapter_for(q).plan(q, paths=paths)
 
 
@@ -465,9 +461,7 @@ def apply_question(
                 "verification_result CONFIRMED/CORRECTED"
             )
     else:
-        raise StoreError(
-            f"{q.id} capability is {adapter.capability.value}; apply not supported"
-        )
+        raise StoreError(f"{q.id} capability is {adapter.capability.value}; apply not supported")
     snap_info = None
     if snapshot_before and not dry_run:
         snap = snapshot_service.create_snapshot(
@@ -557,9 +551,7 @@ def _complete_todo_in_doc(
             "acknowledgement (--confirm-dod). Run without --am-bot after a human "
             "confirms DoD, or complete the TODO via the human CLI/TUI."
         )
-    updated = TodoTask.model_validate(
-        {**task.model_dump(), "status": TodoStatus.DONE.value}
-    )
+    updated = TodoTask.model_validate({**task.model_dump(), "status": TodoStatus.DONE.value})
     tasks = [updated if t.id == todo_id else t for t in doc.tasks]
     next_session = [t for t in doc.next_session if t != todo_id]
     return TodoDocument(next_session=next_session, tasks=tasks)
@@ -576,9 +568,7 @@ def _apply_change_in_doc(doc: ChangesDocument, change_id: str) -> ChangesDocumen
         if item.status == ChangeStatus.APPLIED:
             items.append(item)
         else:
-            items.append(
-                ChangeRecord(**{**item.model_dump(), "status": ChangeStatus.APPLIED})
-            )
+            items.append(ChangeRecord(**{**item.model_dump(), "status": ChangeStatus.APPLIED}))
     if not found:
         raise StoreError(f"Change {change_id} does not exist.")
     return ChangesDocument(items=items)
@@ -634,9 +624,7 @@ def finalize_question(
     manual_ack = False
     if confirm_current_reconciled:
         if not note_clean:
-            raise StoreError(
-                "--confirm-current-reconciled requires a non-empty --note"
-            )
+            raise StoreError("--confirm-current-reconciled requires a non-empty --note")
         manual_ack = True
         # Agent-interpreted / manual acknowledgment: CURRENT already updated
         # via supported CLI. Must NOT invent verification_result / evidence VERIFIED.
@@ -668,9 +656,7 @@ def finalize_question(
 
     recon_note = note_clean
     if manual_ack and "agent-interpreted" not in recon_note.casefold():
-        recon_note = (
-            f"[agent-interpreted / manually reconciled] {recon_note}"
-        ).strip()
+        recon_note = (f"[agent-interpreted / manually reconciled] {recon_note}").strip()
 
     # Preserve verification_result unchanged (never invent)
     prior_vr = q.verification_result
@@ -705,9 +691,7 @@ def finalize_question(
                 TodoStatus.CANCELLED,
                 TodoStatus.DEFERRED,
             }:
-                new_tdoc = _complete_todo_in_doc(
-                    new_tdoc, tid, confirm_dod=confirm_dod
-                )
+                new_tdoc = _complete_todo_in_doc(new_tdoc, tid, confirm_dod=confirm_dod)
                 completed_todos.append(tid)
         # Also strip DONE tasks still lingering in next_session for linked ids
         for tid in q.related_todos:
@@ -722,9 +706,7 @@ def finalize_question(
     result = {
         "question_id": q.id,
         "dry_run": dry_run,
-        "reconciled_at": updated_q.reconciled_at.isoformat()
-        if updated_q.reconciled_at
-        else None,
+        "reconciled_at": updated_q.reconciled_at.isoformat() if updated_q.reconciled_at else None,
         "reconciliation_note": recon_note,
         "no_current_change": no_current_change,
         "confirm_current_reconciled": confirm_current_reconciled,
@@ -756,9 +738,7 @@ def finalize_question(
     # Confirm we did not invent verification_result
     fresh = question_service.get_question(q.id, questions_path=questions_path)
     if prior_vr is None and fresh.verification_result is not None:
-        raise StoreError(
-            f"{q.id}: finalize invented verification_result (bug)"
-        )
+        raise StoreError(f"{q.id}: finalize invented verification_result (bug)")
     try:
         _render_planning_and_patchbay(
             _default_paths(
@@ -994,9 +974,7 @@ def sweep(
                 code="queue_agent",
             )
         )
-        suggested.append(
-            suggest_finalize("Q-xxx", confirm_current_reconciled=True, note="…")
-        )
+        suggested.append(suggest_finalize("Q-xxx", confirm_current_reconciled=True, note="…"))
     if counts["ready_to_finalize"]:
         suggested.append(
             ActionSuggestion(
@@ -1193,15 +1171,18 @@ def cleanup_reconciliation_issues(
                             severity="warning",
                             code="reconciled_unfinished_todo",
                             id=q.id,
-                            detail=(
-                                f"reconciled but linked TODO {tid} is {task.status.value}"
-                            ),
+                            detail=(f"reconciled but linked TODO {tid} is {task.status.value}"),
                             suggestions=[suggest_todo_done(tid)],
                         )
                     )
         # Incomplete targets on OPEN questions (RESOLVED covered via plan blockers above)
         if q.status == QuestionStatus.OPEN and q.reconciled_at is None:
-            if q.target and q.target.domain == "patchbay.mode" and q.target.bay and not q.target.pair:
+            if (
+                q.target
+                and q.target.domain == "patchbay.mode"
+                and q.target.bay
+                and not q.target.pair
+            ):
                 from music_rig import patchbay_state
 
                 try:
@@ -1277,8 +1258,7 @@ def cleanup_reconciliation_issues(
                             ActionSuggestion(
                                 kind=SuggestionKind.ADVISORY,
                                 intent=(
-                                    'current channels set-source <device> <ch> '
-                                    '"<source>" --yes'
+                                    'current channels set-source <device> <ch> "<source>" --yes'
                                 ),
                                 description="Set channel source",
                                 code="set_source",

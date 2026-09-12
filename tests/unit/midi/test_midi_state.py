@@ -53,9 +53,7 @@ def midi_files(tmp_path: Path) -> tuple[Path, Path]:
     midi.write_text(
         yaml.safe_dump(
             {
-                "endpoints": [
-                    {"id": "ableton", "kind": "software", "name": "Ableton Live"}
-                ],
+                "endpoints": [{"id": "ableton", "kind": "software", "name": "Ableton Live"}],
                 "devices": [
                     {"gear_ref": "controller", "role": "controller"},
                     {"gear_ref": "synth", "role": "synth"},
@@ -199,9 +197,7 @@ def test_ableton_three_state_and_inactive_refs(midi_files):
     raw = midi_state.load_raw(midi)
     raw["devices"].append({"gear_ref": "retired", "role": "controller"})
     with pytest.raises(StoreError, match="inactive"):
-        midi_state.propose_set_channel(
-            "retired", 1, data=raw, inventory_path=inventory
-        )
+        midi_state.propose_set_channel("retired", 1, data=raw, inventory_path=inventory)
 
 
 def test_verify_batch_is_atomic_in_memory(midi_files):

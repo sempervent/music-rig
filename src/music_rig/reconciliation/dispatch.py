@@ -7,7 +7,7 @@ Does not load documents, apply mutations, or render CLI strings.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from music_rig.models import ReconciliationState
@@ -48,7 +48,7 @@ ANSWER_CODES = frozenset(
 )
 
 
-class DispatchMode(str, Enum):
+class DispatchMode(StrEnum):
     DONE = "DONE"
     HUMAN_ANSWER = "HUMAN_ANSWER"
     HUMAN_OBSERVATION = "HUMAN_OBSERVATION"
@@ -59,7 +59,7 @@ class DispatchMode(str, Enum):
     BLOCKED = "BLOCKED"
 
 
-class NextActor(str, Enum):
+class NextActor(StrEnum):
     NONE = "NONE"
     HUMAN_ANSWER = "HUMAN_ANSWER"
     HUMAN_OBSERVATION = "HUMAN_OBSERVATION"

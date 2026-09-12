@@ -13,9 +13,7 @@ BANNER = (
 
 
 def _cell(value: object) -> str:
-    return str(value if value not in (None, "") else "—").replace("|", "\\|").replace(
-        "\n", " "
-    )
+    return str(value if value not in (None, "") else "—").replace("|", "\\|").replace("\n", " ")
 
 
 def render_midi_topology_section(data: dict | MidiDocument) -> str:
@@ -33,9 +31,7 @@ def render_midi_topology_section(data: dict | MidiDocument) -> str:
         ]
     )
     for device in doc.devices:
-        lines.append(
-            f"| {device.gear_ref} | {_cell(device.role)} | {_cell(device.notes)} |"
-        )
+        lines.append(f"| {device.gear_ref} | {_cell(device.role)} | {_cell(device.notes)} |")
     lines.extend(
         [
             "",
@@ -46,9 +42,7 @@ def render_midi_topology_section(data: dict | MidiDocument) -> str:
         ]
     )
     if not doc.connections:
-        lines.append(
-            "| — | UNKNOWN | UNKNOWN | — | UNKNOWN | No verified physical links |"
-        )
+        lines.append("| — | UNKNOWN | UNKNOWN | — | UNKNOWN | No verified physical links |")
     for link in doc.connections:
         lines.append(
             f"| {link.id} | {link.source} / {_cell(link.source_port)} | "
@@ -140,9 +134,7 @@ def render_midi_topology_mermaid(data: dict | MidiDocument) -> str:
         "  %% Generated from data/midi.yaml; do not edit directly.",
     ]
     if not doc.connections:
-        lines.append(
-            '  midi_unknown["UNKNOWN physical MIDI topology<br/>No verified links"]'
-        )
+        lines.append('  midi_unknown["UNKNOWN physical MIDI topology<br/>No verified links"]')
         return "\n".join(lines) + "\n"
     labels = {item.id: item.name for item in doc.endpoints}
     labels.update({item.gear_ref: item.gear_ref for item in doc.devices})
@@ -154,7 +146,5 @@ def render_midi_topology_mermaid(data: dict | MidiDocument) -> str:
             f"{link.transport.value}: {_label(link.source_port)} → "
             f"{_label(link.destination_port)} [{link.status.value}]"
         )
-        lines.append(
-            f'  {_node_id(link.source)} -->|"{edge}"| {_node_id(link.destination)}'
-        )
+        lines.append(f'  {_node_id(link.source)} -->|"{edge}"| {_node_id(link.destination)}')
     return "\n".join(lines) + "\n"

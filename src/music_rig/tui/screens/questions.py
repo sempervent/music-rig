@@ -309,11 +309,7 @@ class QuestionsScreen(Screen):
         filter_was_open = self._filter == "OPEN"
         self.reload(select_id=qid)
         fresh = question_service.get_question(qid)
-        if (
-            filter_was_open
-            and fresh.status != QuestionStatus.OPEN
-            and qid not in self._row_ids
-        ):
+        if filter_was_open and fresh.status != QuestionStatus.OPEN and qid not in self._row_ids:
             self.notify(
                 f"{qid} answered and resolved. "
                 "It is hidden because this view shows OPEN Questions. "
@@ -323,16 +319,14 @@ class QuestionsScreen(Screen):
             try:
                 self.app.open_domain("reconcile", qid)  # type: ignore[attr-defined]
             except Exception:
-                self.notify(
-                    f"Open reconcile: uv run rig reconcile plan question {qid}"
-                )
+                self.notify(f"Open reconcile: uv run rig reconcile plan question {qid}")
 
     def action_edit(self) -> None:
         q = self._selected()
         if q is None:
             return
-        from music_rig.tui.forms import RecordEditScreen
         from music_rig.tui.editable_domains.questions import QuestionsEditableAdapter
+        from music_rig.tui.forms import RecordEditScreen
 
         def _done(saved: bool | None) -> None:
             if saved:
@@ -341,8 +335,7 @@ class QuestionsScreen(Screen):
                     still = self._selected_id()
                     if still != q.id:
                         self.notify(
-                            f"{q.id} updated. Hidden because filter=OPEN. "
-                            "Press f for RESOLVED/ALL."
+                            f"{q.id} updated. Hidden because filter=OPEN. Press f for RESOLVED/ALL."
                         )
 
         self.app.push_screen(
@@ -371,6 +364,7 @@ class QuestionsScreen(Screen):
             return
         # Prefer promoting existing draft without reopening full editor when possible
         if q.answer.strip():
+
             def _done(ok: bool | None) -> None:
                 if not ok:
                     return
@@ -382,8 +376,7 @@ class QuestionsScreen(Screen):
                 filter_was_open = self._filter == "OPEN"
                 self.reload(select_id=updated.id)
                 self.notify(
-                    f"{updated.id} resolved (FINAL). "
-                    "CURRENT reconciliation still required."
+                    f"{updated.id} resolved (FINAL). CURRENT reconciliation still required."
                 )
                 if filter_was_open and updated.id not in self._row_ids:
                     self.notify(
@@ -432,9 +425,11 @@ class QuestionsScreen(Screen):
                 f"{suggestion[:1200]}",
                 confirm_label="Open Reconcile",
             ),
-            lambda ok: self.app.open_domain("reconcile", q.id)  # type: ignore[attr-defined]
-            if ok
-            else None,
+            lambda ok: (
+                self.app.open_domain("reconcile", q.id)  # type: ignore[attr-defined]
+                if ok
+                else None
+            ),
         )
 
     def action_defer(self) -> None:
@@ -488,11 +483,7 @@ class QuestionsScreen(Screen):
         if target is None:
             self.notify("No typed target on this question", severity="warning")
             return
-        if (
-            target.domain == "patchbay.mode"
-            and target.bay
-            and not target.pair
-        ):
+        if target.domain == "patchbay.mode" and target.bay and not target.pair:
             from music_rig import patchbay_state
             from music_rig.tui.pickers import ReferencePickerModal
 
@@ -530,7 +521,10 @@ class QuestionsScreen(Screen):
                     _picked,
                 )
                 return
-        if target.domain in {"patchbay.mode", "patchbay.model", "patchbay.connection"} and target.bay:
+        if (
+            target.domain in {"patchbay.mode", "patchbay.model", "patchbay.connection"}
+            and target.bay
+        ):
             self.app.open_domain(  # type: ignore[attr-defined]
                 "patchbay",
                 target.bay,

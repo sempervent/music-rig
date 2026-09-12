@@ -119,9 +119,7 @@ class CursorProvider:
                     check=False,
                 )
             except subprocess.TimeoutExpired as exc:
-                diagnostics["stderr_preview"] = preview_bytes(
-                    exc.stderr, self.max_stderr_bytes
-                )
+                diagnostics["stderr_preview"] = preview_bytes(exc.stderr, self.max_stderr_bytes)
                 raise ProviderTimeoutError(
                     f"Cursor provider timed out after {self.timeout_seconds}s"
                 ) from exc
@@ -139,15 +137,11 @@ class CursorProvider:
                 f"Cursor stdout exceeded {self.max_stdout_bytes} bytes"
             )
         if completed.returncode != 0:
-            raise ProviderInvalidResponseError(
-                f"Cursor exited {completed.returncode}"
-            )
+            raise ProviderInvalidResponseError(f"Cursor exited {completed.returncode}")
         try:
             envelope = json.loads(stdout.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise ProviderInvalidResponseError(
-                f"Cursor returned non-JSON stdout: {exc}"
-            ) from exc
+            raise ProviderInvalidResponseError(f"Cursor returned non-JSON stdout: {exc}") from exc
         turn = parse_cursor_envelope(envelope)
         return turn, diagnostics
 
@@ -173,37 +167,29 @@ def parse_cursor_envelope(envelope: dict[str, Any]) -> AgentTurn:
         elif isinstance(payload, dict):
             raw = payload
         else:
-            raise ProviderInvalidResponseError(
-                "Cursor result must be a JSON object or JSON string"
-            )
+            raise ProviderInvalidResponseError("Cursor result must be a JSON object or JSON string")
         try:
             return AgentTurn.from_dict(raw)
         except Exception as exc:
-            raise ProviderInvalidResponseError(
-                f"Cursor AgentTurn invalid: {exc}"
-            ) from exc
+            raise ProviderInvalidResponseError(f"Cursor AgentTurn invalid: {exc}") from exc
 
     # Already a bare AgentTurn
     if "kind" in envelope:
         try:
             return AgentTurn.from_dict(envelope)
         except Exception as exc:
-            raise ProviderInvalidResponseError(
-                f"Cursor AgentTurn invalid: {exc}"
-            ) from exc
+            raise ProviderInvalidResponseError(f"Cursor AgentTurn invalid: {exc}") from exc
 
     raise ProviderInvalidResponseError("Unrecognized Cursor JSON envelope")
 
 
 def cursor_provider_from_config(agent_cfg, *, root: Path | None = None) -> CursorProvider:
     exe = find_cursor_executable(
-        getattr(getattr(agent_cfg, "cursor", None), "executable", None)
-        or "agent"
+        getattr(getattr(agent_cfg, "cursor", None), "executable", None) or "agent"
     )
     if not exe:
         raise ProviderNotConfiguredError(
-            "Cursor selected, but `agent` is not installed.\n"
-            "Run: uv run rig agent provider setup"
+            "Cursor selected, but `agent` is not installed.\nRun: uv run rig agent provider setup"
         )
     cursor_cfg = getattr(agent_cfg, "cursor", None)
     return CursorProvider(

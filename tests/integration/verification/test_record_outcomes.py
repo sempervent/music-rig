@@ -2,18 +2,17 @@
 
 from __future__ import annotations
 
-from fixtures.repo_fixtures import _clock
 import json
-from datetime import datetime, timezone
-from pathlib import Path
+
 import pytest
 import yaml
 from typer.testing import CliRunner
+
+from fixtures.repo_fixtures import _clock
 from music_rig import (
     ableton_state,
     midi_state,
     question_service,
-    store,
     verification_service,
 )
 from music_rig.cli import app
@@ -22,15 +21,13 @@ from music_rig.models import (
     QuestionStatus,
     ReconciliationState,
     VerificationOutcome,
-    VerificationResult,
 )
 from music_rig.reconciliation import service as reconcile_service
-from music_rig.reconciliation.adapters import get_adapter
-from music_rig.reconciliation.adapters.unsupported import MANUAL_CLASSIFICATION
-from music_rig.reconciliation.types import Capability, PlanOperationKind, VerificationStatus
+from music_rig.reconciliation.types import PlanOperationKind, VerificationStatus
 from music_rig.store import StoreError, load_changes, load_questions
 
 runner = CliRunner()
+
 
 def test_confirmed_clock_intended_to_verified(fx17):
     verification_service.record_observation(
@@ -61,6 +58,7 @@ def test_confirmed_clock_intended_to_verified(fx17):
     verified = reconcile_service.verify_question("Q-170")
     assert verified["verification"] == VerificationStatus.MATCH.value
 
+
 def test_corrected_clock_value_and_verified(fx17):
     # Ensure kaoss is a valid endpoint-like token for clock master
     verification_service.record_observation(
@@ -81,6 +79,7 @@ def test_corrected_clock_value_and_verified(fx17):
     assert raw["clock"]["master"]["endpoint_ref"] == "kaoss"
     assert raw["clock"]["master"]["status"] == "VERIFIED"
 
+
 def test_unknown_observation_no_mutation(fx17):
     before = midi_state.load_raw()["clock"]["master"]["status"]
     verification_service.record_observation(
@@ -95,6 +94,7 @@ def test_unknown_observation_no_mutation(fx17):
     assert midi_state.load_raw()["clock"]["master"]["status"] == before
     with pytest.raises(StoreError):
         reconcile_service.apply_question("Q-170", dry_run=False, yes=True)
+
 
 def test_failed_test_no_verified_optional_change(fx17):
     verification_service.record_observation(
@@ -114,14 +114,14 @@ def test_failed_test_no_verified_optional_change(fx17):
     assert "expected" in chg.details.casefold() or "Expected" in chg.details
     plan = reconcile_service.plan_question("Q-171")
     assert any(
-        o["op"] == PlanOperationKind.RECORD_FAILED_VERIFICATION.value
-        for o in plan.operations
+        o["op"] == PlanOperationKind.RECORD_FAILED_VERIFICATION.value for o in plan.operations
     )
     raw = yaml.safe_load(fx17["controllers"].read_text(encoding="utf-8"))
     ctx = raw["controllers"][0]["contexts"][0]
     assert ctx["evidence"] == "INTENDED"
     ctl = ctx["controls"][0]
     assert ctl["evidence"] == "INTENDED"
+
 
 def test_granularity_one_context_not_whole_controller(fx17):
     verification_service.record_observation(
@@ -138,6 +138,7 @@ def test_granularity_one_context_not_whole_controller(fx17):
     assert contexts["bank-01"]["evidence"] == "INTENDED"
     assert contexts["bank-00"]["controls"][0]["evidence"] == "INTENDED"
 
+
 def test_ableton_template_confirmed_evidence(fx17):
     verification_service.record_observation(
         "Q-172",
@@ -153,6 +154,7 @@ def test_ableton_template_confirmed_evidence(fx17):
     tmpl = next(t for t in doc.templates if t.id == "pfl-jam")
     assert tmpl.evidence == MidiEvidenceStatus.VERIFIED
 
+
 def test_routing_yes_confirmed_sets_path_evidence(fx17):
     verification_service.record_observation(
         "Q-173",
@@ -164,6 +166,7 @@ def test_routing_yes_confirmed_sets_path_evidence(fx17):
     reconcile_service.apply_question("Q-173", dry_run=False, yes=True)
     data = yaml.safe_load(fx17["routing"].read_text(encoding="utf-8"))
     assert data["named_paths"]["kaoss"]["evidence"] == "VERIFIED"
+
 
 def test_verify_record_cli_dry_run(fx17):
     runner = CliRunner()
@@ -186,6 +189,7 @@ def test_verify_record_cli_dry_run(fx17):
     assert payload["ok"] is True
     assert payload["result"]["dry_run"] is True
     assert load_questions().question_map()["Q-170"].verification_result is None
+
 
 def test_current_ableton_set_template_evidence_cli(fx17):
     runner = CliRunner()
@@ -228,6 +232,7 @@ def test_current_ableton_set_template_evidence_cli(fx17):
     doc2 = ableton_state.load_document(fx17["ableton"])
     assert next(t for t in doc2.templates if t.id == "pfl-jam").evidence.value == "VERIFIED"
 
+
 def test_answer_without_observation_does_not_apply_evidence(fx17):
     """LEGACY answers (no HUMAN actor) cannot escalate INTENDED→VERIFIED alone."""
     from music_rig.models import AnswerActor, OpenQuestion, OpenQuestionsDocument
@@ -248,10 +253,10 @@ def test_answer_without_observation_does_not_apply_evidence(fx17):
         reconcile_service.apply_question("Q-170", dry_run=False, yes=True)
     assert midi_state.load_raw()["clock"]["master"]["status"] == "INTENDED"
 
+
 def test_human_attestation_may_apply_clock_evidence(fx17):
     """HUMAN answer under ANSWER_ATTESTATION_SUFFICIENT may dry-run evidence apply."""
     question_service.answer_question("Q-170", "ableton", clock=_clock, render=False)
     out = reconcile_service.apply_question("Q-170", dry_run=True, yes=True)
     assert out.get("dry_run") is True
     assert midi_state.load_raw()["clock"]["master"]["status"] == "INTENDED"
-

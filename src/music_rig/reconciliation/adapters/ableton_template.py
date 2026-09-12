@@ -100,9 +100,7 @@ class AbletonTemplateAdapter(ReconciliationAdapter):
                     op(PlanOperationKind.NO_CURRENT_CHANGE, note="template already VERIFIED")
                 )
         elif vr and vr.outcome == VerificationOutcome.FAILED_TEST:
-            operations.append(
-                op(PlanOperationKind.RECORD_FAILED_VERIFICATION, note=vr.note or "")
-            )
+            operations.append(op(PlanOperationKind.RECORD_FAILED_VERIFICATION, note=vr.note or ""))
 
         from music_rig.reconciliation.suggestions import (
             ActionSuggestion,
@@ -132,9 +130,7 @@ class AbletonTemplateAdapter(ReconciliationAdapter):
             suggestions.append(
                 ActionSuggestion(
                     kind=SuggestionKind.CLI_HINT,
-                    intent=(
-                        f"current ableton set-template-evidence {path_key} VERIFIED"
-                    ),
+                    intent=(f"current ableton set-template-evidence {path_key} VERIFIED"),
                     description=f"Set template {path_key} evidence VERIFIED",
                     code="set_template_evidence",
                     params={"path": path_key},
@@ -150,9 +146,7 @@ class AbletonTemplateAdapter(ReconciliationAdapter):
             )
         )
         suggestions.append(
-            suggest_finalize(
-                question.id, no_current_change=True, note="template reviewed"
-            )
+            suggest_finalize(question.id, no_current_change=True, note="template reviewed")
         )
 
         details: dict[str, Any] = {}
@@ -166,12 +160,9 @@ class AbletonTemplateAdapter(ReconciliationAdapter):
                     {
                         "code": "needs_human_observation",
                         "message": (
-                            "Confirm Live set offline, then "
-                            "`rig verify record --outcome confirmed`"
+                            "Confirm Live set offline, then `rig verify record --outcome confirmed`"
                         ),
-                        "suggestions": [
-                            suggest_verify_record(question.id).to_dict()
-                        ],
+                        "suggestions": [suggest_verify_record(question.id).to_dict()],
                     }
                 )
             details["action_packet"] = build_action_packet(
@@ -201,9 +192,7 @@ class AbletonTemplateAdapter(ReconciliationAdapter):
             blockers=blockers,
             suggestions=suggestions,
             details=details,
-            postconditions=(
-                [f"{path_key} evidence == VERIFIED"] if path_key else []
-            ),
+            postconditions=([f"{path_key} evidence == VERIFIED"] if path_key else []),
             closable=list(question.related_todos) + list(question.related_changes),
         )
 
@@ -284,7 +273,6 @@ class AbletonTemplateAdapter(ReconciliationAdapter):
             current=current,
             expected=question.answer,
             message=(
-                "ableton.template needs CONFIRMED/CORRECTED observation "
-                "before evidence MATCH"
+                "ableton.template needs CONFIRMED/CORRECTED observation before evidence MATCH"
             ),
         )

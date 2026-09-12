@@ -381,3 +381,11 @@ A **proposed** or **experiment** route does not mean it is currently wired.
 - When rig changes are documented, update every affected representation of that change instead of only one file.
 - When nothing in the repository confirms a fact, say that it is unknown.
 - When accepting work from the wishlist, create a TODO with Definition of Done; do not silently treat wishlist rows as commitments.
+
+## Quality gates
+
+- Install hooks once: `uv sync --extra dev` then `uv run pre-commit install`.
+- Local / CI lint: `uv run pre-commit run --all-files` (ruff check --fix, ruff format, ryl check via system hooks).
+- Ruff and ryl rule config live only in `pyproject.toml` — do not duplicate them in `.pre-commit-config.yaml`.
+- Full pytest suite enforces **80%** coverage (`addopts` includes `--cov-fail-under=80`).
+- Subset / debug runs: pass `--cov-fail-under=0` (and usually `-n0`), e.g. `uv run pytest path -n0 --cov-fail-under=0`.

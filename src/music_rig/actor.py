@@ -6,7 +6,7 @@ Default actor is HUMAN. Automated agents must invoke ``rig --am-bot …``.
 from __future__ import annotations
 
 from contextvars import ContextVar
-from enum import Enum
+from enum import StrEnum
 
 from music_rig.models import AnswerActor
 from music_rig.store import StoreError
@@ -25,12 +25,12 @@ __all__ = [
 ]
 
 
-class ActorKind(str, Enum):
+class ActorKind(StrEnum):
     HUMAN = "HUMAN"
     BOT = "BOT"
 
 
-class EvidenceBasis(str, Enum):
+class EvidenceBasis(StrEnum):
     """Why CURRENT evidence may escalate — never invent observations."""
 
     NONE = "NONE"

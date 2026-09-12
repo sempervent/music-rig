@@ -11,7 +11,7 @@ import yaml
 from music_rig import control_state, current_service
 from music_rig.ableton_projections import render_ableton_section
 from music_rig.control_projections import render_controller_mappings_section
-from music_rig.models import ControlTarget, MidiEvidenceStatus, TargetState
+from music_rig.models import MidiEvidenceStatus
 from music_rig.reconcile import format_reconcile_question
 from music_rig.store import (
     ABLETON_PATH,
@@ -62,8 +62,7 @@ def test_production_controller_and_ableton_data_load_conservatively():
     assert len(doc.controllers) == 5
     assert all(item.coverage.value in {"PARTIAL", "UNKNOWN"} for item in doc.controllers)
     assert not any(
-        control.evidence == MidiEvidenceStatus.VERIFIED
-        and control.availability.value != "BROKEN"
+        control.evidence == MidiEvidenceStatus.VERIFIED and control.availability.value != "BROKEN"
         for controller in doc.controllers
         for context in controller.contexts
         for control in context.controls
@@ -91,11 +90,14 @@ def test_message_mutations_resolve_device_channel_without_editing_midi(control_f
         else None
     )
     assert data["controllers"][0]["contexts"][0]["controls"][0]["messages"][0]["number"] == 113
-    assert control_state.resolve_message_channel(
-        "behringer-fcb1010",
-        _load(control_files).controllers[0].contexts[0].controls[0].messages[0],
-        midi_path=control_files["midi"],
-    ) == 16
+    assert (
+        control_state.resolve_message_channel(
+            "behringer-fcb1010",
+            _load(control_files).controllers[0].contexts[0].controls[0].messages[0],
+            midi_path=control_files["midi"],
+        )
+        == 16
+    )
     assert control_files["midi"].read_bytes() == before
     assert control is not None
 
@@ -152,9 +154,7 @@ def test_verify_batch_and_commit_are_controller_only(control_files):
         **_kwargs(control_files),
     )
     assert preview.domain == "controls.verify"
-    current_service.commit_controllers(
-        data, preview, render=False, **_kwargs(control_files)
-    )
+    current_service.commit_controllers(data, preview, render=False, **_kwargs(control_files))
     updated = _load(control_files)
     assert updated.controllers[0].contexts[0].controls[0].evidence.value == "VERIFIED"
     assert hashlib.sha256(control_files["midi"].read_bytes()).hexdigest() == midi_before
@@ -175,19 +175,17 @@ def test_q016_q017_targets_and_reconcile_commands():
     assert questions["Q-016"].target.gear == "behringer-fcb1010"
     assert questions["Q-017"].target.gear == "novation-remote-zero-sl"
     assert "rig current controls verify behringer-fcb1010" in format_reconcile_question("Q-016")
-    assert "rig current controls verify novation-remote-zero-sl" in format_reconcile_question("Q-017")
+    assert "rig current controls verify novation-remote-zero-sl" in format_reconcile_question(
+        "Q-017"
+    )
 
 
 def test_midi_topology_clock_channels_and_statuses_remain_unchanged(control_files):
     raw = yaml.safe_load(control_files["midi"].read_text(encoding="utf-8"))
-    fingerprint = {
-        key: raw[key] for key in ("connections", "channels", "clock")
-    }
+    fingerprint = {key: raw[key] for key in ("connections", "channels", "clock")}
     preview, data = control_state.clear_target(
         "korg-padkontrol", "global", "footswitch", **_kwargs(control_files)
     )
-    current_service.commit_controllers(
-        data, preview, render=False, **_kwargs(control_files)
-    )
+    current_service.commit_controllers(data, preview, render=False, **_kwargs(control_files))
     after = yaml.safe_load(control_files["midi"].read_text(encoding="utf-8"))
     assert {key: after[key] for key in ("connections", "channels", "clock")} == fingerprint

@@ -4,62 +4,59 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Optional
 
 import typer
 from rich.console import Console
 from rich.table import Table
 
-from music_rig.checks import run_checks
 from music_rig import (
-    change_service,
-    channel_state,
-    current_service,
-    control_state,
-    control_surface_state,
     ableton_state,
     automation,
     backup_state,
+    change_service,
+    channel_state,
+    control_state,
+    current_service,
+    gear_usage,
     inbox_service,
     inventory_state,
     midi_state,
-    gear_usage,
     patchbay_state,
     performance_state,
     question_service,
+    rig_views,
     routing_state,
     session_service,
     snapshot_service,
     todo_service,
     wishlist_service,
 )
+from music_rig.checks import run_checks
 from music_rig.current_projections import format_current_preview
 from music_rig.doctor import build_doctor_text
 from music_rig.inbox_service import default_clock
 from music_rig.local_config import load_local_config
 from music_rig.models import (
+    ChangeCategory,
     ChangeStatus,
+    ControlTarget,
     GearCondition,
     InboxStatus,
-    OwnershipStatus,
     MidiEvidenceStatus,
-    MidiTransport,
-    MidiTriState,
-    ControlAvailability,
-    ControlTarget,
     MidiMessage,
     MidiMessageType,
-    PhysicalControlType,
+    MidiTriState,
+    OwnershipStatus,
+    PerformanceCriticality,
     TargetKind,
     TargetState,
-    PerformanceCriticality,
-    ValueBehavior,
     TodoPriority,
     TodoStatus,
     TodoTask,
+    ValueBehavior,
+    WishlistItem,
     WishPriority,
     WishStatus,
-    WishlistItem,
 )
 from music_rig.now_service import format_now, recommend_now
 from music_rig.reconcile import (
@@ -70,15 +67,13 @@ from music_rig.reconcile import (
 from music_rig.reconciliation import service as reconcile_service
 from music_rig.reconciliation.types import err_payload, ok_payload
 from music_rig.render import check_render_sync, render_docs
-from music_rig import rig_views
 from music_rig.status import build_status_text
 from music_rig.store import (
     StoreError,
+    load_ableton,
     load_inbox,
     load_inventory,
     load_midi,
-    load_controllers,
-    load_ableton,
     load_todo,
     load_wishlist,
 )
@@ -121,9 +116,7 @@ def _root_callback(
 
 
 todo_app = typer.Typer(help="Accepted work queue (data/todo.yaml).", no_args_is_help=True)
-wish_app = typer.Typer(
-    help="Speculative wishlist (data/wishlist.yaml).", no_args_is_help=True
-)
+wish_app = typer.Typer(help="Speculative wishlist (data/wishlist.yaml).", no_args_is_help=True)
 next_app = typer.Typer(help="Next Session queue (max 3).", no_args_is_help=True)
 inbox_app = typer.Typer(help="Low-friction capture inbox.", no_args_is_help=True)
 session_app = typer.Typer(help="Studio session logging.", no_args_is_help=True)
@@ -175,15 +168,9 @@ ableton_app = typer.Typer(help="Durable Ableton mapping targets.", no_args_is_he
 performance_app = typer.Typer(
     help="PFL performance orchestration and readiness.", no_args_is_help=True
 )
-snapshot_app = typer.Typer(
-    help="Canonical YAML repository snapshots.", no_args_is_help=True
-)
-backup_app = typer.Typer(
-    help="Backup plan and archive packages.", no_args_is_help=True
-)
-automation_app = typer.Typer(
-    help="Automation capability registry.", no_args_is_help=True
-)
+snapshot_app = typer.Typer(help="Canonical YAML repository snapshots.", no_args_is_help=True)
+backup_app = typer.Typer(help="Backup plan and archive packages.", no_args_is_help=True)
+automation_app = typer.Typer(help="Automation capability registry.", no_args_is_help=True)
 inspect_app = typer.Typer(
     help="Structured inspection for agents and humans.",
     no_args_is_help=True,
@@ -362,8 +349,8 @@ def status_cmd() -> None:
 
 @todo_app.command("list")
 def todo_list(
-    status: Optional[str] = typer.Option(None, "--status"),
-    priority: Optional[str] = typer.Option(None, "--priority"),
+    status: str | None = typer.Option(None, "--status"),
+    priority: str | None = typer.Option(None, "--priority"),
     all_items: bool = typer.Option(False, "--all"),
 ) -> None:
     try:
@@ -390,9 +377,7 @@ def todo_list(
             continue
         if priority_filter and task.priority != priority_filter:
             continue
-        table.add_row(
-            task.id, task.priority.value, task.status.value, task.area, task.task
-        )
+        table.add_row(task.id, task.priority.value, task.status.value, task.area, task.task)
         rows += 1
     console.print(table)
     console.print(f"[dim]{rows} task(s)[/dim]")
@@ -562,9 +547,7 @@ def next_remove_cmd(
         doc = todo_service.next_remove(todo_id, render=not no_render)
     except StoreError as exc:
         _fail(str(exc))
-    console.print(
-        f"Removed {todo_id.upper()} from Next Session ({len(doc.next_session)}/3)"
-    )
+    console.print(f"Removed {todo_id.upper()} from Next Session ({len(doc.next_session)}/3)")
 
 
 @next_app.command("set")
@@ -593,8 +576,8 @@ def next_clear_cmd(no_render: bool = typer.Option(False, "--no-render")) -> None
 
 @wish_app.command("list")
 def wish_list(
-    status: Optional[str] = typer.Option(None, "--status"),
-    priority: Optional[str] = typer.Option(None, "--priority"),
+    status: str | None = typer.Option(None, "--status"),
+    priority: str | None = typer.Option(None, "--priority"),
 ) -> None:
     try:
         doc = load_wishlist()
@@ -678,7 +661,7 @@ def wish_add(no_render: bool = typer.Option(False, "--no-render")) -> None:
         wishlist_service.add_wish(new_item, render=not no_render)
     except (StoreError, Exception) as exc:
         _fail(str(exc))
-    console.print(f'Created wishlist item [bold]{new_item.item}[/bold]')
+    console.print(f"Created wishlist item [bold]{new_item.item}[/bold]")
 
 
 def _wish_status(
@@ -688,9 +671,7 @@ def _wish_status(
         if not typer.confirm(f'Set "{name}" to {status.value}?', default=False):
             raise typer.Abort()
     try:
-        item, changed = wishlist_service.set_wish_status(
-            name, status, render=not no_render
-        )
+        item, changed = wishlist_service.set_wish_status(name, status, render=not no_render)
     except StoreError as exc:
         _fail(str(exc))
     if not changed:
@@ -732,7 +713,7 @@ def wish_status_cmd(
 @wish_app.command("promote")
 def wish_promote(
     name: str,
-    wish_status: Optional[str] = typer.Option(
+    wish_status: str | None = typer.Option(
         None, "--wish-status", help="Optional new wishlist status after promotion"
     ),
     no_render: bool = typer.Option(False, "--no-render"),
@@ -763,9 +744,7 @@ def wish_promote(
         new_status = _parse_wish_status(wish_status)
         keep = False
     else:
-        keep = typer.confirm(
-            f"Keep wishlist status as {item.status.value}?", default=True
-        )
+        keep = typer.confirm(f"Keep wishlist status as {item.status.value}?", default=True)
         if not keep:
             new_status = _parse_wish_status(
                 typer.prompt("New wishlist status", default=item.status.value)
@@ -790,10 +769,8 @@ def wish_promote(
 
 @app.command("capture")
 def capture_cmd(
-    text: Optional[str] = typer.Argument(None, help="Observation text"),
-    as_type: str = typer.Option(
-        "inbox", "--as", help="inbox (default), todo, or wish"
-    ),
+    text: str | None = typer.Argument(None, help="Observation text"),
+    as_type: str = typer.Option("inbox", "--as", help="inbox (default), todo, or wish"),
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     """Zero-friction capture. Default writes an OPEN inbox item."""
@@ -826,7 +803,7 @@ def capture_cmd(
             wishlist_service.add_wish(new_item, render=not no_render)
         except (StoreError, Exception) as exc:
             _fail(str(exc))
-        console.print(f'Created wishlist item [bold]{new_item.item}[/bold]')
+        console.print(f"Created wishlist item [bold]{new_item.item}[/bold]")
         return
     _fail("--as must be inbox, todo, or wish")
 
@@ -911,9 +888,7 @@ def inbox_triage(
     if choice.strip() == "1":
         new_task = _prompt_todo_fields(default_task=item.text)
         try:
-            cap, created = inbox_service.triage_to_todo(
-                cap_id, new_task, render=not no_render
-            )
+            cap, created = inbox_service.triage_to_todo(cap_id, new_task, render=not no_render)
         except StoreError as exc:
             _fail(str(exc))
         console.print(f"{cap.id} TRIAGED -> created {created.id}")
@@ -923,15 +898,11 @@ def inbox_triage(
             new_item = WishlistItem(
                 item=typer.prompt("Item", default=item.text[:60]),
                 category=typer.prompt("Category", default="Uncategorized"),
-                problem_capability=typer.prompt(
-                    "Problem / Capability", default=item.text
-                ),
+                problem_capability=typer.prompt("Problem / Capability", default=item.text),
                 priority=_parse_wish_priority(typer.prompt("Priority", default="P2")),
                 status=_parse_wish_status(typer.prompt("Status", default="IDEA")),
             )
-            cap, created = inbox_service.triage_to_wish(
-                cap_id, new_item, render=not no_render
-            )
+            cap, created = inbox_service.triage_to_wish(cap_id, new_item, render=not no_render)
         except (StoreError, Exception) as exc:
             _fail(str(exc))
         console.print(f"{cap.id} TRIAGED -> wishlist '{created.item}'")
@@ -944,7 +915,7 @@ def inbox_triage(
 
 @app.command("channels")
 def channels_cmd(
-    device: Optional[str] = typer.Option(None, "--device", help="tascam|alesis"),
+    device: str | None = typer.Option(None, "--device", help="tascam|alesis"),
 ) -> None:
     try:
         console.print(rig_views.format_channels(device=device).rstrip())
@@ -954,9 +925,7 @@ def channels_cmd(
 
 @app.command("patchbay")
 def patchbay_cmd(
-    target: Optional[str] = typer.Argument(
-        None, help="Patchbay id (e.g. PB-B), or 'list'"
-    ),
+    target: str | None = typer.Argument(None, help="Patchbay id (e.g. PB-B), or 'list'"),
     unknown: bool = typer.Option(False, "--unknown"),
     all_jacks: bool = typer.Option(False, "--all"),
 ) -> None:
@@ -994,10 +963,10 @@ def path_show_cmd(name: str) -> None:
 
 @app.command("change")
 def change_cmd(
-    summary: Optional[str] = typer.Argument(None),
-    category: Optional[str] = typer.Option(None, "--category", "-c"),
-    details: Optional[str] = typer.Option(None, "--details", "-d"),
-    area: Optional[list[str]] = typer.Option(None, "--area", "-a"),
+    summary: str | None = typer.Argument(None),
+    category: str | None = typer.Option(None, "--category", "-c"),
+    details: str | None = typer.Option(None, "--details", "-d"),
+    area: list[str] | None = typer.Option(None, "--area", "-a"),
 ) -> None:
     """Record that physical/logical reality may have changed (does not edit CURRENT)."""
     try:
@@ -1033,9 +1002,7 @@ def changes_list_cmd(all_items: bool = typer.Option(False, "--all")) -> None:
         items = change_service.list_changes(all_items=all_items)
     except StoreError as exc:
         _fail(str(exc))
-    console.print(
-        "[bold]RIG CHANGES[/bold]" if all_items else "[bold]OPEN RIG CHANGES[/bold]"
-    )
+    console.print("[bold]RIG CHANGES[/bold]" if all_items else "[bold]OPEN RIG CHANGES[/bold]")
     if not items:
         console.print("(none)")
         return
@@ -1081,9 +1048,7 @@ def changes_applied_cmd(
         if not typer.confirm("Continue?", default=False):
             raise typer.Abort()
     try:
-        updated, changed = change_service.set_change_status(
-            chg_id, ChangeStatus.APPLIED
-        )
+        updated, changed = change_service.set_change_status(chg_id, ChangeStatus.APPLIED)
     except StoreError as exc:
         _fail(str(exc))
     if not changed:
@@ -1105,9 +1070,7 @@ def changes_dismiss_cmd(
         if not typer.confirm(f"Dismiss {item.id}?", default=False):
             raise typer.Abort()
     try:
-        updated, changed = change_service.set_change_status(
-            chg_id, ChangeStatus.DISMISSED
-        )
+        updated, changed = change_service.set_change_status(chg_id, ChangeStatus.DISMISSED)
     except StoreError as exc:
         _fail(str(exc))
     if not changed:
@@ -1118,7 +1081,7 @@ def changes_dismiss_cmd(
 
 @session_app.command("start")
 def session_start_cmd(
-    focus: Optional[str] = typer.Option(None, "--focus"),
+    focus: str | None = typer.Option(None, "--focus"),
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     chosen = focus
@@ -1151,13 +1114,9 @@ def session_start_cmd(
     console.print(f"Started [bold]{session.id}[/bold]")
     console.print(f"Focus: {session_service.focus_label(session.focus)}")
     if session.focus.upper().startswith("RIG-"):
-        if typer.confirm(
-            f"Mark {session.focus.strip().upper()} IN PROGRESS?", default=False
-        ):
+        if typer.confirm(f"Mark {session.focus.strip().upper()} IN PROGRESS?", default=False):
             try:
-                session_service.start_task(
-                    session.focus, render=not no_render
-                )
+                session_service.start_task(session.focus, render=not no_render)
                 console.print(f"{session.focus.strip().upper()} -> IN PROGRESS")
             except StoreError as exc:
                 _fail(str(exc))
@@ -1170,9 +1129,7 @@ def session_status_cmd() -> None:
     except StoreError as exc:
         _fail(str(exc))
     now = default_clock()
-    duration = session_service.format_duration(
-        session.started_at, session.ended_at, now=now
-    )
+    duration = session_service.format_duration(session.started_at, session.ended_at, now=now)
     started_local = session.started_at.strftime("%I:%M %p").lstrip("0")
     console.print("[bold]ACTIVE SESSION[/bold]")
     console.print(session.id)
@@ -1254,9 +1211,7 @@ def session_end_cmd() -> None:
     summary = session_service.summarize(session)
     console.print("[bold]SESSION SUMMARY[/bold]")
     console.print("")
-    console.print(
-        f"Duration: {session_service.format_duration(session.started_at, None, now=now)}"
-    )
+    console.print(f"Duration: {session_service.format_duration(session.started_at, None, now=now)}")
     console.print(f"Focus: {session.focus or '(none)'}")
     console.print("")
     console.print(f"Notes:        {summary['notes']}")
@@ -1323,9 +1278,7 @@ def session_list_cmd(limit: int = typer.Option(10, "--limit")) -> None:
     table.add_column("Events")
     now = default_clock()
     for session in sessions:
-        duration = session_service.format_duration(
-            session.started_at, session.ended_at, now=now
-        )
+        duration = session_service.format_duration(session.started_at, session.ended_at, now=now)
         table.add_row(
             session.id,
             session.started_at.date().isoformat(),
@@ -1358,8 +1311,8 @@ def _confirm_current(preview, *, yes: bool, dry_run: bool) -> bool:
 
 def _maybe_resolve_evidence(
     *,
-    question_id: Optional[str],
-    change_id: Optional[str],
+    question_id: str | None,
+    change_id: str | None,
     answer_hint: str,
     yes: bool,
 ) -> tuple[bool, bool, str]:
@@ -1395,9 +1348,7 @@ def _maybe_resolve_evidence(
         if yes:
             apply_chg = False
         else:
-            apply_chg = typer.confirm(
-                f"Mark {change_id.strip().upper()} APPLIED?", default=False
-            )
+            apply_chg = typer.confirm(f"Mark {change_id.strip().upper()} APPLIED?", default=False)
     return resolve_q, apply_chg, answer
 
 
@@ -1405,10 +1356,7 @@ def _parse_ownership(raw: str) -> OwnershipStatus:
     try:
         return OwnershipStatus(raw.strip().upper().replace("-", "_"))
     except ValueError:
-        _fail(
-            "Invalid ownership status. Use OWNED, RETIRED, SOLD, "
-            "LOANED_OUT, or UNKNOWN."
-        )
+        _fail("Invalid ownership status. Use OWNED, RETIRED, SOLD, LOANED_OUT, or UNKNOWN.")
         raise
 
 
@@ -1422,8 +1370,8 @@ def _parse_condition(raw: str) -> GearCondition:
 
 @gear_app.command("list")
 def gear_list_cmd(
-    category: Optional[str] = typer.Option(None, "--category"),
-    status: Optional[str] = typer.Option(None, "--status"),
+    category: str | None = typer.Option(None, "--category"),
+    status: str | None = typer.Option(None, "--status"),
 ) -> None:
     """List canonical owned-equipment records."""
     try:
@@ -1484,9 +1432,7 @@ def gear_usage_cmd(gear_id: str) -> None:
     console.print("CURRENT routing:")
     if usage["routing"]:
         for ref in usage["routing"]:
-            console.print(
-                f"  {ref['path']}/{ref['branch']}  {ref['node']} — {ref['label']}"
-            )
+            console.print(f"  {ref['path']}/{ref['branch']}  {ref['node']} — {ref['label']}")
     else:
         console.print("  (none)")
     console.print("Wishlist:")
@@ -1504,8 +1450,8 @@ def _commit_inventory_preview(
     *,
     yes: bool,
     dry_run: bool,
-    question: Optional[str],
-    change: Optional[str],
+    question: str | None,
+    change: str | None,
     answer_hint: str,
     no_render: bool,
 ) -> None:
@@ -1550,17 +1496,17 @@ def _commit_inventory_preview(
 
 @current_gear_app.command("add")
 def current_gear_add(
-    gear_id: Optional[str] = typer.Option(None, "--id"),
-    name: Optional[str] = typer.Option(None, "--name"),
-    manufacturer: Optional[str] = typer.Option(None, "--manufacturer"),
-    model: Optional[str] = typer.Option(None, "--model"),
-    category: Optional[str] = typer.Option(None, "--category"),
-    quantity: Optional[int] = typer.Option(None, "--quantity", min=1),
-    notes: Optional[str] = typer.Option(None, "--notes"),
+    gear_id: str | None = typer.Option(None, "--id"),
+    name: str | None = typer.Option(None, "--name"),
+    manufacturer: str | None = typer.Option(None, "--manufacturer"),
+    model: str | None = typer.Option(None, "--model"),
+    category: str | None = typer.Option(None, "--category"),
+    quantity: int | None = typer.Option(None, "--quantity", min=1),
+    notes: str | None = typer.Option(None, "--notes"),
     yes: bool = typer.Option(False, "--yes"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    question: Optional[str] = typer.Option(None, "--question"),
-    change: Optional[str] = typer.Option(None, "--change"),
+    question: str | None = typer.Option(None, "--question"),
+    change: str | None = typer.Option(None, "--change"),
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     if name is None:
@@ -1607,8 +1553,8 @@ def _gear_field_mutation(
     *,
     yes: bool,
     dry_run: bool,
-    question: Optional[str],
-    change: Optional[str],
+    question: str | None,
+    change: str | None,
     no_render: bool,
 ) -> None:
     _commit_inventory_preview(
@@ -1629,17 +1575,23 @@ def current_gear_set_status(
     status: str,
     yes: bool = typer.Option(False, "--yes"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    question: Optional[str] = typer.Option(None, "--question"),
-    change: Optional[str] = typer.Option(None, "--change"),
+    question: str | None = typer.Option(None, "--question"),
+    change: str | None = typer.Option(None, "--change"),
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     try:
-        preview, data = inventory_state.propose_set_status(
-            gear_id, _parse_ownership(status)
-        )
+        preview, data = inventory_state.propose_set_status(gear_id, _parse_ownership(status))
     except StoreError as exc:
         _fail(str(exc))
-    _gear_field_mutation(preview, data, yes=yes, dry_run=dry_run, question=question, change=change, no_render=no_render)
+    _gear_field_mutation(
+        preview,
+        data,
+        yes=yes,
+        dry_run=dry_run,
+        question=question,
+        change=change,
+        no_render=no_render,
+    )
 
 
 @current_gear_app.command("set-condition")
@@ -1648,17 +1600,23 @@ def current_gear_set_condition(
     condition: str,
     yes: bool = typer.Option(False, "--yes"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    question: Optional[str] = typer.Option(None, "--question"),
-    change: Optional[str] = typer.Option(None, "--change"),
+    question: str | None = typer.Option(None, "--question"),
+    change: str | None = typer.Option(None, "--change"),
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     try:
-        preview, data = inventory_state.propose_set_condition(
-            gear_id, _parse_condition(condition)
-        )
+        preview, data = inventory_state.propose_set_condition(gear_id, _parse_condition(condition))
     except StoreError as exc:
         _fail(str(exc))
-    _gear_field_mutation(preview, data, yes=yes, dry_run=dry_run, question=question, change=change, no_render=no_render)
+    _gear_field_mutation(
+        preview,
+        data,
+        yes=yes,
+        dry_run=dry_run,
+        question=question,
+        change=change,
+        no_render=no_render,
+    )
 
 
 @current_gear_app.command("set-location")
@@ -1667,15 +1625,23 @@ def current_gear_set_location(
     location: str,
     yes: bool = typer.Option(False, "--yes"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    question: Optional[str] = typer.Option(None, "--question"),
-    change: Optional[str] = typer.Option(None, "--change"),
+    question: str | None = typer.Option(None, "--question"),
+    change: str | None = typer.Option(None, "--change"),
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     try:
         preview, data = inventory_state.propose_set_location(gear_id, location)
     except StoreError as exc:
         _fail(str(exc))
-    _gear_field_mutation(preview, data, yes=yes, dry_run=dry_run, question=question, change=change, no_render=no_render)
+    _gear_field_mutation(
+        preview,
+        data,
+        yes=yes,
+        dry_run=dry_run,
+        question=question,
+        change=change,
+        no_render=no_render,
+    )
 
 
 @current_gear_app.command("retire")
@@ -1683,43 +1649,59 @@ def current_gear_retire(
     gear_id: str,
     yes: bool = typer.Option(False, "--yes"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    question: Optional[str] = typer.Option(None, "--question"),
-    change: Optional[str] = typer.Option(None, "--change"),
+    question: str | None = typer.Option(None, "--question"),
+    change: str | None = typer.Option(None, "--change"),
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     try:
         preview, data = inventory_state.propose_retire(gear_id)
     except StoreError as exc:
         _fail(str(exc))
-    _gear_field_mutation(preview, data, yes=yes, dry_run=dry_run, question=question, change=change, no_render=no_render)
+    _gear_field_mutation(
+        preview,
+        data,
+        yes=yes,
+        dry_run=dry_run,
+        question=question,
+        change=change,
+        no_render=no_render,
+    )
 
 
 @current_gear_app.command("acquire")
 def current_gear_acquire(
     wishlist_item_name: str,
-    gear_id: Optional[str] = typer.Option(None, "--id"),
-    name: Optional[str] = typer.Option(None, "--name"),
-    manufacturer: Optional[str] = typer.Option(None, "--manufacturer"),
-    model: Optional[str] = typer.Option(None, "--model"),
-    category: Optional[str] = typer.Option(None, "--category"),
-    quantity: Optional[int] = typer.Option(None, "--quantity", min=1),
-    notes: Optional[str] = typer.Option(None, "--notes"),
+    gear_id: str | None = typer.Option(None, "--id"),
+    name: str | None = typer.Option(None, "--name"),
+    manufacturer: str | None = typer.Option(None, "--manufacturer"),
+    model: str | None = typer.Option(None, "--model"),
+    category: str | None = typer.Option(None, "--category"),
+    quantity: int | None = typer.Option(None, "--quantity", min=1),
+    notes: str | None = typer.Option(None, "--notes"),
     yes: bool = typer.Option(False, "--yes"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    question: Optional[str] = typer.Option(None, "--question"),
-    change: Optional[str] = typer.Option(None, "--change"),
+    question: str | None = typer.Option(None, "--question"),
+    change: str | None = typer.Option(None, "--change"),
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     try:
         wish = wishlist_service.get_item(load_wishlist(), wishlist_item_name)
     except StoreError as exc:
         _fail(str(exc))
-    manufacturer = manufacturer if manufacturer is not None else typer.prompt("Manufacturer (optional)", default="")
+    manufacturer = (
+        manufacturer
+        if manufacturer is not None
+        else typer.prompt("Manufacturer (optional)", default="")
+    )
     model = model if model is not None else typer.prompt("Model (optional)", default="")
     category = category if category is not None else typer.prompt("Category", default=wish.category)
     quantity = quantity if quantity is not None else typer.prompt("Quantity", default=1, type=int)
     notes = notes if notes is not None else typer.prompt("Notes (optional)", default="")
-    gear_id = gear_id if gear_id is not None else (typer.prompt("ID (blank to generate)", default="") or None)
+    gear_id = (
+        gear_id
+        if gear_id is not None
+        else (typer.prompt("ID (blank to generate)", default="") or None)
+    )
     todo = load_todo()
     related = [todo.task_map()[ref] for ref in wish.todo_refs if ref in todo.task_map()]
     console.print("Related TODOs:")
@@ -1790,8 +1772,8 @@ def _commit_routing_preview(
     *,
     yes: bool,
     dry_run: bool,
-    question: Optional[str],
-    change: Optional[str],
+    question: str | None,
+    change: str | None,
     answer_hint: str,
     no_render: bool,
 ) -> None:
@@ -1849,15 +1831,15 @@ def current_path_branches(path: str) -> None:
 def current_path_move(
     path: str,
     node: str,
-    branch: Optional[str] = typer.Option(None, "--branch"),
-    before: Optional[str] = typer.Option(None, "--before"),
-    after: Optional[str] = typer.Option(None, "--after"),
+    branch: str | None = typer.Option(None, "--branch"),
+    before: str | None = typer.Option(None, "--before"),
+    after: str | None = typer.Option(None, "--after"),
     first: bool = typer.Option(False, "--first"),
     last: bool = typer.Option(False, "--last"),
     yes: bool = typer.Option(False, "--yes"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    question: Optional[str] = typer.Option(None, "--question"),
-    change: Optional[str] = typer.Option(None, "--change"),
+    question: str | None = typer.Option(None, "--question"),
+    change: str | None = typer.Option(None, "--change"),
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     try:
@@ -1888,16 +1870,16 @@ def current_path_move(
 def current_path_insert(
     path: str,
     node_id: str,
-    label: Optional[str] = typer.Option(None, "--label"),
-    branch: Optional[str] = typer.Option(None, "--branch"),
-    before: Optional[str] = typer.Option(None, "--before"),
-    after: Optional[str] = typer.Option(None, "--after"),
+    label: str | None = typer.Option(None, "--label"),
+    branch: str | None = typer.Option(None, "--branch"),
+    before: str | None = typer.Option(None, "--before"),
+    after: str | None = typer.Option(None, "--after"),
     first: bool = typer.Option(False, "--first"),
     last: bool = typer.Option(False, "--last"),
     yes: bool = typer.Option(False, "--yes"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    question: Optional[str] = typer.Option(None, "--question"),
-    change: Optional[str] = typer.Option(None, "--change"),
+    question: str | None = typer.Option(None, "--question"),
+    change: str | None = typer.Option(None, "--change"),
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     try:
@@ -1929,11 +1911,11 @@ def current_path_insert(
 def current_path_remove(
     path: str,
     node: str,
-    branch: Optional[str] = typer.Option(None, "--branch"),
+    branch: str | None = typer.Option(None, "--branch"),
     yes: bool = typer.Option(False, "--yes"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    question: Optional[str] = typer.Option(None, "--question"),
-    change: Optional[str] = typer.Option(None, "--change"),
+    question: str | None = typer.Option(None, "--question"),
+    change: str | None = typer.Option(None, "--change"),
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     try:
@@ -1957,17 +1939,15 @@ def current_path_set_mode(
     path: str,
     node: str,
     mode: str,
-    branch: Optional[str] = typer.Option(None, "--branch"),
+    branch: str | None = typer.Option(None, "--branch"),
     yes: bool = typer.Option(False, "--yes"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    question: Optional[str] = typer.Option(None, "--question"),
-    change: Optional[str] = typer.Option(None, "--change"),
+    question: str | None = typer.Option(None, "--question"),
+    change: str | None = typer.Option(None, "--change"),
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     try:
-        preview, data = routing_state.propose_set_mode(
-            path, node, mode, branch=branch
-        )
+        preview, data = routing_state.propose_set_mode(path, node, mode, branch=branch)
     except StoreError as exc:
         _fail(str(exc))
     _commit_routing_preview(
@@ -1988,8 +1968,8 @@ def current_path_set_evidence(
     evidence: str,
     yes: bool = typer.Option(False, "--yes"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    question: Optional[str] = typer.Option(None, "--question"),
-    change: Optional[str] = typer.Option(None, "--change"),
+    question: str | None = typer.Option(None, "--question"),
+    change: str | None = typer.Option(None, "--change"),
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     """Set NamedPath.evidence (VERIFIED|INTENDED|UNKNOWN) after human check."""
@@ -2058,9 +2038,7 @@ def current_path_verify(
     for branch_id in branch_ids:
         while True:
             try:
-                _preview, staged = routing_state.propose_batch(
-                    path_id, mutations, data=original
-                )
+                _preview, staged = routing_state.propose_batch(path_id, mutations, data=original)
                 _pid, named = routing_state.get_named_path(staged, path_id)
                 branch = named.branches[branch_id]
             except StoreError as exc:
@@ -2124,9 +2102,7 @@ def current_path_verify(
                 _fail(str(exc))
 
     try:
-        preview, data = routing_state.propose_batch(
-            path_id, mutations, data=original
-        )
+        preview, data = routing_state.propose_batch(path_id, mutations, data=original)
     except StoreError as exc:
         _fail(str(exc))
     console.print("")
@@ -2138,9 +2114,7 @@ def current_path_verify(
             console.print(f"  - {summary}")
     if dry_run:
         try:
-            current_service.commit_routing(
-                data, preview, dry_run=True, render=False
-            )
+            current_service.commit_routing(data, preview, dry_run=True, render=False)
         except StoreError as exc:
             _fail(str(exc))
         console.print("[dim]Dry-run: nothing written.[/dim]")
@@ -2156,9 +2130,7 @@ def current_path_verify(
         raise typer.Abort()
     try:
         if preview.changed:
-            current_service.commit_routing(
-                data, preview, render=not no_render
-            )
+            current_service.commit_routing(data, preview, render=not no_render)
         for summary in pending_changes:
             change_service.create_change(
                 summary,
@@ -2180,9 +2152,7 @@ def current_pb_show(
 ) -> None:
     """Alias for read-only `rig patchbay` (reuses the same view)."""
     try:
-        console.print(
-            rig_views.format_patchbay(bay_id, unknown_only=unknown).rstrip()
-        )
+        console.print(rig_views.format_patchbay(bay_id, unknown_only=unknown).rstrip())
     except StoreError as exc:
         _fail(str(exc))
 
@@ -2194,8 +2164,8 @@ def current_pb_set_mode(
     mode: str = typer.Argument(..., help="normal|half-normal|thru|unknown"),
     yes: bool = typer.Option(False, "--yes"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    question: Optional[str] = typer.Option(None, "--question"),
-    change: Optional[str] = typer.Option(None, "--change"),
+    question: str | None = typer.Option(None, "--question"),
+    change: str | None = typer.Option(None, "--change"),
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     try:
@@ -2250,8 +2220,8 @@ def current_pb_set_mode(
 def current_pb_set_connection(
     bay_id: str,
     jack: str = typer.Argument(..., help="Upper jack N or pair N/M"),
-    upper: Optional[str] = typer.Option(None, "--upper", help="Upper connection label"),
-    lower: Optional[str] = typer.Option(None, "--lower", help="Lower connection label"),
+    upper: str | None = typer.Option(None, "--upper", help="Upper connection label"),
+    lower: str | None = typer.Option(None, "--lower", help="Lower connection label"),
     yes: bool = typer.Option(False, "--yes"),
     dry_run: bool = typer.Option(False, "--dry-run"),
     no_render: bool = typer.Option(False, "--no-render"),
@@ -2294,8 +2264,8 @@ def current_pb_set_model(
     model: str,
     yes: bool = typer.Option(False, "--yes"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    question: Optional[str] = typer.Option(None, "--question"),
-    change: Optional[str] = typer.Option(None, "--change"),
+    question: str | None = typer.Option(None, "--question"),
+    change: str | None = typer.Option(None, "--change"),
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     try:
@@ -2356,9 +2326,7 @@ def current_pb_verify(
         lower = pair["lower_n"] if pair["lower_n"] is not None else "?"
         console.print("")
         console.print(f"{bay_id.upper()} pair {pair['upper_n']}/{lower}")
-        console.print(
-            f"{pair['upper_conn'] or '—'} -> {pair['lower_conn'] or '—'}"
-        )
+        console.print(f"{pair['upper_conn'] or '—'} -> {pair['lower_conn'] or '—'}")
         console.print(f"Current mode: {str(pair['mode']).upper()}")
         console.print("Mode:")
         console.print("  [1] normal")
@@ -2400,14 +2368,10 @@ def current_pb_verify(
     if dry_run:
         console.print("[dim]Dry-run: nothing written.[/dim]")
         raise typer.Exit(0)
-    if not yes and not typer.confirm(
-        f"Apply {changed_n} CURRENT updates?", default=False
-    ):
+    if not yes and not typer.confirm(f"Apply {changed_n} CURRENT updates?", default=False):
         raise typer.Abort()
     try:
-        result = current_service.commit_patchbay(
-            data, preview, render=not no_render
-        )
+        result = current_service.commit_patchbay(data, preview, render=not no_render)
     except StoreError as exc:
         _fail(str(exc))
     console.print(f"[green]Applied:[/green] {result.message}")
@@ -2415,7 +2379,7 @@ def current_pb_verify(
 
 @current_ch_app.command("show")
 def current_ch_show(
-    device: Optional[str] = typer.Option(None, "--device", help="tascam|alesis"),
+    device: str | None = typer.Option(None, "--device", help="tascam|alesis"),
 ) -> None:
     """Alias for read-only `rig channels`."""
     try:
@@ -2431,8 +2395,8 @@ def current_ch_set_source(
     source: str,
     yes: bool = typer.Option(False, "--yes"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    question: Optional[str] = typer.Option(None, "--question"),
-    change: Optional[str] = typer.Option(None, "--change"),
+    question: str | None = typer.Option(None, "--question"),
+    change: str | None = typer.Option(None, "--change"),
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     try:
@@ -2473,8 +2437,8 @@ def current_ch_clear_source(
     channel: str,
     yes: bool = typer.Option(False, "--yes"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    question: Optional[str] = typer.Option(None, "--question"),
-    change: Optional[str] = typer.Option(None, "--change"),
+    question: str | None = typer.Option(None, "--question"),
+    change: str | None = typer.Option(None, "--change"),
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     try:
@@ -2538,10 +2502,7 @@ def midi_summary() -> None:
     console.print(f"Endpoints:     {len(doc.endpoints)}")
     console.print(f"Physical links:{len(doc.connections):>3}")
     console.print(f"Clock master:  {master}")
-    console.print(
-        "Evidence:      "
-        + "  ".join(f"{key} {value}" for key, value in counts.items())
-    )
+    console.print("Evidence:      " + "  ".join(f"{key} {value}" for key, value in counts.items()))
 
 
 @midi_app.command("devices")
@@ -2590,9 +2551,7 @@ def midi_channels() -> None:
     for label in ("Gear ref", "Channel", "Evidence", "Notes"):
         table.add_column(label)
     for item in doc.channels:
-        table.add_row(
-            item.gear_ref, str(item.channel), item.status.value, item.notes or "—"
-        )
+        table.add_row(item.gear_ref, str(item.channel), item.status.value, item.notes or "—")
     console.print(table)
 
 
@@ -2603,10 +2562,7 @@ def midi_clock() -> None:
     except StoreError as exc:
         _fail(str(exc))
     if doc.clock.master:
-        console.print(
-            f"Master: {_midi_ref(doc.clock.master)} "
-            f"({doc.clock.master.status.value})"
-        )
+        console.print(f"Master: {_midi_ref(doc.clock.master)} ({doc.clock.master.status.value})")
     else:
         console.print("Master: UNKNOWN")
     table = Table(title="CLOCK DESTINATIONS")
@@ -2654,8 +2610,8 @@ def _commit_midi_preview(
     *,
     yes: bool,
     dry_run: bool,
-    question: Optional[str],
-    change: Optional[str],
+    question: str | None,
+    change: str | None,
     answer_hint: str,
     no_render: bool,
 ) -> None:
@@ -2704,8 +2660,8 @@ def _midi_mutation_options(
     *,
     yes: bool,
     dry_run: bool,
-    question: Optional[str],
-    change: Optional[str],
+    question: str | None,
+    change: str | None,
     no_render: bool,
 ) -> None:
     _commit_midi_preview(
@@ -2726,15 +2682,23 @@ def current_midi_set_channel(
     channel: str,
     yes: bool = typer.Option(False, "--yes"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    question: Optional[str] = typer.Option(None, "--question"),
-    change: Optional[str] = typer.Option(None, "--change"),
+    question: str | None = typer.Option(None, "--question"),
+    change: str | None = typer.Option(None, "--change"),
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     try:
         preview, data = midi_state.propose_set_channel(gear, channel)
     except StoreError as exc:
         _fail(str(exc))
-    _midi_mutation_options(preview, data, yes=yes, dry_run=dry_run, question=question, change=change, no_render=no_render)
+    _midi_mutation_options(
+        preview,
+        data,
+        yes=yes,
+        dry_run=dry_run,
+        question=question,
+        change=change,
+        no_render=no_render,
+    )
 
 
 @current_midi_app.command("add-link")
@@ -2746,8 +2710,8 @@ def current_midi_add_link(
     transport: str = typer.Option(..., "--transport"),
     yes: bool = typer.Option(False, "--yes"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    question: Optional[str] = typer.Option(None, "--question"),
-    change: Optional[str] = typer.Option(None, "--change"),
+    question: str | None = typer.Option(None, "--question"),
+    change: str | None = typer.Option(None, "--change"),
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     try:
@@ -2760,7 +2724,15 @@ def current_midi_add_link(
         )
     except StoreError as exc:
         _fail(str(exc))
-    _midi_mutation_options(preview, data, yes=yes, dry_run=dry_run, question=question, change=change, no_render=no_render)
+    _midi_mutation_options(
+        preview,
+        data,
+        yes=yes,
+        dry_run=dry_run,
+        question=question,
+        change=change,
+        no_render=no_render,
+    )
 
 
 @current_midi_app.command("remove-link")
@@ -2768,15 +2740,23 @@ def current_midi_remove_link(
     link_id: str,
     yes: bool = typer.Option(False, "--yes"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    question: Optional[str] = typer.Option(None, "--question"),
-    change: Optional[str] = typer.Option(None, "--change"),
+    question: str | None = typer.Option(None, "--question"),
+    change: str | None = typer.Option(None, "--change"),
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     try:
         preview, data = midi_state.propose_remove_link(link_id)
     except StoreError as exc:
         _fail(str(exc))
-    _midi_mutation_options(preview, data, yes=yes, dry_run=dry_run, question=question, change=change, no_render=no_render)
+    _midi_mutation_options(
+        preview,
+        data,
+        yes=yes,
+        dry_run=dry_run,
+        question=question,
+        change=change,
+        no_render=no_render,
+    )
 
 
 @current_midi_app.command("set-clock-master")
@@ -2784,15 +2764,23 @@ def current_midi_set_clock_master(
     endpoint: str,
     yes: bool = typer.Option(False, "--yes"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    question: Optional[str] = typer.Option(None, "--question"),
-    change: Optional[str] = typer.Option(None, "--change"),
+    question: str | None = typer.Option(None, "--question"),
+    change: str | None = typer.Option(None, "--change"),
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     try:
         preview, data = midi_state.propose_set_clock_master(endpoint)
     except StoreError as exc:
         _fail(str(exc))
-    _midi_mutation_options(preview, data, yes=yes, dry_run=dry_run, question=question, change=change, no_render=no_render)
+    _midi_mutation_options(
+        preview,
+        data,
+        yes=yes,
+        dry_run=dry_run,
+        question=question,
+        change=change,
+        no_render=no_render,
+    )
 
 
 @current_midi_app.command("set-clock")
@@ -2801,29 +2789,35 @@ def current_midi_set_clock(
     enabled: str,
     yes: bool = typer.Option(False, "--yes"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    question: Optional[str] = typer.Option(None, "--question"),
-    change: Optional[str] = typer.Option(None, "--change"),
+    question: str | None = typer.Option(None, "--question"),
+    change: str | None = typer.Option(None, "--change"),
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     try:
-        preview, data = midi_state.propose_set_clock_destination(
-            gear_or_endpoint, enabled
-        )
+        preview, data = midi_state.propose_set_clock_destination(gear_or_endpoint, enabled)
     except StoreError as exc:
         _fail(str(exc))
-    _midi_mutation_options(preview, data, yes=yes, dry_run=dry_run, question=question, change=change, no_render=no_render)
+    _midi_mutation_options(
+        preview,
+        data,
+        yes=yes,
+        dry_run=dry_run,
+        question=question,
+        change=change,
+        no_render=no_render,
+    )
 
 
 @current_midi_app.command("ableton-set")
 def current_midi_ableton_set(
     port_id: str,
-    track: Optional[str] = typer.Option(None, "--track"),
-    sync: Optional[str] = typer.Option(None, "--sync"),
-    remote: Optional[str] = typer.Option(None, "--remote"),
+    track: str | None = typer.Option(None, "--track"),
+    sync: str | None = typer.Option(None, "--sync"),
+    remote: str | None = typer.Option(None, "--remote"),
     yes: bool = typer.Option(False, "--yes"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    question: Optional[str] = typer.Option(None, "--question"),
-    change: Optional[str] = typer.Option(None, "--change"),
+    question: str | None = typer.Option(None, "--question"),
+    change: str | None = typer.Option(None, "--change"),
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     try:
@@ -2832,15 +2826,23 @@ def current_midi_ableton_set(
         )
     except StoreError as exc:
         _fail(str(exc))
-    _midi_mutation_options(preview, data, yes=yes, dry_run=dry_run, question=question, change=change, no_render=no_render)
+    _midi_mutation_options(
+        preview,
+        data,
+        yes=yes,
+        dry_run=dry_run,
+        question=question,
+        change=change,
+        no_render=no_render,
+    )
 
 
 @current_midi_app.command("verify")
 def current_midi_verify(
     yes: bool = typer.Option(False, "--yes"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    question: Optional[str] = typer.Option(None, "--question"),
-    change: Optional[str] = typer.Option(None, "--change"),
+    question: str | None = typer.Option(None, "--question"),
+    change: str | None = typer.Option(None, "--change"),
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     """Walk known MIDI facts and apply selected verification as one transaction."""
@@ -2850,17 +2852,11 @@ def current_midi_verify(
         _fail(str(exc))
     mutations: list[dict] = []
     for item in doc.channels:
-        value = typer.prompt(
-            f"Channel for {item.gear_ref}", default=str(item.channel)
-        ).strip()
+        value = typer.prompt(f"Channel for {item.gear_ref}", default=str(item.channel)).strip()
         if value:
-            mutations.append(
-                {"op": "set_channel", "gear_ref": item.gear_ref, "channel": value}
-            )
+            mutations.append({"op": "set_channel", "gear_ref": item.gear_ref, "channel": value})
     if doc.clock.master:
-        master = typer.prompt(
-            "Clock master", default=_midi_ref(doc.clock.master)
-        ).strip()
+        master = typer.prompt("Clock master", default=_midi_ref(doc.clock.master)).strip()
         if master:
             mutations.append({"op": "set_clock_master", "ref": master})
     for item in doc.clock.destinations:
@@ -2898,7 +2894,15 @@ def current_midi_verify(
         preview, data = midi_state.propose_batch(mutations)
     except StoreError as exc:
         _fail(str(exc))
-    _midi_mutation_options(preview, data, yes=yes, dry_run=dry_run, question=question, change=change, no_render=no_render)
+    _midi_mutation_options(
+        preview,
+        data,
+        yes=yes,
+        dry_run=dry_run,
+        question=question,
+        change=change,
+        no_render=no_render,
+    )
 
 
 def _controller_record(gear: str):
@@ -2952,13 +2956,22 @@ def controls_show(gear: str) -> None:
         table.add_column(label)
     for context in record.contexts:
         for control in context.controls:
-            messages = "; ".join(
-                f"{m.type.value} {m.number} ch {m.channel or '—'} ({m.value_behavior.value})"
-                for m in control.messages
-            ) or "—"
+            messages = (
+                "; ".join(
+                    f"{m.type.value} {m.number} ch {m.channel or '—'} ({m.value_behavior.value})"
+                    for m in control.messages
+                )
+                or "—"
+            )
             target = control.target.state.value
             if control.target.state == TargetState.MAPPED:
-                ref = control.target.track or control.target.send or control.target.action or control.target.notes or "—"
+                ref = (
+                    control.target.track
+                    or control.target.send
+                    or control.target.action
+                    or control.target.notes
+                    or "—"
+                )
                 target = f"{control.target.kind.value}: {ref}"
             table.add_row(
                 context.id,
@@ -2973,7 +2986,7 @@ def controls_show(gear: str) -> None:
 
 
 @controls_app.command("contexts")
-def controls_contexts(gear: Optional[str] = None) -> None:
+def controls_contexts(gear: str | None = None) -> None:
     try:
         doc = control_state.load_document()
     except StoreError as exc:
@@ -3018,7 +3031,7 @@ def controls_context(gear: str, context_id: str) -> None:
 
 
 @controls_app.command("gaps")
-def controls_gaps(gear: Optional[str] = None) -> None:
+def controls_gaps(gear: str | None = None) -> None:
     try:
         gaps = control_state.find_gaps(control_state.load_document())
     except StoreError as exc:
@@ -3034,7 +3047,7 @@ def controls_gaps(gear: Optional[str] = None) -> None:
 
 
 @controls_app.command("conflicts")
-def controls_conflicts(gear: Optional[str] = None) -> None:
+def controls_conflicts(gear: str | None = None) -> None:
     try:
         conflicts = control_state.find_conflicts(control_state.load_document())
     except StoreError as exc:
@@ -3271,7 +3284,7 @@ def performance_bindings() -> None:
 
 
 @performance_app.command("recovery")
-def performance_recovery(recovery_id: Optional[str] = None) -> None:
+def performance_recovery(recovery_id: str | None = None) -> None:
     doc = _performance_doc()
     values = doc.recovery
     if recovery_id is not None:
@@ -3380,9 +3393,7 @@ def performance_preflight_cmd(
         report = automation.preflight(mode=mode)
     except StoreError as exc:
         _fail(str(exc))
-    console.print(
-        f"[bold]PREFLIGHT[/bold]  mode={report.mode}  worst={report.worst.value}"
-    )
+    console.print(f"[bold]PREFLIGHT[/bold]  mode={report.mode}  worst={report.worst.value}")
     console.print("Advisory only — never blocks play; no files modified.")
     console.print("")
     by_section: dict[str, list] = {}
@@ -3397,7 +3408,7 @@ def performance_preflight_cmd(
 
 @snapshot_app.command("create")
 def snapshot_create_cmd(
-    output: Optional[Path] = typer.Option(
+    output: Path | None = typer.Option(
         None, "--output", help="Parent directory for SNAP-* folders"
     ),
 ) -> None:
@@ -3419,9 +3430,7 @@ def snapshot_create_cmd(
     console.print(f"Tree:      {tree}")
     console.print(f"Files:     {len(manifest.canonical_files)}")
     sync = manifest.generated_docs_synchronized
-    console.print(
-        f"Docs sync: {'yes' if sync else 'no' if sync is False else 'unknown'}"
-    )
+    console.print(f"Docs sync: {'yes' if sync else 'no' if sync is False else 'unknown'}")
 
 
 @snapshot_app.command("list")
@@ -3542,7 +3551,7 @@ def backup_status_cmd() -> None:
 
 @backup_app.command("create")
 def backup_create_cmd(
-    output: Optional[Path] = typer.Option(
+    output: Path | None = typer.Option(
         None, "--output", help="Parent directory for BACKUP-* packages"
     ),
 ) -> None:
@@ -3570,8 +3579,7 @@ def automation_capabilities_cmd() -> None:
     console.print(table)
     console.print("")
     console.print(
-        "OBS / Ableton / MIDI / macOS adapters are NOT_IMPLEMENTED — "
-        "no fake success adapters."
+        "OBS / Ableton / MIDI / macOS adapters are NOT_IMPLEMENTED — no fake success adapters."
     )
 
 
@@ -3580,17 +3588,13 @@ def _commit_performance_preview(
 ) -> None:
     if not _confirm_current(preview, yes=yes, dry_run=dry_run):
         if dry_run:
-            current_service.commit_performance(
-                data, preview, dry_run=True, render=False
-            )
+            current_service.commit_performance(data, preview, dry_run=True, render=False)
             raise typer.Exit(0)
         if not preview.changed:
             raise typer.Exit(0)
         raise typer.Abort()
     try:
-        result = current_service.commit_performance(
-            data, preview, render=not no_render
-        )
+        result = current_service.commit_performance(data, preview, render=not no_render)
     except StoreError as exc:
         _fail(str(exc))
     console.print(f"[green]Applied:[/green] {result.message}")
@@ -3599,13 +3603,13 @@ def _commit_performance_preview(
 @current_performance_app.command("bind")
 def current_performance_bind(
     action: str,
-    controller: Optional[str] = typer.Option(None, "--controller"),
-    surface: Optional[str] = typer.Option(None, "--surface"),
+    controller: str | None = typer.Option(None, "--controller"),
+    surface: str | None = typer.Option(None, "--surface"),
     context: str = typer.Option(..., "--context"),
     control: str = typer.Option(..., "--control"),
     evidence: str = typer.Option("INTENDED", "--evidence"),
     notes: str = typer.Option("", "--notes"),
-    binding_id: Optional[str] = typer.Option(None, "--id"),
+    binding_id: str | None = typer.Option(None, "--id"),
     yes: bool = typer.Option(False, "--yes"),
     dry_run: bool = typer.Option(False, "--dry-run"),
     no_render: bool = typer.Option(False, "--no-render"),
@@ -3623,9 +3627,7 @@ def current_performance_bind(
         )
     except (StoreError, ValueError) as exc:
         _fail(str(exc))
-    _commit_performance_preview(
-        preview, data, yes=yes, dry_run=dry_run, no_render=no_render
-    )
+    _commit_performance_preview(preview, data, yes=yes, dry_run=dry_run, no_render=no_render)
 
 
 @current_performance_app.command("unbind")
@@ -3641,10 +3643,7 @@ def current_performance_unbind(
         _fail(f"Unknown performance binding {binding_id!r}.")
     action = next(item for item in doc.actions if item.id == binding.action_ref)
     action_bindings = [item for item in doc.bindings if item.action_ref == action.id]
-    if (
-        action.criticality == PerformanceCriticality.EMERGENCY
-        and len(action_bindings) == 1
-    ):
+    if action.criticality == PerformanceCriticality.EMERGENCY and len(action_bindings) == 1:
         console.print(
             f"[yellow]Warning:[/yellow] {binding_id} is the last binding for "
             f"EMERGENCY action {action.id}."
@@ -3657,9 +3656,7 @@ def current_performance_unbind(
         preview, data = performance_state.propose_unbind(binding_id)
     except StoreError as exc:
         _fail(str(exc))
-    _commit_performance_preview(
-        preview, data, yes=yes, dry_run=dry_run, no_render=no_render
-    )
+    _commit_performance_preview(preview, data, yes=yes, dry_run=dry_run, no_render=no_render)
 
 
 @current_performance_app.command("set-evidence")
@@ -3674,9 +3671,7 @@ def current_performance_set_evidence(
         preview, data = performance_state.propose_set_evidence(binding_id, evidence)
     except (StoreError, ValueError) as exc:
         _fail(str(exc))
-    _commit_performance_preview(
-        preview, data, yes=yes, dry_run=dry_run, no_render=no_render
-    )
+    _commit_performance_preview(preview, data, yes=yes, dry_run=dry_run, no_render=no_render)
 
 
 @current_performance_app.command("set-recovery-evidence")
@@ -3688,14 +3683,10 @@ def current_performance_set_recovery_evidence(
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     try:
-        preview, data = performance_state.propose_set_recovery_evidence(
-            recovery_id, evidence
-        )
+        preview, data = performance_state.propose_set_recovery_evidence(recovery_id, evidence)
     except (StoreError, ValueError) as exc:
         _fail(str(exc))
-    _commit_performance_preview(
-        preview, data, yes=yes, dry_run=dry_run, no_render=no_render
-    )
+    _commit_performance_preview(preview, data, yes=yes, dry_run=dry_run, no_render=no_render)
 
 
 @current_performance_app.command("verify")
@@ -3734,9 +3725,7 @@ def current_performance_verify(
         preview, data = performance_state.propose_batch(mutations)
     except StoreError as exc:
         _fail(str(exc))
-    _commit_performance_preview(
-        preview, data, yes=yes, dry_run=dry_run, no_render=no_render
-    )
+    _commit_performance_preview(preview, data, yes=yes, dry_run=dry_run, no_render=no_render)
 
 
 def _commit_controls_preview(
@@ -3745,8 +3734,8 @@ def _commit_controls_preview(
     *,
     yes: bool,
     dry_run: bool,
-    question: Optional[str],
-    change: Optional[str],
+    question: str | None,
+    change: str | None,
     no_render: bool,
 ) -> None:
     if not _confirm_current(preview, yes=yes, dry_run=dry_run):
@@ -3786,7 +3775,7 @@ def _commit_controls_preview(
 
 
 def _message_from_cli(
-    message_type: str, number: int, channel: Optional[str], behavior: str
+    message_type: str, number: int, channel: str | None, behavior: str
 ) -> MidiMessage:
     channel_value: int | str | None = channel
     if channel and channel.isdigit():
@@ -3818,12 +3807,12 @@ def current_controls_set_message(
     control: str,
     message_type: str,
     number: int = typer.Argument(..., min=0, max=127),
-    channel: Optional[str] = typer.Option(None, "--channel"),
+    channel: str | None = typer.Option(None, "--channel"),
     behavior: str = typer.Option("fixed", "--behavior"),
     yes: bool = typer.Option(False, "--yes"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    question: Optional[str] = typer.Option(None, "--question"),
-    change: Optional[str] = typer.Option(None, "--change"),
+    question: str | None = typer.Option(None, "--question"),
+    change: str | None = typer.Option(None, "--change"),
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     try:
@@ -3842,12 +3831,12 @@ def current_controls_add_message(
     control: str,
     message_type: str,
     number: int = typer.Argument(..., min=0, max=127),
-    channel: Optional[str] = typer.Option(None, "--channel"),
+    channel: str | None = typer.Option(None, "--channel"),
     behavior: str = typer.Option("fixed", "--behavior"),
     yes: bool = typer.Option(False, "--yes"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    question: Optional[str] = typer.Option(None, "--question"),
-    change: Optional[str] = typer.Option(None, "--change"),
+    question: str | None = typer.Option(None, "--question"),
+    change: str | None = typer.Option(None, "--change"),
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     try:
@@ -3867,8 +3856,8 @@ def current_controls_remove_message(
     index: int = typer.Argument(0, min=0),
     yes: bool = typer.Option(False, "--yes"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    question: Optional[str] = typer.Option(None, "--question"),
-    change: Optional[str] = typer.Option(None, "--change"),
+    question: str | None = typer.Option(None, "--question"),
+    change: str | None = typer.Option(None, "--change"),
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     try:
@@ -3885,8 +3874,8 @@ def current_controls_clear_message(
     control: str,
     yes: bool = typer.Option(False, "--yes"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    question: Optional[str] = typer.Option(None, "--question"),
-    change: Optional[str] = typer.Option(None, "--change"),
+    question: str | None = typer.Option(None, "--question"),
+    change: str | None = typer.Option(None, "--change"),
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     try:
@@ -3902,15 +3891,15 @@ def current_controls_set_target(
     context: str,
     control: str,
     state: str,
-    kind: Optional[str] = typer.Option(None, "--kind"),
-    track: Optional[str] = typer.Option(None, "--track"),
-    send: Optional[str] = typer.Option(None, "--send"),
-    action: Optional[str] = typer.Option(None, "--action"),
-    notes: Optional[str] = typer.Option(None, "--notes"),
+    kind: str | None = typer.Option(None, "--kind"),
+    track: str | None = typer.Option(None, "--track"),
+    send: str | None = typer.Option(None, "--send"),
+    action: str | None = typer.Option(None, "--action"),
+    notes: str | None = typer.Option(None, "--notes"),
     yes: bool = typer.Option(False, "--yes"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    question: Optional[str] = typer.Option(None, "--question"),
-    change: Optional[str] = typer.Option(None, "--change"),
+    question: str | None = typer.Option(None, "--question"),
+    change: str | None = typer.Option(None, "--change"),
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     try:
@@ -3935,8 +3924,8 @@ def current_controls_clear_target(
     control: str,
     yes: bool = typer.Option(False, "--yes"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    question: Optional[str] = typer.Option(None, "--question"),
-    change: Optional[str] = typer.Option(None, "--change"),
+    question: str | None = typer.Option(None, "--question"),
+    change: str | None = typer.Option(None, "--change"),
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     try:
@@ -3954,14 +3943,12 @@ def current_controls_set_evidence(
     evidence: str,
     yes: bool = typer.Option(False, "--yes"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    question: Optional[str] = typer.Option(None, "--question"),
-    change: Optional[str] = typer.Option(None, "--change"),
+    question: str | None = typer.Option(None, "--question"),
+    change: str | None = typer.Option(None, "--change"),
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     try:
-        preview, data = control_state.propose_set_evidence(
-            gear, context, control, evidence
-        )
+        preview, data = control_state.propose_set_evidence(gear, context, control, evidence)
     except (StoreError, ValueError) as exc:
         _fail(str(exc))
     _control_options(preview, data, yes, dry_run, question, change, no_render)
@@ -3974,15 +3961,13 @@ def current_controls_set_context_evidence(
     evidence: str,
     yes: bool = typer.Option(False, "--yes"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    question: Optional[str] = typer.Option(None, "--question"),
-    change: Optional[str] = typer.Option(None, "--change"),
+    question: str | None = typer.Option(None, "--question"),
+    change: str | None = typer.Option(None, "--change"),
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     """Set ControllerContext.evidence (not whole controller)."""
     try:
-        preview, data = control_state.propose_set_context_evidence(
-            gear, context, evidence
-        )
+        preview, data = control_state.propose_set_context_evidence(gear, context, evidence)
     except (StoreError, ValueError) as exc:
         _fail(str(exc))
     _control_options(preview, data, yes, dry_run, question, change, no_render)
@@ -3994,21 +3979,17 @@ def current_ableton_set_template_evidence(
     evidence: str,
     yes: bool = typer.Option(False, "--yes"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    question: Optional[str] = typer.Option(None, "--question"),
-    change: Optional[str] = typer.Option(None, "--change"),
+    question: str | None = typer.Option(None, "--question"),
+    change: str | None = typer.Option(None, "--change"),
     no_render: bool = typer.Option(False, "--no-render"),
     as_json: bool = typer.Option(False, "--json"),
 ) -> None:
     """Set AbletonTemplate.evidence after explicit human Live-set check."""
     try:
-        preview, data = ableton_state.propose_set_template_evidence(
-            template_id, evidence
-        )
+        preview, data = ableton_state.propose_set_template_evidence(template_id, evidence)
     except (StoreError, ValueError) as exc:
         if as_json:
-            _verify_emit(
-                err_payload("store_error", str(exc)), as_json=True, exit_code=1
-            )
+            _verify_emit(err_payload("store_error", str(exc)), as_json=True, exit_code=1)
             return
         _fail(str(exc))
     if dry_run:
@@ -4063,14 +4044,12 @@ def current_controls_set_availability(
     availability: str,
     yes: bool = typer.Option(False, "--yes"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    question: Optional[str] = typer.Option(None, "--question"),
-    change: Optional[str] = typer.Option(None, "--change"),
+    question: str | None = typer.Option(None, "--question"),
+    change: str | None = typer.Option(None, "--change"),
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     try:
-        preview, data = control_state.propose_set_availability(
-            gear, context, control, availability
-        )
+        preview, data = control_state.propose_set_availability(gear, context, control, availability)
     except (StoreError, ValueError) as exc:
         _fail(str(exc))
     _control_options(preview, data, yes, dry_run, question, change, no_render)
@@ -4081,8 +4060,8 @@ def current_controls_verify(
     gear: str,
     yes: bool = typer.Option(False, "--yes"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    question: Optional[str] = typer.Option(None, "--question"),
-    change: Optional[str] = typer.Option(None, "--change"),
+    question: str | None = typer.Option(None, "--question"),
+    change: str | None = typer.Option(None, "--change"),
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     """Review modeled controls and apply evidence changes as one transaction."""
@@ -4273,34 +4252,26 @@ def reconcile_status_cmd(
     try:
         text = build_reconcile_summary()
         if as_json:
-            _reconcile_emit(
-                ok_payload("status", {"text": text.rstrip()}), as_json=True
-            )
+            _reconcile_emit(ok_payload("status", {"text": text.rstrip()}), as_json=True)
         else:
             console.print(text.rstrip())
     except StoreError as exc:
         if as_json:
-            _reconcile_emit(
-                err_payload("store_error", str(exc)), as_json=True, exit_code=1
-            )
+            _reconcile_emit(err_payload("store_error", str(exc)), as_json=True, exit_code=1)
         _fail(str(exc))
 
 
 @reconcile_app.command("queue")
 def reconcile_queue_cmd(
-    artifact_type: Optional[str] = typer.Option(None, "--type"),
-    state: Optional[str] = typer.Option(None, "--state"),
+    artifact_type: str | None = typer.Option(None, "--type"),
+    state: str | None = typer.Option(None, "--state"),
     ready: bool = typer.Option(False, "--ready"),
     as_json: bool = typer.Option(False, "--json"),
 ) -> None:
     """List reconciliation queue (Rich table unless --json)."""
     try:
-        items = reconcile_service.build_queue(
-            artifact_type=artifact_type, state=state, ready=ready
-        )
-        payload = ok_payload(
-            "queue", {"items": [i.to_dict() for i in items], "count": len(items)}
-        )
+        items = reconcile_service.build_queue(artifact_type=artifact_type, state=state, ready=ready)
+        payload = ok_payload("queue", {"items": [i.to_dict() for i in items], "count": len(items)})
         if as_json:
             _reconcile_emit(payload, as_json=True)
             return
@@ -4310,16 +4281,12 @@ def reconcile_queue_cmd(
         console.print(f"[dim]{len(items)} item(s)[/dim]")
     except StoreError as exc:
         if as_json:
-            _reconcile_emit(
-                err_payload("store_error", str(exc)), as_json=True, exit_code=1
-            )
+            _reconcile_emit(err_payload("store_error", str(exc)), as_json=True, exit_code=1)
             return
         _fail(str(exc))
     except ValueError as exc:
         if as_json:
-            _reconcile_emit(
-                err_payload("invalid_state", str(exc)), as_json=True, exit_code=1
-            )
+            _reconcile_emit(err_payload("invalid_state", str(exc)), as_json=True, exit_code=1)
             return
         _fail(str(exc))
 
@@ -4341,9 +4308,7 @@ def reconcile_show_cmd(
             console.print_json(data=result)
     except StoreError as exc:
         if as_json:
-            _reconcile_emit(
-                err_payload("store_error", str(exc)), as_json=True, exit_code=1
-            )
+            _reconcile_emit(err_payload("store_error", str(exc)), as_json=True, exit_code=1)
             return
         _fail(str(exc))
 
@@ -4380,9 +4345,7 @@ def reconcile_plan_cmd(
             console.print(f"  $ {cmd}")
     except StoreError as exc:
         if as_json:
-            _reconcile_emit(
-                err_payload("store_error", str(exc)), as_json=True, exit_code=1
-            )
+            _reconcile_emit(err_payload("store_error", str(exc)), as_json=True, exit_code=1)
             return
         _fail(str(exc))
 
@@ -4414,16 +4377,12 @@ def reconcile_apply_cmd(
         console.print_json(data=result)
     except StoreError as exc:
         if as_json:
-            _reconcile_emit(
-                err_payload("store_error", str(exc)), as_json=True, exit_code=1
-            )
+            _reconcile_emit(err_payload("store_error", str(exc)), as_json=True, exit_code=1)
             return
         _fail(str(exc))
     except NotImplementedError as exc:
         if as_json:
-            _reconcile_emit(
-                err_payload("not_supported", str(exc)), as_json=True, exit_code=1
-            )
+            _reconcile_emit(err_payload("not_supported", str(exc)), as_json=True, exit_code=1)
             return
         _fail(str(exc))
 
@@ -4454,9 +4413,7 @@ def reconcile_verify_cmd(
             raise typer.Exit(exit_code)
     except StoreError as exc:
         if as_json:
-            _reconcile_emit(
-                err_payload("store_error", str(exc)), as_json=True, exit_code=1
-            )
+            _reconcile_emit(err_payload("store_error", str(exc)), as_json=True, exit_code=1)
             return
         _fail(str(exc))
 
@@ -4507,9 +4464,7 @@ def reconcile_finalize_cmd(
         console.print_json(data=result)
     except StoreError as exc:
         if as_json:
-            _reconcile_emit(
-                err_payload("store_error", str(exc)), as_json=True, exit_code=1
-            )
+            _reconcile_emit(err_payload("store_error", str(exc)), as_json=True, exit_code=1)
             return
         _fail(str(exc))
 
@@ -4524,9 +4479,7 @@ def reconcile_sweep_cmd(
     """Aggregate independent reconciliation checks; finalize READY matches only."""
     try:
         # Default dry-run=True; --write clears dry_run
-        result = reconcile_service.sweep(
-            dry_run=dry_run, yes=yes, confirm_dod=confirm_dod
-        )
+        result = reconcile_service.sweep(dry_run=dry_run, yes=yes, confirm_dod=confirm_dod)
         payload = ok_payload("sweep", result)
         if as_json:
             _reconcile_emit(payload, as_json=True)
@@ -4535,9 +4488,7 @@ def reconcile_sweep_cmd(
         console.print_json(data=result)
     except StoreError as exc:
         if as_json:
-            _reconcile_emit(
-                err_payload("store_error", str(exc)), as_json=True, exit_code=1
-            )
+            _reconcile_emit(err_payload("store_error", str(exc)), as_json=True, exit_code=1)
             return
         _fail(str(exc))
 
@@ -4893,9 +4844,7 @@ def reconcile_change_cmd(
         console.print(format_reconcile_change(chg_id).rstrip())
     except StoreError as exc:
         if as_json:
-            _reconcile_emit(
-                err_payload("store_error", str(exc)), as_json=True, exit_code=1
-            )
+            _reconcile_emit(err_payload("store_error", str(exc)), as_json=True, exit_code=1)
             return
         _fail(str(exc))
 
@@ -4914,9 +4863,7 @@ def reconcile_question_cmd(
         console.print(format_reconcile_question(question_id).rstrip())
     except StoreError as exc:
         if as_json:
-            _reconcile_emit(
-                err_payload("store_error", str(exc)), as_json=True, exit_code=1
-            )
+            _reconcile_emit(err_payload("store_error", str(exc)), as_json=True, exit_code=1)
             return
         _fail(str(exc))
 
@@ -4933,8 +4880,10 @@ def _verify_emit(payload: dict, *, as_json: bool, exit_code: int = 0) -> None:
 
 
 def _print_verify_card(card: dict) -> None:
-    console.print(f"[bold]{card['question_id']}[/bold]  {card.get('area')}  "
-                  f"[{(card.get('verification') or {}).get('kind', '—')}]")
+    console.print(
+        f"[bold]{card['question_id']}[/bold]  {card.get('area')}  "
+        f"[{(card.get('verification') or {}).get('kind', '—')}]"
+    )
     console.print(card.get("question") or "")
     console.print("")
     console.print(f"[bold]Answer[/bold]: {card.get('answer')!r}")
@@ -4985,14 +4934,13 @@ def _print_verify_card(card: dict) -> None:
             else:
                 mark = " ★next" if w.get("in_next_session") else ""
                 console.print(
-                    f"  {w.get('id')} {w.get('priority')} {w.get('status')}{mark} — "
-                    f"{w.get('task')}"
+                    f"  {w.get('id')} {w.get('priority')} {w.get('status')}{mark} — {w.get('task')}"
                 )
 
 
 @verify_app.command("queue")
 def verify_queue_cmd(
-    area: Optional[str] = typer.Option(None, "--area"),
+    area: str | None = typer.Option(None, "--area"),
     as_json: bool = typer.Option(False, "--json"),
 ) -> None:
     """OPEN unanswered questions with verification metadata (prioritized)."""
@@ -5012,9 +4960,7 @@ def verify_queue_cmd(
         console.print(f"[dim]{len(items)} guided OPEN question(s)[/dim]")
     except StoreError as exc:
         if as_json:
-            _verify_emit(
-                err_payload("store_error", str(exc)), as_json=True, exit_code=1
-            )
+            _verify_emit(err_payload("store_error", str(exc)), as_json=True, exit_code=1)
             return
         _fail(str(exc))
 
@@ -5045,9 +4991,7 @@ def verify_next_cmd(
         console.print(f"Start: {rec['start_command']}")
     except StoreError as exc:
         if as_json:
-            _verify_emit(
-                err_payload("store_error", str(exc)), as_json=True, exit_code=1
-            )
+            _verify_emit(err_payload("store_error", str(exc)), as_json=True, exit_code=1)
             return
         _fail(str(exc))
 
@@ -5069,9 +5013,7 @@ def verify_show_cmd(
         _print_verify_card(card)
     except StoreError as exc:
         if as_json:
-            _verify_emit(
-                err_payload("store_error", str(exc)), as_json=True, exit_code=1
-            )
+            _verify_emit(err_payload("store_error", str(exc)), as_json=True, exit_code=1)
             return
         _fail(str(exc))
 
@@ -5082,9 +5024,7 @@ def _interactive_pick_answer(card: dict) -> str | None:
     choices = list(accepted.get("choices") or [])
     at = accepted.get("answer_type")
     console.print("")
-    console.print(
-        "Enter answer (or UNKNOWN). Empty / cancel aborts with no write."
-    )
+    console.print("Enter answer (or UNKNOWN). Empty / cancel aborts with no write.")
     if at in {"ENUM", "BOOL", "REF"} and choices:
         for idx, choice in enumerate(choices, start=1):
             console.print(f"  {idx}) {choice}")
@@ -5122,8 +5062,7 @@ def _offer_reconcile_after_answer(question_id: str, *, answer_only: bool) -> Non
         console.print(f"[yellow]Plan unavailable: {exc}[/yellow]")
         return
     console.print("")
-    console.print(f"[bold]Reconcile plan[/bold]  {plan.state.value}  "
-                  f"({plan.capability.value})")
+    console.print(f"[bold]Reconcile plan[/bold]  {plan.state.value}  ({plan.capability.value})")
     if plan.current is not None:
         console.print(f"CURRENT: {plan.current}")
     if plan.desired is not None:
@@ -5134,8 +5073,7 @@ def _offer_reconcile_after_answer(question_id: str, *, answer_only: bool) -> Non
         console.print(f"  $ {cmd}")
 
     if not typer.confirm("Reconcile now (plan actions)?", default=False):
-        console.print("[dim]Later: uv run rig reconcile plan question "
-                      f"{question_id}[/dim]")
+        console.print(f"[dim]Later: uv run rig reconcile plan question {question_id}[/dim]")
         return
 
     state = plan.state.value
@@ -5161,9 +5099,7 @@ def _offer_reconcile_after_answer(question_id: str, *, answer_only: bool) -> Non
                 if verified.get("verification") == "MATCH":
                     if typer.confirm("Finalize?", default=False):
                         try:
-                            fin = reconcile_service.finalize_question(
-                                question_id, yes=True
-                            )
+                            fin = reconcile_service.finalize_question(question_id, yes=True)
                             console.print_json(data=fin)
                         except StoreError as exc:
                             console.print(f"[red]finalize failed: {exc}[/red]")
@@ -5266,9 +5202,7 @@ def verify_run_cmd(
         raise typer.Exit(0)
     note_raw = typer.prompt("Observation note (optional)", default="")
     note = note_raw.strip() or None
-    record_obs = typer.confirm(
-        "Record as verified human observation?", default=True
-    )
+    record_obs = typer.confirm("Record as verified human observation?", default=True)
     if record_obs:
         # Infer CONFIRMED vs CORRECTED from CURRENT / prior answer
         try:
@@ -5291,8 +5225,7 @@ def verify_run_cmd(
         except StoreError as exc:
             _fail(str(exc))
         console.print(
-            f"[green]Observation[/green] {outcome.value} "
-            f"normalized={result.get('answer')!r}"
+            f"[green]Observation[/green] {outcome.value} normalized={result.get('answer')!r}"
         )
     else:
         try:
@@ -5315,7 +5248,7 @@ def verify_run_cmd(
 def verify_answer_cmd(
     question_id: str,
     value: str = typer.Option(..., "--value", help="Observed answer (UNKNOWN allowed)"),
-    note: Optional[str] = typer.Option(None, "--note", help="Observation note"),
+    note: str | None = typer.Option(None, "--note", help="Observation note"),
     dry_run: bool = typer.Option(False, "--dry-run"),
     yes: bool = typer.Option(False, "--yes"),
     as_json: bool = typer.Option(False, "--json"),
@@ -5324,9 +5257,7 @@ def verify_answer_cmd(
     from music_rig import verification_service
 
     if not dry_run and not yes and not as_json:
-        if not typer.confirm(
-            f"Record answer for {question_id} as {value!r}?", default=False
-        ):
+        if not typer.confirm(f"Record answer for {question_id} as {value!r}?", default=False):
             console.print("[dim]Aborted.[/dim]")
             raise typer.Exit(0)
     try:
@@ -5340,9 +5271,7 @@ def verify_answer_cmd(
         )
     except StoreError as exc:
         if as_json:
-            _verify_emit(
-                err_payload("store_error", str(exc)), as_json=True, exit_code=1
-            )
+            _verify_emit(err_payload("store_error", str(exc)), as_json=True, exit_code=1)
             return
         _fail(str(exc))
     out = {k: v for k, v in result.items() if k != "question"}
@@ -5371,8 +5300,8 @@ def verify_record_cmd(
         "--outcome",
         help="confirmed|corrected|unknown|failed_test",
     ),
-    value: Optional[str] = typer.Option(None, "--value"),
-    note: Optional[str] = typer.Option(None, "--note"),
+    value: str | None = typer.Option(None, "--value"),
+    note: str | None = typer.Option(None, "--note"),
     dry_run: bool = typer.Option(False, "--dry-run"),
     yes: bool = typer.Option(False, "--yes"),
     as_json: bool = typer.Option(False, "--json"),
@@ -5384,9 +5313,7 @@ def verify_record_cmd(
     from music_rig import verification_service
 
     if not dry_run and not yes and not as_json:
-        if not typer.confirm(
-            f"Record {outcome} observation for {question_id}?", default=False
-        ):
+        if not typer.confirm(f"Record {outcome} observation for {question_id}?", default=False):
             console.print("[dim]Aborted.[/dim]")
             raise typer.Exit(0)
     try:
@@ -5402,9 +5329,7 @@ def verify_record_cmd(
         )
     except StoreError as exc:
         if as_json:
-            _verify_emit(
-                err_payload("store_error", str(exc)), as_json=True, exit_code=1
-            )
+            _verify_emit(err_payload("store_error", str(exc)), as_json=True, exit_code=1)
             return
         _fail(str(exc))
     out = {k: v for k, v in result.items() if k != "question"}
@@ -5428,8 +5353,8 @@ def verify_record_cmd(
 @verify_app.command("confirm")
 def verify_confirm_alias(
     question_id: str,
-    value: Optional[str] = typer.Option(None, "--value"),
-    note: Optional[str] = typer.Option(None, "--note"),
+    value: str | None = typer.Option(None, "--value"),
+    note: str | None = typer.Option(None, "--note"),
     dry_run: bool = typer.Option(False, "--dry-run"),
     yes: bool = typer.Option(False, "--yes"),
     as_json: bool = typer.Option(False, "--json"),
@@ -5451,7 +5376,7 @@ def verify_confirm_alias(
 def verify_correct_alias(
     question_id: str,
     value: str = typer.Option(..., "--value"),
-    note: Optional[str] = typer.Option(None, "--note"),
+    note: str | None = typer.Option(None, "--note"),
     dry_run: bool = typer.Option(False, "--dry-run"),
     yes: bool = typer.Option(False, "--yes"),
     as_json: bool = typer.Option(False, "--json"),
@@ -5472,8 +5397,8 @@ def verify_correct_alias(
 @verify_app.command("fail")
 def verify_fail_alias(
     question_id: str,
-    note: Optional[str] = typer.Option(None, "--note"),
-    value: Optional[str] = typer.Option(None, "--value"),
+    note: str | None = typer.Option(None, "--note"),
+    value: str | None = typer.Option(None, "--value"),
     dry_run: bool = typer.Option(False, "--dry-run"),
     yes: bool = typer.Option(False, "--yes"),
     as_json: bool = typer.Option(False, "--json"),
@@ -5491,12 +5416,11 @@ def verify_fail_alias(
         create_change=create_change,
     )
 
+
 @verify_app.command("session")
 def verify_session_cmd(
-    area: Optional[str] = typer.Option(None, "--area"),
-    todo: Optional[str] = typer.Option(
-        None, "--todo", help="Prefer questions linked to this RIG id"
-    ),
+    area: str | None = typer.Option(None, "--area"),
+    todo: str | None = typer.Option(None, "--todo", help="Prefer questions linked to this RIG id"),
 ) -> None:
     """One-at-a-time guided loop: Answer / Skip / Unknown / Quit."""
     from music_rig import verification_service
@@ -5522,10 +5446,14 @@ def verify_session_cmd(
             continue
         _print_verify_card(card)
         console.print("")
-        action = typer.prompt(
-            "Action: [A]nswer / [S]kip / [U]nknown / [Q]uit",
-            default="S",
-        ).strip().casefold()
+        action = (
+            typer.prompt(
+                "Action: [A]nswer / [S]kip / [U]nknown / [Q]uit",
+                default="S",
+            )
+            .strip()
+            .casefold()
+        )
         if action in {"q", "quit"}:
             break
         if action in {"s", "skip", ""}:
@@ -5594,9 +5522,7 @@ def verify_summary_cmd(
         console.print(format_verify_summary_table(data, width=console.width))
     except StoreError as exc:
         if as_json:
-            _verify_emit(
-                err_payload("store_error", str(exc)), as_json=True, exit_code=1
-            )
+            _verify_emit(err_payload("store_error", str(exc)), as_json=True, exit_code=1)
             return
         _fail(str(exc))
 
@@ -5627,9 +5553,7 @@ def verify_area_cmd(
         console.print(f"[dim]{len(items)} item(s) in area matching {area!r}[/dim]")
     except StoreError as exc:
         if as_json:
-            _verify_emit(
-                err_payload("store_error", str(exc)), as_json=True, exit_code=1
-            )
+            _verify_emit(err_payload("store_error", str(exc)), as_json=True, exit_code=1)
             return
         _fail(str(exc))
 
@@ -5641,7 +5565,7 @@ def question_list_cmd(
     unreconciled: bool = typer.Option(
         False, "--unreconciled", help="RESOLVED but not yet reconciled"
     ),
-    area: Optional[str] = typer.Option(None, "--area"),
+    area: str | None = typer.Option(None, "--area"),
     as_json: bool = typer.Option(False, "--json"),
 ) -> None:
     """List questions. Default: ACTIVE (OPEN + RESOLVED-unreconciled)."""
@@ -5663,9 +5587,7 @@ def question_list_cmd(
             }
             for q in items
         ]
-        typer.echo(
-            json.dumps(ok_payload("question.list", payload), indent=2, default=str)
-        )
+        typer.echo(json.dumps(ok_payload("question.list", payload), indent=2, default=str))
         return
     if all_items:
         title = "QUESTIONS (all)"
@@ -5696,9 +5618,7 @@ def question_show_cmd(
     fields = question_service.question_json_fields(q)
     if as_json:
         payload = {**q.model_dump(mode="json"), **fields}
-        typer.echo(
-            json.dumps(ok_payload("question.show", payload), indent=2, default=str)
-        )
+        typer.echo(json.dumps(ok_payload("question.show", payload), indent=2, default=str))
         return
     console.print(f"[bold]{q.id}[/bold]")
     console.print("")
@@ -5741,10 +5661,10 @@ def question_show_cmd(
 
 @question_app.command("add")
 def question_add_cmd(
-    question: Optional[str] = typer.Option(None, "--question", "-q"),
-    area: Optional[str] = typer.Option(None, "--area", "-a"),
-    todo: Optional[list[str]] = typer.Option(None, "--todo", "-t"),
-    notes: Optional[str] = typer.Option(None, "--notes", "-n"),
+    question: str | None = typer.Option(None, "--question", "-q"),
+    area: str | None = typer.Option(None, "--area", "-a"),
+    todo: list[str] | None = typer.Option(None, "--todo", "-t"),
+    notes: str | None = typer.Option(None, "--notes", "-n"),
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     try:
@@ -5788,9 +5708,7 @@ def question_draft_cmd(
         )
     except StoreError as exc:
         if as_json:
-            typer.echo(
-                json.dumps(err_payload("store_error", str(exc)), indent=2, default=str)
-            )
+            typer.echo(json.dumps(err_payload("store_error", str(exc)), indent=2, default=str))
             raise typer.Exit(1)
         _fail(str(exc))
     out = {k: v for k, v in result.items() if k != "question"}
@@ -5806,10 +5724,10 @@ def question_draft_cmd(
 @question_app.command("resolve")
 def question_resolve_cmd(
     question_id: str,
-    answer: Optional[str] = typer.Option(
+    answer: str | None = typer.Option(
         None, "--answer", help="Optional; defaults to existing draft answer"
     ),
-    change: Optional[str] = typer.Option(None, "--change", help="Related CHG id"),
+    change: str | None = typer.Option(None, "--change", help="Related CHG id"),
     no_render: bool = typer.Option(False, "--no-render"),
     as_json: bool = typer.Option(False, "--json"),
 ) -> None:
@@ -5840,17 +5758,13 @@ def question_resolve_cmd(
         )
     except StoreError as exc:
         if as_json:
-            typer.echo(
-                json.dumps(err_payload("store_error", str(exc)), indent=2, default=str)
-            )
+            typer.echo(json.dumps(err_payload("store_error", str(exc)), indent=2, default=str))
             raise typer.Exit(1)
         _fail(str(exc))
     fields = question_service.question_json_fields(updated)
     out = {
         **fields,
-        "suggested_next_command": (
-            f"uv run rig reconcile plan question {updated.id} --json"
-        ),
+        "suggested_next_command": (f"uv run rig reconcile plan question {updated.id} --json"),
         "message": "Answer recorded. CURRENT reconciliation still required.",
     }
     if as_json:
@@ -5869,7 +5783,7 @@ def question_answer_cmd(
     question_id: str,
     answer: str = typer.Option(..., "--answer", help="Non-empty answer text"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    change: Optional[str] = typer.Option(None, "--change", help="Related CHG id"),
+    change: str | None = typer.Option(None, "--change", help="Related CHG id"),
     no_render: bool = typer.Option(False, "--no-render"),
     as_json: bool = typer.Option(False, "--json"),
 ) -> None:
@@ -5884,9 +5798,7 @@ def question_answer_cmd(
         )
     except StoreError as exc:
         if as_json:
-            typer.echo(
-                json.dumps(err_payload("store_error", str(exc)), indent=2, default=str)
-            )
+            typer.echo(json.dumps(err_payload("store_error", str(exc)), indent=2, default=str))
             raise typer.Exit(1)
         _fail(str(exc))
     out = {k: v for k, v in result.items() if k != "question"}
@@ -5900,9 +5812,7 @@ def question_answer_cmd(
     console.print(result.get("message") or "Answer recorded.")
     if dry_run:
         console.print("[dim]dry-run — no write[/dim]")
-    console.print(
-        f"Next: {result.get('suggested_next_command') or result.get('next_command')}"
-    )
+    console.print(f"Next: {result.get('suggested_next_command') or result.get('next_command')}")
 
 
 @question_target_app.command("show")
@@ -5914,9 +5824,7 @@ def question_target_show_cmd(
         result = question_service.show_target(question_id)
     except StoreError as exc:
         if as_json:
-            typer.echo(
-                json.dumps(err_payload("store_error", str(exc)), indent=2, default=str)
-            )
+            typer.echo(json.dumps(err_payload("store_error", str(exc)), indent=2, default=str))
             raise typer.Exit(1)
         _fail(str(exc))
     if as_json:
@@ -5929,16 +5837,16 @@ def question_target_show_cmd(
 @question_target_app.command("set")
 def question_target_set_cmd(
     question_id: str,
-    domain: Optional[str] = typer.Option(None, "--domain"),
-    bay: Optional[str] = typer.Option(None, "--bay"),
-    pair: Optional[str] = typer.Option(None, "--pair"),
-    path: Optional[str] = typer.Option(None, "--path"),
-    gear: Optional[str] = typer.Option(None, "--gear"),
-    device: Optional[str] = typer.Option(None, "--device"),
-    channel: Optional[str] = typer.Option(None, "--channel"),
-    branch: Optional[str] = typer.Option(None, "--branch"),
-    node: Optional[str] = typer.Option(None, "--node"),
-    context: Optional[str] = typer.Option(None, "--context"),
+    domain: str | None = typer.Option(None, "--domain"),
+    bay: str | None = typer.Option(None, "--bay"),
+    pair: str | None = typer.Option(None, "--pair"),
+    path: str | None = typer.Option(None, "--path"),
+    gear: str | None = typer.Option(None, "--gear"),
+    device: str | None = typer.Option(None, "--device"),
+    channel: str | None = typer.Option(None, "--channel"),
+    branch: str | None = typer.Option(None, "--branch"),
+    node: str | None = typer.Option(None, "--node"),
+    context: str | None = typer.Option(None, "--context"),
     dry_run: bool = typer.Option(False, "--dry-run"),
     yes: bool = typer.Option(False, "--yes"),
     no_render: bool = typer.Option(False, "--no-render"),
@@ -5965,9 +5873,7 @@ def question_target_set_cmd(
         )
     except StoreError as exc:
         if as_json:
-            typer.echo(
-                json.dumps(err_payload("store_error", str(exc)), indent=2, default=str)
-            )
+            typer.echo(json.dumps(err_payload("store_error", str(exc)), indent=2, default=str))
             raise typer.Exit(1)
         _fail(str(exc))
     if as_json:
@@ -5985,7 +5891,7 @@ def question_target_set_cmd(
 @question_target_app.command("clear")
 def question_target_clear_cmd(
     question_id: str,
-    field: Optional[list[str]] = typer.Option(
+    field: list[str] | None = typer.Option(
         None, "--field", help="Clear specific field(s); omit to clear entire target"
     ),
     dry_run: bool = typer.Option(False, "--dry-run"),
@@ -6005,9 +5911,7 @@ def question_target_clear_cmd(
         )
     except StoreError as exc:
         if as_json:
-            typer.echo(
-                json.dumps(err_payload("store_error", str(exc)), indent=2, default=str)
-            )
+            typer.echo(json.dumps(err_payload("store_error", str(exc)), indent=2, default=str))
             raise typer.Exit(1)
         _fail(str(exc))
     if as_json:
@@ -6077,9 +5981,7 @@ def question_link_todo_cmd(
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     try:
-        updated = question_service.link_todo(
-            question_id, todo_id, render=not no_render
-        )
+        updated = question_service.link_todo(question_id, todo_id, render=not no_render)
     except StoreError as exc:
         _fail(str(exc))
     console.print(f"Linked {todo_id.strip().upper()} -> {updated.id}")
@@ -6092,9 +5994,7 @@ def question_link_change_cmd(
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
     try:
-        updated = question_service.link_change(
-            question_id, change_id, render=not no_render
-        )
+        updated = question_service.link_change(question_id, change_id, render=not no_render)
     except StoreError as exc:
         _fail(str(exc))
     console.print(f"Linked {change_id.strip().upper()} <-> {updated.id}")
@@ -6109,9 +6009,7 @@ def render_cmd(check: bool = typer.Option(False, "--check")) -> None:
             _fail(str(exc))
         if stale:
             for path in stale:
-                err_console.print(
-                    f"[red]{path} is out of date with canonical YAML[/red]"
-                )
+                err_console.print(f"[red]{path} is out of date with canonical YAML[/red]")
             err_console.print("Run: uv run rig render")
             raise typer.Exit(1)
         console.print("[green]Generated Markdown is synchronized.[/green]")
@@ -6128,11 +6026,11 @@ def render_cmd(check: bool = typer.Option(False, "--check")) -> None:
 
 @app.command("tui")
 def tui_cmd(
-    domain: Optional[str] = typer.Argument(
+    domain: str | None = typer.Argument(
         None,
         help="Optional domain route (question, patchbay, todo, …).",
     ),
-    object_id: Optional[str] = typer.Argument(
+    object_id: str | None = typer.Argument(
         None,
         help="Optional object id (Q-008, PB-B, …).",
     ),
@@ -6167,9 +6065,7 @@ def inspect_domains(
         typer.echo(inspect_service.dumps(payload, as_json=True))
         return
     # Human: Rich table via presentation (no tabs); print as plain text
-    text = inspect_service.dumps(
-        payload, as_json=False, width=console.width, kind="domains"
-    )
+    text = inspect_service.dumps(payload, as_json=False, width=console.width, kind="domains")
     console.print(text)
 
 

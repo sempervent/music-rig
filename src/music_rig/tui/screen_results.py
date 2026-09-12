@@ -9,7 +9,7 @@ Architectural rules:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import TypeVar
 
 from music_rig.tui.save_outcome import SaveOutcome
@@ -17,7 +17,7 @@ from music_rig.tui.save_outcome import SaveOutcome
 T = TypeVar("T")
 
 
-class AnswerNextAction(str, Enum):
+class AnswerNextAction(StrEnum):
     """Post-answer navigation intent — parent performs the push."""
 
     NONE = "none"

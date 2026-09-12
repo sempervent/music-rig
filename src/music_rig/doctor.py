@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from music_rig import control_state, performance_state
+from music_rig.automation import CAPABILITIES, CapabilityStatus, list_capabilities
+from music_rig.backup_state import BackupReadiness, status_items
 from music_rig.checks import run_checks
+from music_rig.local_config import load_local_config
 from music_rig.models import (
     ChangeCategory,
     ChangeStatus,
@@ -14,22 +18,18 @@ from music_rig.models import (
 from music_rig.reconcile import reconciliation_advisories
 from music_rig.rig_views import patchbay_unknown_mode_stats
 from music_rig.session_service import find_active
+from music_rig.snapshot_service import list_snapshots
 from music_rig.status import git_summary
 from music_rig.store import (
     ROOT,
     StoreError,
     load_changes,
     load_inbox,
-    load_questions,
     load_inventory,
+    load_questions,
     load_routing,
     load_todo,
 )
-from music_rig import control_state, performance_state
-from music_rig.automation import CAPABILITIES, CapabilityStatus, list_capabilities
-from music_rig.backup_state import BackupReadiness, status_items
-from music_rig.local_config import load_local_config
-from music_rig.snapshot_service import list_snapshots
 
 
 def build_doctor_text(
@@ -219,7 +219,15 @@ def build_doctor_text(
         lines.append(f"✗ Patchbay data invalid: {exc}")
         attention += 1
 
-    pb_stale = [e for e in checks.errors if "patchbays.md" in e or "tascam-channel-map" in e or "alesis-mixer-map" in e or "patchbays.mmd" in e or "tascam-channel-map.mmd" in e]
+    pb_stale = [
+        e
+        for e in checks.errors
+        if "patchbays.md" in e
+        or "tascam-channel-map" in e
+        or "alesis-mixer-map" in e
+        or "patchbays.mmd" in e
+        or "tascam-channel-map.mmd" in e
+    ]
     if pb_stale:
         lines.append("✗ CURRENT projection docs out of sync")
         attention += 1
@@ -229,11 +237,7 @@ def build_doctor_text(
     # Routing
     lines.append("")
     lines.append("Routing")
-    routing_errors = [
-        e
-        for e in checks.errors
-        if e.startswith("routing:") or "routing.yaml" in e
-    ]
+    routing_errors = [e for e in checks.errors if e.startswith("routing:") or "routing.yaml" in e]
     if routing_errors:
         lines.append("✗ Named paths invalid")
         attention += 1
@@ -276,8 +280,7 @@ def build_doctor_text(
             1
             for change in changes.items
             if change.status == ChangeStatus.OPEN
-            and change.category
-            in {ChangeCategory.PEDAL_CHAIN, ChangeCategory.AUDIO_ROUTING}
+            and change.category in {ChangeCategory.PEDAL_CHAIN, ChangeCategory.AUDIO_ROUTING}
         )
         if routing_changes:
             lines.append(f"⚠ {routing_changes} OPEN PEDAL_CHAIN / AUDIO_ROUTING change(s)")
@@ -291,17 +294,12 @@ def build_doctor_text(
     lines.append("")
     lines.append("MIDI")
     midi_errors = [
-        error
-        for error in checks.errors
-        if error.startswith("midi:") or "midi.yaml" in error
+        error for error in checks.errors if error.startswith("midi:") or "midi.yaml" in error
     ]
     midi_stale = [
         error
         for error in checks.errors
-        if any(
-            name in error
-            for name in ("midi-topology.md", "midi-clock.md", "midi-topology.mmd")
-        )
+        if any(name in error for name in ("midi-topology.md", "midi-clock.md", "midi-topology.mmd"))
     ]
     if midi_errors:
         lines.append("✗ MIDI state invalid")
@@ -352,13 +350,10 @@ def build_doctor_text(
     performance_errors = [
         error
         for error in checks.errors
-        if error.startswith("performance:")
-        or error.startswith("control-surfaces:")
+        if error.startswith("performance:") or error.startswith("control-surfaces:")
     ]
     performance_stale = [
-        error
-        for error in checks.errors
-        if "performance.md" in error or "live-recovery.md" in error
+        error for error in checks.errors if "performance.md" in error or "live-recovery.md" in error
     ]
     if performance_errors:
         lines.append("✗ Performance orchestration invalid")
@@ -436,9 +431,7 @@ def build_doctor_text(
         if status == CapabilityStatus.NOT_IMPLEMENTED
     ]
     lines.append(f"✓ Available: {', '.join(available)}")
-    lines.append(
-        f"⚠ Not implemented (no fake success): {', '.join(unimplemented)}"
-    )
+    lines.append(f"⚠ Not implemented (no fake success): {', '.join(unimplemented)}")
     attention += 1
     lines.append("✓ Simulate/preflight never execute external actions")
 
@@ -470,9 +463,7 @@ def build_doctor_text(
             if node.kind == "device" and not node.gear_ref
         ]
         if unlinked_devices:
-            lines.append(
-                f"⚠ {len(unlinked_devices)} device-kind routing node(s) lack gear_ref"
-            )
+            lines.append(f"⚠ {len(unlinked_devices)} device-kind routing node(s) lack gear_ref")
             attention += 1
         else:
             lines.append("✓ All device-kind routing nodes have gear_ref")

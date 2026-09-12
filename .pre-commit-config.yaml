@@ -1,0 +1,19 @@
+# Hook entrypoints only — rule config lives in pyproject.toml (ruff / ryl).
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: uv run ruff check --fix
+        language: system
+        types: [python]
+      - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format
+        language: system
+        types: [python]
+      - id: ryl-check
+        name: ryl check
+        entry: uv run ryl check
+        language: system
+        types: [yaml]

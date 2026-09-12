@@ -14,9 +14,8 @@ from music_rig.tui.debug import format_error
 from music_rig.tui.dialogs import CommandLineModal, ConfirmModal, HelpScreen, InputModal
 from music_rig.tui.editable import BaseEditableAdapter
 from music_rig.tui.forms import RecordEditScreen
-from music_rig.tui.modes import VIM_HELP_COMMON, EditorMode, ModeController, parse_command
 from music_rig.tui.header import RigHeader
-
+from music_rig.tui.modes import VIM_HELP_COMMON, EditorMode, ModeController, parse_command
 
 _ADD_MODALS = {
     "question": "music_rig.tui.screens.create.AddQuestionModal",

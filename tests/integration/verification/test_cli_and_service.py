@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -20,7 +20,7 @@ from music_rig.store import StoreError, load_questions
 
 
 def _clock():
-    return datetime(2026, 9, 11, 22, 0, 0, tzinfo=timezone.utc)
+    return datetime(2026, 9, 11, 22, 0, 0, tzinfo=UTC)
 
 
 def _write_docs(tmp: Path) -> dict[str, Path]:
@@ -341,7 +341,8 @@ def fx16(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(store, "DOCS_INVENTORY_PATH", docs["inventory.md"])
     monkeypatch.setattr(patchbay_state, "PATCHBAYS_PATH", patchbays)
 
-    from music_rig import midi_state, render as render_mod, routing_state
+    from music_rig import midi_state, routing_state
+    from music_rig import render as render_mod
 
     monkeypatch.setattr(midi_state, "MIDI_PATH", midi)
     monkeypatch.setattr(routing_state, "ROUTING_PATH", routing)
@@ -551,7 +552,10 @@ def test_verify_run_unknown_and_cancel(fx16):
     runner = CliRunner()
     cancel = runner.invoke(app, ["verify", "run", "Q-090"], input="0\n")
     assert cancel.exit_code == 0
-    assert "Cancelled" in cancel.stdout or question_service.get_question("Q-090").status == QuestionStatus.OPEN
+    assert (
+        "Cancelled" in cancel.stdout
+        or question_service.get_question("Q-090").status == QuestionStatus.OPEN
+    )
 
     # UNKNOWN as observation → no resolve (Stage 17)
     unk_obs = runner.invoke(
@@ -577,13 +581,12 @@ def test_verify_run_unknown_and_cancel(fx16):
     assert q2.status == QuestionStatus.RESOLVED
     assert q2.verification_result is None
 
+
 # --- e2e patchbay HALF-NORMAL → reconcile MATCH finalize ---
 
 
 def test_e2e_patchbay_half_normal_reconcile_finalize(fx16):
-    verification_service.record_verified_answer(
-        "Q-090", "HALF_NORMAL", clock=_clock, render=False
-    )
+    verification_service.record_verified_answer("Q-090", "HALF_NORMAL", clock=_clock, render=False)
     q = question_service.get_question("Q-090")
     assert q.answer == "half-normal"
     plan = reconcile_service.plan_question("Q-090")
@@ -619,9 +622,7 @@ def test_freetext_needs_agent_no_current_guess(fx16):
 
 def test_verify_only_epistemic_guard(fx16):
     """BOOL answer on routing.verify stays VERIFY_ONLY — no CURRENT invent."""
-    verification_service.record_verified_answer(
-        "Q-091", "YES", clock=_clock, render=False
-    )
+    verification_service.record_verified_answer("Q-091", "YES", clock=_clock, render=False)
     plan = reconcile_service.plan_question("Q-091")
     assert plan.capability == Capability.VERIFY_ONLY
     assert plan.state in {
@@ -683,9 +684,7 @@ def test_summary_table_no_tabs(fx16):
 def test_now_mentions_verify_run(fx16, monkeypatch):
     from music_rig.now_service import format_now, recommend_now
 
-    monkeypatch.setattr(
-        "music_rig.now_service.find_active", lambda *a, **k: None
-    )
+    monkeypatch.setattr("music_rig.now_service.find_active", lambda *a, **k: None)
     rec = recommend_now()
     assert rec.primary_reference == "RIG-090"
     text = format_now(rec)

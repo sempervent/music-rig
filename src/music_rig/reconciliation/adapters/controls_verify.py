@@ -42,16 +42,10 @@ class ControlsVerifyAdapter(ReconciliationAdapter):
         if gear:
             for body in controllers:
                 if isinstance(body, dict) and body.get("gear_ref") == gear:
-                    contexts = [
-                        c
-                        for c in (body.get("contexts") or [])
-                        if isinstance(c, dict)
-                    ]
+                    contexts = [c for c in (body.get("contexts") or []) if isinstance(c, dict)]
                     scoped = None
                     if context:
-                        scoped = next(
-                            (c for c in contexts if c.get("id") == context), None
-                        )
+                        scoped = next((c for c in contexts if c.get("id") == context), None)
                     return {
                         "gear_ref": gear,
                         "context": context,
@@ -63,9 +57,7 @@ class ControlsVerifyAdapter(ReconciliationAdapter):
             return {"gear_ref": gear, "found": False}
         return {
             "gears": [
-                b.get("gear_ref")
-                for b in controllers
-                if isinstance(b, dict) and b.get("gear_ref")
+                b.get("gear_ref") for b in controllers if isinstance(b, dict) and b.get("gear_ref")
             ]
         }
 
@@ -169,8 +161,7 @@ class ControlsVerifyAdapter(ReconciliationAdapter):
                     ActionSuggestion(
                         kind=SuggestionKind.CLI_HINT,
                         intent=(
-                            f"current controls set-evidence {gear} {context} "
-                            f"<control> VERIFIED"
+                            f"current controls set-evidence {gear} {context} <control> VERIFIED"
                         ),
                         description="Set scoped control evidence VERIFIED",
                         code="controls_set_evidence",
@@ -178,9 +169,7 @@ class ControlsVerifyAdapter(ReconciliationAdapter):
                     )
                 )
         suggestions.append(
-            suggest_finalize(
-                question.id, no_current_change=True, note="controls reviewed"
-            )
+            suggest_finalize(question.id, no_current_change=True, note="controls reviewed")
         )
 
         details: dict[str, Any] = {}
@@ -200,10 +189,7 @@ class ControlsVerifyAdapter(ReconciliationAdapter):
                 target_sug = [
                     ActionSuggestion(
                         kind=SuggestionKind.TARGET,
-                        intent=(
-                            f"question target set {question.id} "
-                            f"--context <context-id> --yes"
-                        ),
+                        intent=(f"question target set {question.id} --context <context-id> --yes"),
                         description="Set target.context for scoped evidence",
                         code="missing_target_field",
                         params={"question_id": question.id},

@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 from music_rig import channel_state, patchbay_state
-from music_rig.store import CHANNEL_MAP_PATH, PATCHBAYS_PATH
 
 
 def _cell(value: Any) -> str:
@@ -64,9 +62,7 @@ def render_patchbays_section(data: dict[str, Any] | None = None) -> str:
             lines.append("_No jack pairs represented._")
             lines.append("")
             continue
-        lines.append(
-            "| Upper | Upper connection | Lower | Lower connection | Mode |"
-        )
+        lines.append("| Upper | Upper connection | Lower | Lower connection | Mode |")
         lines.append("|---:|---|---:|---|---|")
         for pair in pairs:
             lower = pair["lower_n"] if pair["lower_n"] is not None else "—"
@@ -103,15 +99,15 @@ def render_patchbays_mermaid(data: dict[str, Any] | None = None) -> str:
         lines.append("    direction TB")
         for pair in pairs:
             u = pair["upper_n"]
-            l = pair["lower_n"]
+            lower_n = pair["lower_n"]
             uc = _conn_display(pair["upper_conn"], pair.get("status", ""))
             lc = _conn_display(pair["lower_conn"], pair.get("status", ""))
             mode = _mode_display(pair["mode"])
             uid = f"{safe}U{u}"
-            lid = f"{safe}L{l if l is not None else 'x'}"
+            lid = f"{safe}L{lower_n if lower_n is not None else 'x'}"
             lines.append(f'    {uid}["{u} {uc}"]')
-            if l is not None:
-                lines.append(f'    {lid}["{l} {lc}"]')
+            if lower_n is not None:
+                lines.append(f'    {lid}["{lower_n} {lc}"]')
                 edge = "no source" if pair["upper_conn"] in (None, "") else f"mode {mode.lower()}"
                 lines.append(f"    {uid} -.->|{edge}| {lid}")
         lines.append("  end")
@@ -129,7 +125,9 @@ def render_tascam_section(data: dict[str, Any] | None = None) -> str:
         "| Input | Track Name | Source | Type | Status |",
         "|---:|---|---|---|---|",
     ]
-    for key in sorted(tascam.keys(), key=lambda k: (0, int(k)) if str(k).isdigit() else (1, str(k))):
+    for key in sorted(
+        tascam.keys(), key=lambda k: (0, int(k)) if str(k).isdigit() else (1, str(k))
+    ):
         meta = tascam[key]
         source = meta.get("source")
         lines.append(
@@ -187,7 +185,9 @@ def render_tascam_mermaid(data: dict[str, Any] | None = None) -> str:
         "%% DO NOT EDIT DIRECTLY.",
         "flowchart TB",
     ]
-    for key in sorted(tascam.keys(), key=lambda k: (0, int(k)) if str(k).isdigit() else (1, str(k))):
+    for key in sorted(
+        tascam.keys(), key=lambda k: (0, int(k)) if str(k).isdigit() else (1, str(k))
+    ):
         meta = tascam[key]
         name = meta.get("name") or "UNASSIGNED"
         source = meta.get("source")

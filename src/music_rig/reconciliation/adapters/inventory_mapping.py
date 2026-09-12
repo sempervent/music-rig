@@ -62,16 +62,13 @@ class InventoryMappingAdapter(ReconciliationAdapter):
             ActionSuggestion(
                 kind=SuggestionKind.CLI_HINT,
                 intent=(
-                    f'current patchbay set-model PB-A "<observed model>" '
-                    f"--question {question.id}"
+                    f'current patchbay set-model PB-A "<observed model>" --question {question.id}'
                 ),
                 description="Record observed hardware model on a PB letter",
                 code="set_model",
                 params={"question_id": question.id},
             ),
-            suggest_finalize(
-                question.id, no_current_change=True, note="..."
-            ),
+            suggest_finalize(question.id, no_current_change=True, note="..."),
         ]
         blockers: list[Any] = []
         if state == ReconciliationState.NEEDS_AGENT_ACTION:
@@ -90,7 +87,8 @@ class InventoryMappingAdapter(ReconciliationAdapter):
                         [
                             bid
                             for bid, body in (
-                                (patchbay_state.load_raw(paths.get("patchbays")).get("patchbays") or {})
+                                patchbay_state.load_raw(paths.get("patchbays")).get("patchbays")
+                                or {}
                             ).items()
                             if isinstance(body, dict)
                         ]
@@ -124,9 +122,7 @@ class InventoryMappingAdapter(ReconciliationAdapter):
                         "rig reconcile finalize",
                     ],
                     postcondition="each PB letter hardware_model matches observed unit",
-                    missing_capability=(
-                        "patchbay gear_ref / set-gear not available yet"
-                    ),
+                    missing_capability=("patchbay gear_ref / set-gear not available yet"),
                 )
                 if state == ReconciliationState.NEEDS_AGENT_ACTION
                 else None,

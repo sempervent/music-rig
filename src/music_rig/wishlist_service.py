@@ -5,9 +5,9 @@ from __future__ import annotations
 from music_rig.models import (
     TodoDocument,
     TodoTask,
-    WishStatus,
     WishlistDocument,
     WishlistItem,
+    WishStatus,
 )
 from music_rig.render import render_docs
 from music_rig.store import StoreError, load_todo, load_wishlist, write_documents
@@ -90,9 +90,7 @@ def promote_wish(
     for wish_item in new_wish_doc.items:
         for ref in wish_item.todo_refs:
             if ref not in known:
-                raise StoreError(
-                    f"Wishlist '{wish_item.item}' references unknown TODO {ref}"
-                )
+                raise StoreError(f"Wishlist '{wish_item.item}' references unknown TODO {ref}")
 
     write_documents(
         todo=new_todo_doc,

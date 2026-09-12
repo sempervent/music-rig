@@ -10,6 +10,7 @@ from music_rig.reconciliation.dispatch import (
 )
 from music_rig.reconciliation.types import Capability, Plan
 
+
 def _q014_plan(*, actor: AnswerActor = AnswerActor.HUMAN) -> Plan:
     if actor is AnswerActor.HUMAN:
         return Plan(
@@ -53,14 +54,15 @@ def _q014_plan(*, actor: AnswerActor = AnswerActor.HUMAN) -> Plan:
         details={"answer_actor": "BOT"},
     )
 
+
 def test_q014_human_attestation_dispatch_deterministic():
     d = classify_reconciliation_dispatch(_q014_plan(actor=AnswerActor.HUMAN))
     assert d.mode is DispatchMode.DETERMINISTIC
     assert d.provider_eligible is False
     assert d.next_actor is NextActor.DETERMINISTIC_ENGINE
 
+
 def test_q014_bot_answer_needs_human():
     d = classify_reconciliation_dispatch(_q014_plan(actor=AnswerActor.BOT))
     assert d.mode is DispatchMode.HUMAN_ANSWER
     assert d.provider_eligible is False
-

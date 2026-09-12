@@ -8,15 +8,15 @@ Redo binding: **U** (uppercase u). Ctrl+r remains Refresh to avoid collision.
 
 from __future__ import annotations
 
-from enum import Enum
-from typing import Callable
+from collections.abc import Callable
+from enum import StrEnum
 
 from textual.binding import Binding
 from textual.screen import Screen
-from textual.widgets import Input, Static
+from textual.widgets import Static
 
 
-class EditorMode(str, Enum):
+class EditorMode(StrEnum):
     NORMAL = "NORMAL"
     INSERT = "INSERT"
     COMMAND = "COMMAND"
@@ -106,7 +106,9 @@ class CommandInputModal:
     pass
 
 
-def update_mode_banner(screen: Screen, controller: ModeController, widget_id: str = "mode-banner") -> None:
+def update_mode_banner(
+    screen: Screen, controller: ModeController, widget_id: str = "mode-banner"
+) -> None:
     try:
         screen.query_one(f"#{widget_id}", Static).update(controller.banner())
     except Exception:

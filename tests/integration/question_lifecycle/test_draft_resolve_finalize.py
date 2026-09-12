@@ -2,23 +2,23 @@
 
 from __future__ import annotations
 
-from fixtures.repo_fixtures import _clock
 import json
-from datetime import datetime, timezone
 from pathlib import Path
+
 import pytest
 import yaml
 from typer.testing import CliRunner
+
+from fixtures.repo_fixtures import _clock
 from music_rig import channel_state, question_service, todo_service
-from music_rig.channel_state import propose_set_source, validate_channel_map
+from music_rig.channel_state import propose_set_source
 from music_rig.cli import app
-from music_rig.models import AnswerState, QuestionStatus, ReconciliationState, TodoStatus
+from music_rig.models import QuestionStatus, ReconciliationState, TodoStatus
 from music_rig.reconciliation import service as reconcile_service
-from music_rig.store import StoreError, load_questions, load_todo
-from music_rig.tui.app import RigApp
-from music_rig.tui.screens.answer import AnswerScreen
+from music_rig.store import StoreError, load_todo
 
 runner = CliRunner()
+
 
 def test_draft_and_answer_cli_json(fx19):
     r = runner.invoke(
@@ -60,11 +60,10 @@ def test_draft_and_answer_cli_json(fx19):
     assert payload2["result"]["reconciled_at"] is None
     assert payload2["result"]["suggested_next_command"]
 
+
 def test_resolve_promotes_draft_without_new_answer(fx19):
     question_service.draft_question("Q-191", "keep me", render=False)
-    r = runner.invoke(
-        app, ["question", "resolve", "Q-191", "--json", "--no-render"]
-    )
+    r = runner.invoke(app, ["question", "resolve", "Q-191", "--json", "--no-render"])
     assert r.exit_code == 0, r.output
     payload = json.loads(r.output)
     assert payload["result"]["answer_state"] == "FINAL"
@@ -72,6 +71,7 @@ def test_resolve_promotes_draft_without_new_answer(fx19):
     q = question_service.get_question("Q-191")
     assert q.status == QuestionStatus.RESOLVED
     assert q.verification_result is None
+
 
 def test_manual_finalize_q001_style(fx19, monkeypatch):
     """Multi-domain CURRENT via services, then finalize --confirm-current-reconciled."""
@@ -96,9 +96,7 @@ def test_manual_finalize_q001_style(fx19, monkeypatch):
     packet = (plan.details or {}).get("action_packet") or {}
     assert packet.get("requires_agent_interpretation") is True
     assert packet.get("manual_finalize_allowed") is True
-    assert "--confirm-current-reconciled" in (
-        packet.get("required_confirmation") or ""
-    )
+    assert "--confirm-current-reconciled" in (packet.get("required_confirmation") or "")
     assert packet.get("finalize_command_template")
 
     with pytest.raises(StoreError):
@@ -141,6 +139,7 @@ def test_manual_finalize_q001_style(fx19, monkeypatch):
     assert todo.task_map()["RIG-190"].status == TodoStatus.DONE
     assert "RIG-190" not in todo.next_session
 
+
 def test_manual_finalize_cli(fx19):
     question_service.answer_question("Q-190", "destinations set", render=False)
     r = runner.invoke(
@@ -166,6 +165,7 @@ def test_manual_finalize_cli(fx19):
     assert q.reconciled_at is not None
     assert q.verification_result is None
 
+
 def test_cleanup_draft_and_manual_findings(fx19):
     question_service.draft_question("Q-191", "drafty", render=False)
     question_service.answer_question("Q-190", "needs agent", render=False)
@@ -181,6 +181,7 @@ def test_cleanup_draft_and_manual_findings(fx19):
     draft_issue = next(i for i in issues if i["code"] == "question_draft_answer")
     assert any("resolve" in c for c in draft_issue["suggested_commands"])
 
+
 def test_todo_schema_rejects_terminal_in_next_session(fx19):
     """DONE/CANCELLED cannot remain in Next Session (model + check)."""
     from music_rig.models import TodoDocument
@@ -194,13 +195,13 @@ def test_todo_schema_rejects_terminal_in_next_session(fx19):
     with pytest.raises(Exception):
         TodoDocument.model_validate(raw)
 
+
 def test_todo_done_removes_from_next_session(fx19):
-    todo_service.set_todo_status(
-        "RIG-190", TodoStatus.DONE, remove_from_next=True, render=False
-    )
+    todo_service.set_todo_status("RIG-190", TodoStatus.DONE, remove_from_next=True, render=False)
     tdoc = load_todo()
     assert tdoc.task_map()["RIG-190"].status == TodoStatus.DONE
     assert "RIG-190" not in tdoc.next_session
+
 
 def test_reconcile_show_exposes_answer_state(fx19):
     question_service.draft_question("Q-191", "x", render=False)
@@ -208,11 +209,13 @@ def test_reconcile_show_exposes_answer_state(fx19):
     assert shown["answer_state"] == "DRAFT"
     assert shown["question_status"] == "OPEN"
 
+
 def test_question_show_json_answer_state(fx19):
     r = runner.invoke(app, ["question", "show", "Q-191", "--json"])
     assert r.exit_code == 0, r.output
     payload = json.loads(r.output)
     assert payload["result"]["answer_state"] == "UNANSWERED"
+
 
 def test_skills_mentions_live_data_and_blocking_bug():
     text = Path("SKILLS.md").read_text(encoding="utf-8")
@@ -221,4 +224,3 @@ def test_skills_mentions_live_data_and_blocking_bug():
     assert "Do not ask redundant" in text
     assert "confirm-current-reconciled" in text
     assert "question draft" in text
-

@@ -6,7 +6,8 @@ from music_rig import automation, snapshot_service, todo_service
 from music_rig.backup_state import status_items
 from music_rig.doctor import build_doctor_text
 from music_rig.models import ChangeStatus, InboxStatus, WishStatus
-from music_rig.performance_state import evaluate_readiness, load_document as load_performance
+from music_rig.performance_state import evaluate_readiness
+from music_rig.performance_state import load_document as load_performance
 from music_rig.reconcile import build_reconcile_summary
 from music_rig.session_service import list_sessions
 from music_rig.status import build_status_text
@@ -197,9 +198,7 @@ def _gear_adapter() -> SimpleAdapter:
             ]
         )
 
-    return SimpleAdapter(
-        "gear", "Gear", ["ID", "Name", "Ownership", "Condition"], rows, detail
-    )
+    return SimpleAdapter("gear", "Gear", ["ID", "Name", "Ownership", "Condition"], rows, detail)
 
 
 def _midi_adapter() -> SimpleAdapter:
@@ -207,15 +206,9 @@ def _midi_adapter() -> SimpleAdapter:
         doc = load_midi()
         return [
             AdapterRow("summary", ["summary", "Overview"], "summary overview"),
-            AdapterRow(
-                "endpoints", ["endpoints", f"{len(doc.endpoints)} endpoints"], "endpoints"
-            ),
-            AdapterRow(
-                "links", ["links", f"{len(doc.connections)} links"], "links connections"
-            ),
-            AdapterRow(
-                "channels", ["channels", f"{len(doc.channels)} channels"], "channels"
-            ),
+            AdapterRow("endpoints", ["endpoints", f"{len(doc.endpoints)} endpoints"], "endpoints"),
+            AdapterRow("links", ["links", f"{len(doc.connections)} links"], "links connections"),
+            AdapterRow("channels", ["channels", f"{len(doc.channels)} channels"], "channels"),
             AdapterRow("clock", ["clock", "Clock / Ableton"], "clock ableton"),
         ]
 
@@ -304,26 +297,20 @@ def _controls_adapter() -> SimpleAdapter:
         for ctx in ctrl.contexts:
             lines.append(f"### {ctx.id} — {ctx.label} [{ctx.evidence.value}]")
             for physical in ctx.controls:
-                lines.append(
-                    f"- {physical.id}: {physical.label} [{physical.availability.value}]"
-                )
+                lines.append(f"- {physical.id}: {physical.label} [{physical.availability.value}]")
         return "\n".join(lines)
 
-    return SimpleAdapter(
-        "controls", "Controllers", ["Gear", "Coverage", "Contexts"], rows, detail
-    )
+    return SimpleAdapter("controls", "Controllers", ["Gear", "Coverage", "Contexts"], rows, detail)
 
 
 def _ableton_adapter() -> SimpleAdapter:
     def rows() -> list[AdapterRow]:
         doc = load_ableton()
         out = [
-            AdapterRow(t.id, ["track", t.id, t.name], f"track {t.id} {t.name}")
-            for t in doc.tracks
+            AdapterRow(t.id, ["track", t.id, t.name], f"track {t.id} {t.name}") for t in doc.tracks
         ]
         out.extend(
-            AdapterRow(s.id, ["send", s.id, s.label], f"send {s.id} {s.label}")
-            for s in doc.sends
+            AdapterRow(s.id, ["send", s.id, s.label], f"send {s.id} {s.label}") for s in doc.sends
         )
         out.extend(
             AdapterRow(a.id, ["action", a.id, a.label], f"action {a.id} {a.label}")
@@ -478,9 +465,7 @@ def _performance_adapter() -> SimpleAdapter:
             return f"# {rec.label}\n\nSymptom: {rec.symptom}\n\n## Manual steps\n{steps}"
         return f"Unknown {row_id}"
 
-    return SimpleAdapter(
-        "performance", "Performance", ["Kind", "ID", "Label"], rows, detail
-    )
+    return SimpleAdapter("performance", "Performance", ["Kind", "ID", "Label"], rows, detail)
 
 
 def _snapshots_adapter() -> SimpleAdapter:
@@ -519,9 +504,7 @@ def _snapshots_adapter() -> SimpleAdapter:
         ["ID", "Created", "Branch"],
         rows,
         detail,
-        _actions=[
-            AdapterAction("create", "Create Snapshot", key="c", needs_selection=False)
-        ],
+        _actions=[AdapterAction("create", "Create Snapshot", key="c", needs_selection=False)],
         _action_fn=action,
     )
 
@@ -549,9 +532,7 @@ def _backups_adapter() -> SimpleAdapter:
                 )
         return f"Unknown backup item {row_id}"
 
-    return SimpleAdapter(
-        "backup", "Backups", ["ID", "Readiness", "Detail"], rows, detail
-    )
+    return SimpleAdapter("backup", "Backups", ["ID", "Readiness", "Detail"], rows, detail)
 
 
 def _sessions_adapter() -> SimpleAdapter:
@@ -568,9 +549,7 @@ def _sessions_adapter() -> SimpleAdapter:
     def detail(row_id: str) -> str:
         for s in list_sessions(limit=200):
             if s.id == row_id:
-                events = "\n".join(
-                    f"- [{e.type.value}] {e.text}" for e in s.events[:30]
-                )
+                events = "\n".join(f"- [{e.type.value}] {e.text}" for e in s.events[:30])
                 return (
                     f"# {s.id}\n\nStatus: {s.status.value}\n"
                     f"Focus: {s.focus or '—'}\n\n## Events\n{events or '—'}"
@@ -612,9 +591,7 @@ def _automation_adapter() -> SimpleAdapter:
                 )
         return f"Unknown capability {row_id}"
 
-    return SimpleAdapter(
-        "automation", "Automation", ["Family", "Status"], rows, detail
-    )
+    return SimpleAdapter("automation", "Automation", ["Family", "Status"], rows, detail)
 
 
 def get_adapter(domain_key: str) -> SimpleAdapter | None:
@@ -633,9 +610,7 @@ def get_adapter(domain_key: str) -> SimpleAdapter | None:
         "session": _sessions_adapter,
         "doctor": lambda: _text_row_adapter("doctor", "Doctor", build_doctor_text),
         "status": lambda: _text_row_adapter("status", "Status", build_status_text),
-        "reconcile": lambda: _text_row_adapter(
-            "reconcile", "Reconcile", build_reconcile_summary
-        ),
+        "reconcile": lambda: _text_row_adapter("reconcile", "Reconcile", build_reconcile_summary),
         "automation": _automation_adapter,
     }
     factory = mapping.get(domain_key)

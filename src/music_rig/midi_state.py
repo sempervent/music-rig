@@ -8,8 +8,8 @@ from pathlib import Path
 from typing import Any
 
 from music_rig.models import (
-    CurrentPreview,
     INACTIVE_OWNERSHIP,
+    CurrentPreview,
     MidiAbletonPort,
     MidiChannelAssignment,
     MidiClockDestination,
@@ -53,9 +53,7 @@ def load_raw(path: Path | None = None) -> dict[str, Any]:
     return raw
 
 
-def load_document(
-    path: Path | None = None, *, inventory_path: Path | None = None
-) -> MidiDocument:
+def load_document(path: Path | None = None, *, inventory_path: Path | None = None) -> MidiDocument:
     raw = load_raw(path)
     errors = validate_midi_doc(raw, inventory_path=inventory_path)
     if errors:
@@ -65,9 +63,7 @@ def load_document(
 
 def dump_with_header(data: dict[str, Any], *, existing_text: str | None = None) -> str:
     header = (
-        _extract_leading_comment_header(existing_text)
-        if existing_text is not None
-        else ""
+        _extract_leading_comment_header(existing_text) if existing_text is not None else ""
     ) or MIDI_HEADER
     if not header.endswith("\n"):
         header += "\n"
@@ -75,14 +71,10 @@ def dump_with_header(data: dict[str, Any], *, existing_text: str | None = None) 
 
 
 def _known_refs(doc: MidiDocument) -> set[str]:
-    return {item.id for item in doc.endpoints} | {
-        item.gear_ref for item in doc.devices
-    }
+    return {item.id for item in doc.endpoints} | {item.gear_ref for item in doc.devices}
 
 
-def validate_midi_doc(
-    data: dict[str, Any], *, inventory_path: Path | None = None
-) -> list[str]:
+def validate_midi_doc(data: dict[str, Any], *, inventory_path: Path | None = None) -> list[str]:
     if not isinstance(data, dict):
         return ["MIDI document must be a mapping"]
     try:
@@ -117,9 +109,7 @@ def validate_midi_doc(
                 errors.append(f"MIDI link {link.id} {field} {ref!r} is unknown")
     for assignment in doc.channels:
         if assignment.gear_ref not in device_refs:
-            errors.append(
-                f"MIDI channel gear_ref {assignment.gear_ref!r} is not in devices"
-            )
+            errors.append(f"MIDI channel gear_ref {assignment.gear_ref!r} is not in devices")
     if doc.clock.master is not None:
         ref = doc.clock.master.endpoint_ref or doc.clock.master.gear_ref or ""
         if ref not in known:
@@ -135,9 +125,7 @@ def validate_midi_doc(
     return errors
 
 
-def _validated(
-    raw: dict[str, Any], *, inventory_path: Path | None = None
-) -> MidiDocument:
+def _validated(raw: dict[str, Any], *, inventory_path: Path | None = None) -> MidiDocument:
     errors = validate_midi_doc(raw, inventory_path=inventory_path)
     if errors:
         raise StoreError("MIDI validation failed: " + "; ".join(errors))
@@ -150,10 +138,7 @@ def _assert_active_gear(ref: str, *, inventory_path: Path | None = None) -> None
     if item is None:
         raise StoreError(f"Unknown inventory gear_ref {ref!r}.")
     if item.ownership_status in INACTIVE_OWNERSHIP:
-        raise StoreError(
-            f"Cannot reference inactive gear {ref!r} "
-            f"({item.ownership_status.value})."
-        )
+        raise StoreError(f"Cannot reference inactive gear {ref!r} ({item.ownership_status.value}).")
 
 
 def _snapshot(value: Any) -> Any:
@@ -226,8 +211,7 @@ def propose_set_channel(
         notes=existing.notes if notes is None and existing else (notes or ""),
     )
     raw["channels"] = [
-        _snapshot(updated) if item.gear_ref == ref else _snapshot(item)
-        for item in doc.channels
+        _snapshot(updated) if item.gear_ref == ref else _snapshot(item) for item in doc.channels
     ]
     if existing is None:
         raw["channels"].append(_snapshot(updated))
@@ -246,9 +230,7 @@ def propose_set_channel(
 
 def _next_link_id(connections: list) -> str:
     numbers = [
-        int(match.group(1))
-        for item in connections
-        if (match := _LINK_RE.fullmatch(item.id))
+        int(match.group(1)) for item in connections if (match := _LINK_RE.fullmatch(item.id))
     ]
     return f"midi-link-{(max(numbers) + 1 if numbers else 1):03d}"
 
@@ -276,7 +258,11 @@ def propose_add_link(
         if ref in {device.gear_ref for device in doc.devices}:
             _assert_active_gear(ref, inventory_path=inventory_path)
     try:
-        tx = transport if isinstance(transport, MidiTransport) else MidiTransport(transport.strip().upper())
+        tx = (
+            transport
+            if isinstance(transport, MidiTransport)
+            else MidiTransport(transport.strip().upper())
+        )
     except ValueError as exc:
         raise StoreError("Transport must be DIN, USB, or VIRTUAL.") from exc
     exact = next(
@@ -345,9 +331,7 @@ def propose_remove_link(
     if existing is None:
         raise StoreError(f"Unknown MIDI link {link_id!r}.")
     before = _snapshot(existing)
-    raw["connections"] = [
-        _snapshot(link) for link in doc.connections if link.id.lower() != key
-    ]
+    raw["connections"] = [_snapshot(link) for link in doc.connections if link.id.lower() != key]
     return (
         _preview(
             "midi.link",
@@ -449,15 +433,13 @@ def propose_set_clock_destination(
     if "gear_ref" in payload:
         _assert_active_gear(clean, inventory_path=inventory_path)
     try:
-        state = enabled if isinstance(enabled, MidiTriState) else MidiTriState(enabled.strip().lower())
+        state = (
+            enabled if isinstance(enabled, MidiTriState) else MidiTriState(enabled.strip().lower())
+        )
     except ValueError as exc:
         raise StoreError("Clock state must be on, off, or unknown.") from exc
     existing = next(
-        (
-            item
-            for item in doc.clock.destinations
-            if (item.endpoint_ref or item.gear_ref) == clean
-        ),
+        (item for item in doc.clock.destinations if (item.endpoint_ref or item.gear_ref) == clean),
         None,
     )
     evidence = (
@@ -506,9 +488,7 @@ def propose_ableton_set(
 ) -> tuple[CurrentPreview, dict[str, Any]]:
     raw = copy.deepcopy(data if data is not None else load_raw(midi_path))
     doc = _validated(raw, inventory_path=inventory_path)
-    existing = next(
-        (port for port in doc.ableton_ports if port.id == port_id.strip()), None
-    )
+    existing = next((port for port in doc.ableton_ports if port.id == port_id.strip()), None)
     if existing is None:
         raise StoreError(
             f"Unknown Ableton port {port_id!r}; add ports to midi.yaml only from "
@@ -548,8 +528,7 @@ def propose_ableton_set(
     )
     before, after = _snapshot(existing), _snapshot(updated)
     raw["ableton_ports"] = [
-        after if port.id == existing.id else _snapshot(port)
-        for port in doc.ableton_ports
+        after if port.id == existing.id else _snapshot(port) for port in doc.ableton_ports
     ]
     return (
         _preview(
@@ -576,33 +555,21 @@ def propose_batch(
         op = mutation.get("op")
         kwargs = {key: value for key, value in mutation.items() if key != "op"}
         if op == "set_channel":
-            _, raw = propose_set_channel(
-                data=raw, inventory_path=inventory_path, **kwargs
-            )
+            _, raw = propose_set_channel(data=raw, inventory_path=inventory_path, **kwargs)
         elif op == "add_link":
-            _, raw = propose_add_link(
-                data=raw, inventory_path=inventory_path, **kwargs
-            )
+            _, raw = propose_add_link(data=raw, inventory_path=inventory_path, **kwargs)
         elif op == "remove_link":
-            _, raw = propose_remove_link(
-                data=raw, inventory_path=inventory_path, **kwargs
-            )
+            _, raw = propose_remove_link(data=raw, inventory_path=inventory_path, **kwargs)
         elif op == "verify_link":
-            _, raw = _propose_verify_link(
-                data=raw, inventory_path=inventory_path, **kwargs
-            )
+            _, raw = _propose_verify_link(data=raw, inventory_path=inventory_path, **kwargs)
         elif op == "set_clock_master":
-            _, raw = propose_set_clock_master(
-                data=raw, inventory_path=inventory_path, **kwargs
-            )
+            _, raw = propose_set_clock_master(data=raw, inventory_path=inventory_path, **kwargs)
         elif op == "set_clock_destination":
             _, raw = propose_set_clock_destination(
                 data=raw, inventory_path=inventory_path, **kwargs
             )
         elif op == "ableton_set":
-            _, raw = propose_ableton_set(
-                data=raw, inventory_path=inventory_path, **kwargs
-            )
+            _, raw = propose_ableton_set(data=raw, inventory_path=inventory_path, **kwargs)
         else:
             raise StoreError(f"Unknown MIDI batch op {op!r}.")
     after_doc = _validated(raw, inventory_path=inventory_path)

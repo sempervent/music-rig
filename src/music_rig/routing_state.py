@@ -117,9 +117,7 @@ def semantic_fingerprint(doc: RoutingDocument | dict[str, Any]) -> dict[str, Any
     return out
 
 
-def validate_routing_doc(
-    data: dict[str, Any], *, inventory_path: Path | None = None
-) -> list[str]:
+def validate_routing_doc(data: dict[str, Any], *, inventory_path: Path | None = None) -> list[str]:
     errors: list[str] = []
     if not isinstance(data, dict):
         return ["routing document must be a mapping"]
@@ -150,9 +148,7 @@ def validate_routing_doc(
             if not bid.strip():
                 errors.append(f"path {pid}: empty branch id")
             if branch.position not in ("before", "after"):
-                errors.append(
-                    f"path {pid} branch {bid}: position must be 'before' or 'after'"
-                )
+                errors.append(f"path {pid} branch {bid}: position must be 'before' or 'after'")
             if bid != "main" and not branch.attach:
                 errors.append(f"path {pid} branch {bid}: non-main branch requires attach")
             if bid == "main" and branch.attach:
@@ -160,8 +156,7 @@ def validate_routing_doc(
             for node in branch.nodes:
                 if not _NODE_ID_RE.match(node.id):
                     errors.append(
-                        f"path {pid}: invalid node id {node.id!r} "
-                        "(use letters, digits, ._-)"
+                        f"path {pid}: invalid node id {node.id!r} (use letters, digits, ._-)"
                     )
                 node_ids.append(node.id.lower())
         if len(node_ids) != len(set(node_ids)):
@@ -231,9 +226,7 @@ def path_to_display_tree(path: NamedPath) -> PathTreeNode:
 
     def attached(parent_id: str) -> list[tuple[str, RoutingBranch]]:
         items = [
-            (bid, b)
-            for bid, b in path.branches.items()
-            if bid != "main" and b.attach == parent_id
+            (bid, b) for bid, b in path.branches.items() if bid != "main" and b.attach == parent_id
         ]
         # stable: before-position first (YAML order preserved via dict order)
         before = [(i, b) for i, b in items if b.position != "after"]
@@ -339,8 +332,7 @@ def resolve_node(branch: RoutingBranch, token: str) -> tuple[int, RoutingNode]:
     if not matches:
         raise StoreError(f"Node {token!r} not found in branch.")
     raise StoreError(
-        f"Ambiguous node {token!r}. Matches: "
-        + ", ".join(sorted({n.id for _, n in matches}))
+        f"Ambiguous node {token!r}. Matches: " + ", ".join(sorted({n.id for _, n in matches}))
     )
 
 
@@ -389,12 +381,8 @@ def _preview(
 ) -> CurrentPreview:
     before_chain = chain_text(before_path.branches[branch_id].nodes)
     after_chain = chain_text(after_path.branches[branch_id].nodes)
-    before_fp = semantic_fingerprint(
-        RoutingDocument(routes={}, named_paths={path_id: before_path})
-    )
-    after_fp = semantic_fingerprint(
-        RoutingDocument(routes={}, named_paths={path_id: after_path})
-    )
+    before_fp = semantic_fingerprint(RoutingDocument(routes={}, named_paths={path_id: before_path}))
+    after_fp = semantic_fingerprint(RoutingDocument(routes={}, named_paths={path_id: after_path}))
     changed = before_fp != after_fp
     msg = message
     if branch_id != "main" and "No other" not in message:
@@ -494,9 +482,7 @@ def propose_insert(
     if nid.lower() in existing_ids:
         raise StoreError(f"Node id {nid!r} already exists on path {pid}.")
     new_node = RoutingNode(id=nid, label=(label or nid).strip())
-    insert_at = _placement_index(
-        br.nodes, before=before, after=after, first=first, last=last
-    )
+    insert_at = _placement_index(br.nodes, before=before, after=after, first=first, last=last)
     new_nodes = list(br.nodes)
     new_nodes.insert(insert_at, new_node)
     new_branches = dict(named.branches)
@@ -545,11 +531,7 @@ def propose_remove(
     bid, br = resolve_branch(named, branch)
     _idx, node = resolve_node(br, node_token)
     # refuse removing a node that other branches attach to
-    dependents = [
-        child_id
-        for child_id, child in named.branches.items()
-        if child.attach == node.id
-    ]
+    dependents = [child_id for child_id, child in named.branches.items() if child.attach == node.id]
     if dependents:
         raise StoreError(
             f"Cannot remove {node.id}: branches still attach to it "
@@ -701,12 +683,8 @@ def propose_batch(
         lines.append(f"  Before: {chain_text(before_named.branches[bid].nodes)}")
         lines.append(f"  After:  {chain_text(after_named.branches[bid].nodes)}")
         lines.append("")
-    before_fp = semantic_fingerprint(
-        RoutingDocument(routes={}, named_paths={pid: before_named})
-    )
-    after_fp = semantic_fingerprint(
-        RoutingDocument(routes={}, named_paths={pid: after_named})
-    )
+    before_fp = semantic_fingerprint(RoutingDocument(routes={}, named_paths={pid: before_named}))
+    after_fp = semantic_fingerprint(RoutingDocument(routes={}, named_paths={pid: after_named}))
     changed = before_fp != after_fp
     preview = CurrentPreview(
         domain="routing.verify",

@@ -10,7 +10,7 @@ from textual.widgets import Button, DataTable, Footer, Label, Static
 
 from music_rig.store import StoreError
 from music_rig.tui.debug import debug_log, format_error, is_debug
-from music_rig.tui.dialogs import CommandLineModal, ConfirmModal, DiscardModal, HelpScreen
+from music_rig.tui.dialogs import CommandLineModal, DiscardModal, HelpScreen
 from music_rig.tui.editable import BaseEditableAdapter, DiffRow, WorkingRecord
 from music_rig.tui.editors import FieldForm
 from music_rig.tui.fields import FieldSpec, FieldType
@@ -78,18 +78,13 @@ class ConflictModal(SingleShotMixin, ModalScreen[str | None]):
         with Vertical(id="modal"):
             yield Label("Concurrency conflict", id="modal-title")
             yield Static(
-                self._message
-                + "\n\nThis record changed on disk since editing began.\n"
+                self._message + "\n\nThis record changed on disk since editing began.\n"
                 "Blind overwrite is not allowed. Your staged edits are kept until you Reload.",
                 id="modal-body",
             )
             with Vertical(id="mode-choices"):
-                yield Button(
-                    "1 Reload and discard mine", id="reload", action="screen.reload"
-                )
-                yield Button(
-                    "2 View my staged difference", id="diff", action="screen.diff"
-                )
+                yield Button("1 Reload and discard mine", id="reload", action="screen.reload")
+                yield Button("2 View my staged difference", id="diff", action="screen.diff")
                 yield Button(
                     "3 Cancel (keep edits)",
                     variant="primary",
@@ -274,7 +269,9 @@ class RecordEditScreen(Screen[bool]):
 
     def _run_command(self, raw: str) -> None:
         cmd, _args = parse_command(raw)
-        if cmd in {"",}:
+        if cmd in {
+            "",
+        }:
             return
         if cmd == "write":
             self.action_review_apply()

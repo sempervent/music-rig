@@ -1,24 +1,22 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-import yaml
 from typer.testing import CliRunner
 
 from music_rig import inbox_service, todo_service, wishlist_service
 from music_rig.cli import app
 from music_rig.models import (
     InboxDocument,
-    InboxItem,
     InboxStatus,
     TodoDocument,
     TodoStatus,
     TodoTask,
-    WishStatus,
     WishlistDocument,
     WishlistItem,
+    WishStatus,
 )
 from music_rig.render import (
     TODO_END,
@@ -34,10 +32,8 @@ from music_rig.store import (
     load_inbox,
     load_todo,
     load_wishlist,
-    save_inbox,
     save_todo,
     save_wishlist,
-    write_documents,
 )
 
 runner = CliRunner()
@@ -304,14 +300,12 @@ def test_promote_failure_leaves_wish(tmp_path: Path):
 def test_capture_and_triage(tmp_path: Path, monkeypatch):
     inbox_path = tmp_path / "inbox.yaml"
     todo_path, wish_path, docs_todo, docs_wish = _write_planning(tmp_path, _todo_doc())
-    fixed = datetime(2026, 9, 10, 21, 37, tzinfo=timezone.utc)
+    fixed = datetime(2026, 9, 10, 21, 37, tzinfo=UTC)
 
     def clock():
         return fixed
 
-    item = inbox_service.capture_text(
-        "RE-2 got noisy", clock=clock, inbox_path=inbox_path
-    )
+    item = inbox_service.capture_text("RE-2 got noisy", clock=clock, inbox_path=inbox_path)
     assert item.id == "CAP-001"
     assert item.status == InboxStatus.OPEN
     assert item.created_at == fixed

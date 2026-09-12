@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 from music_rig.tui.queries import HomeCounts, home_counts
 
@@ -140,8 +140,9 @@ DOMAINS: list[DomainSpec] = [
         "Operations",
         aliases=("sessions",),
         count_fn=_c(
-            lambda c: f"{c.sessions}"
-            + (f" (active {c.active_session})" if c.active_session else "")
+            lambda c: (
+                f"{c.sessions}" + (f" (active {c.active_session})" if c.active_session else "")
+            )
         ),
     ),
     DomainSpec("doctor", "Doctor", "Operations"),

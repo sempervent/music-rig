@@ -2,18 +2,12 @@
 
 from __future__ import annotations
 
-import shutil
-from pathlib import Path
 import pytest
-import yaml
-from music_rig import store
-from music_rig.patchbay_state import list_pairs, load_raw
-from music_rig.store import StoreError, load_questions
+
 from music_rig.tui.app import RigApp
-from music_rig.tui.editable_domains import registry
-from music_rig.tui.modes import EditorMode, parse_command
+from music_rig.tui.modes import EditorMode
 from music_rig.tui.save_outcome import SaveOutcome
-from music_rig.tui.working import ConcurrentModificationError, WorkingDocument
+
 
 @pytest.mark.asyncio
 async def test_vim_navigation_and_modes(tui_fx):
@@ -41,6 +35,7 @@ async def test_vim_navigation_and_modes(tui_fx):
         await pilot.pause()
         assert "NORMAL" in str(app.screen.query_one("#mode-banner").content)
 
+
 @pytest.mark.asyncio
 async def test_vim_command_q_refuses_dirty_qbang_discards(tui_fx):
     before = tui_fx["patchbays"].read_text(encoding="utf-8")
@@ -67,6 +62,7 @@ async def test_vim_command_q_refuses_dirty_qbang_discards(tui_fx):
         await pilot.pause()
     assert tui_fx["patchbays"].read_text(encoding="utf-8") == before
 
+
 @pytest.mark.asyncio
 async def test_vim_undo_staged(tui_fx):
     app = RigApp(route="patchbay", object_id="PB-B")
@@ -80,17 +76,20 @@ async def test_vim_undo_staged(tui_fx):
         dirty = str(app.screen.query_one("#dirty-label").content)
         assert "unsaved" not in dirty
 
+
 def test_save_outcome_enum():
     assert SaveOutcome.SUCCESS.ok
     assert not SaveOutcome.FAILED.ok
 
+
 def test_ctrl_s_binding_has_priority():
-    from music_rig.tui.forms import RecordEditScreen
     from music_rig.tui.editable_domains.todo import TodoEditableAdapter
+    from music_rig.tui.forms import RecordEditScreen
 
     bindings = RecordEditScreen(TodoEditableAdapter(), "RIG-001").BINDINGS
     ctrl_s = [b for b in bindings if getattr(b, "key", None) == "ctrl+s"]
     assert ctrl_s and ctrl_s[0].priority is True
+
 
 @pytest.mark.asyncio
 async def test_mode_banner_on_editable(tui_fx):
@@ -99,4 +98,3 @@ async def test_mode_banner_on_editable(tui_fx):
         await pilot.pause()
         banner = str(app.screen.query_one("#mode-banner").content)
         assert EditorMode.NORMAL.value in banner
-

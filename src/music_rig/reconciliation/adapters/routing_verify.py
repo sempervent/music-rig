@@ -69,11 +69,7 @@ class RoutingVerifyAdapter(ReconciliationAdapter):
                 state = ReconciliationState.NEEDS_ANSWER
         elif vr and vr.outcome == VerificationOutcome.FAILED_TEST:
             state = ReconciliationState.NEEDS_AGENT_ACTION
-        elif (
-            has_positive_observation(question)
-            and path
-            and answer in {"YES", "Y"}
-        ):
+        elif has_positive_observation(question) and path and answer in {"YES", "Y"}:
             if evidence == MidiEvidenceStatus.VERIFIED.value:
                 state = ReconciliationState.CURRENT_MATCHES
             else:
@@ -84,11 +80,7 @@ class RoutingVerifyAdapter(ReconciliationAdapter):
             state = ReconciliationState.NEEDS_AGENT_ACTION
 
         operations: list[dict[str, Any]] = []
-        if (
-            has_positive_observation(question)
-            and path
-            and answer in {"YES", "Y"}
-        ):
+        if has_positive_observation(question) and path and answer in {"YES", "Y"}:
             operations.append(
                 op(
                     PlanOperationKind.SET_EVIDENCE_VERIFIED,
@@ -98,9 +90,7 @@ class RoutingVerifyAdapter(ReconciliationAdapter):
                 )
             )
         elif vr and vr.outcome == VerificationOutcome.FAILED_TEST:
-            operations.append(
-                op(PlanOperationKind.RECORD_FAILED_VERIFICATION, note=vr.note or "")
-            )
+            operations.append(op(PlanOperationKind.RECORD_FAILED_VERIFICATION, note=vr.note or ""))
         elif has_positive_observation(question) and answer in {"NO", "N"}:
             operations.append(
                 op(
@@ -155,9 +145,7 @@ class RoutingVerifyAdapter(ReconciliationAdapter):
             )
         )
         suggestions.append(
-            suggest_finalize(
-                question.id, no_current_change=True, note="verified path"
-            )
+            suggest_finalize(question.id, no_current_change=True, note="verified path")
         )
 
         details: dict[str, Any] = {}
@@ -176,9 +164,7 @@ class RoutingVerifyAdapter(ReconciliationAdapter):
                     "rig reconcile apply",
                 ],
                 postcondition=(
-                    f"path {path} evidence == VERIFIED"
-                    if path
-                    else "named path evidence VERIFIED"
+                    f"path {path} evidence == VERIFIED" if path else "named path evidence VERIFIED"
                 ),
             )
             if not has_positive_observation(question):
@@ -186,9 +172,7 @@ class RoutingVerifyAdapter(ReconciliationAdapter):
                     {
                         "code": "needs_human_observation",
                         "message": "Record confirm/correct via verify record",
-                        "suggestions": [
-                            suggest_verify_record(question.id).to_dict()
-                        ],
+                        "suggestions": [suggest_verify_record(question.id).to_dict()],
                     }
                 )
 
@@ -203,9 +187,7 @@ class RoutingVerifyAdapter(ReconciliationAdapter):
             blockers=blockers,
             suggestions=suggestions,
             details=details,
-            postconditions=(
-                [f"path {path} evidence == VERIFIED"] if path else []
-            ),
+            postconditions=([f"path {path} evidence == VERIFIED"] if path else []),
             closable=list(question.related_todos) + list(question.related_changes),
         )
 
@@ -223,9 +205,7 @@ class RoutingVerifyAdapter(ReconciliationAdapter):
                 "verification_result CONFIRMED or CORRECTED"
             )
         if question.answer.strip().upper() not in {"YES", "Y"}:
-            raise StoreError(
-                "routing.verify evidence apply only when answer YES (path matches)"
-            )
+            raise StoreError("routing.verify evidence apply only when answer YES (path matches)")
         if not yes and not dry_run:
             raise StoreError("apply requires --yes (or --dry-run)")
         path = question.target.path if question.target else None

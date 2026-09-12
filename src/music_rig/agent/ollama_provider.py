@@ -161,17 +161,13 @@ class OllamaProvider:
             try:
                 turn_raw = json.loads(content)
             except json.JSONDecodeError as exc:
-                raise ProviderInvalidResponseError(
-                    f"Ollama content is not JSON: {exc}"
-                ) from exc
+                raise ProviderInvalidResponseError(f"Ollama content is not JSON: {exc}") from exc
         else:
             raise ProviderInvalidResponseError("Ollama response missing message.content")
         try:
             turn = AgentTurn.from_dict(turn_raw)
         except Exception as exc:
-            raise ProviderInvalidResponseError(
-                f"Ollama AgentTurn invalid: {exc}"
-            ) from exc
+            raise ProviderInvalidResponseError(f"Ollama AgentTurn invalid: {exc}") from exc
         tracker.emit(ProgressPhase.DONE, "provider turn complete")
         return turn, diagnostics
 
@@ -220,9 +216,7 @@ class OllamaProvider:
                 raise ProviderInvalidResponseError(
                     f"Ollama model unavailable or endpoint missing: {detail}"
                 ) from exc
-            raise ProviderInvalidResponseError(
-                f"Ollama HTTP {exc.code}: {detail}"
-            ) from exc
+            raise ProviderInvalidResponseError(f"Ollama HTTP {exc.code}: {detail}") from exc
         except urllib.error.URLError as exc:
             raise OllamaUnavailableError(
                 f"Ollama not reachable at {self.base_url}: {exc.reason}"
@@ -236,9 +230,7 @@ class OllamaProvider:
         try:
             parsed = json.loads(blob.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise ProviderInvalidResponseError(
-                f"Ollama returned non-JSON: {exc}"
-            ) from exc
+            raise ProviderInvalidResponseError(f"Ollama returned non-JSON: {exc}") from exc
         if not isinstance(parsed, dict):
             raise ProviderInvalidResponseError("Ollama JSON must be an object")
         return parsed
@@ -304,7 +296,9 @@ def ollama_reachable(base_url: str = "http://127.0.0.1:11434", *, timeout: float
         return False
 
 
-def ollama_provider_from_config(agent_cfg, *, on_progress: ProgressCallback | None = None) -> OllamaProvider:
+def ollama_provider_from_config(
+    agent_cfg, *, on_progress: ProgressCallback | None = None
+) -> OllamaProvider:
     ollama_cfg = getattr(agent_cfg, "ollama", None)
     base = getattr(ollama_cfg, "base_url", None) or "http://127.0.0.1:11434"
     model = getattr(ollama_cfg, "model", None) or ""

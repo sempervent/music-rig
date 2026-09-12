@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import Any
 
 from music_rig import question_service
-from music_rig.models import QuestionStatus
 from music_rig import store as store_mod
+from music_rig.models import QuestionStatus
 from music_rig.store import StoreError, load_questions
 from music_rig.tui.adapters.questions import filter_questions, question_detail_markdown
 from music_rig.tui.editable import ApplyResult, BaseEditableAdapter, WorkingRecord
@@ -20,7 +20,6 @@ from music_rig.tui.fields import (
     text_spec,
 )
 from music_rig.tui.working import ConcurrentModificationError
-
 
 QUESTION_FIELDS: list[FieldSpec] = [
     readonly_spec("id", "ID"),

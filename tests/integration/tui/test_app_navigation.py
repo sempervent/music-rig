@@ -7,12 +7,11 @@ from pathlib import Path
 import pytest
 import yaml
 
-from music_rig import snapshot_service, store
+from music_rig import snapshot_service
 from music_rig.patchbay_state import list_pairs, load_raw
 from music_rig.store import load_questions
 from music_rig.tui.app import RigApp
 from music_rig.tui.working import ConcurrentModificationError, WorkingDocument, sha256_file
-
 
 # ---------------------------------------------------------------------------
 # Home / navigation
@@ -154,11 +153,7 @@ async def test_question_resolve_human_path_lowercase_r(tui_fx):
     assert q.resolved_at is not None
     joined = " ".join(notifications)
     assert "Q-002" in joined
-    assert (
-        "reconcile" in joined.casefold()
-        or "resolved" in joined.casefold()
-        or "OPEN" in joined
-    )
+    assert "reconcile" in joined.casefold() or "resolved" in joined.casefold() or "OPEN" in joined
 
 
 @pytest.mark.asyncio
@@ -307,7 +302,7 @@ async def test_patchbay_pb_b_unknown_visible(tui_fx):
         from music_rig.tui.screens.patchbays import PatchbayEditorScreen
 
         assert isinstance(app.screen, PatchbayEditorScreen)
-        table = app.screen.query_one("#list-table")
+        assert app.screen.query_one("#list-table") is not None
         # At least one UNKNOWN mode cell present via row count
         assert len(app.screen._pair_keys) == 2
 
@@ -461,6 +456,7 @@ async def test_generic_midi_controls_performance_editable():
 @pytest.mark.asyncio
 async def test_cli_tui_help():
     from typer.testing import CliRunner
+
     from music_rig.cli import app
 
     result = CliRunner().invoke(app, ["tui", "--help"])
@@ -597,8 +593,9 @@ def test_rename_collision_rejected(tui_fx, monkeypatch):
 
 
 def test_inspect_commands(tui_fx):
-    from music_rig import inspect_service
     from typer.testing import CliRunner
+
+    from music_rig import inspect_service
     from music_rig.cli import app
 
     domains = inspect_service.list_domains()
@@ -682,8 +679,8 @@ def test_production_data_untouched_by_tui_fx(tui_fx):
 @pytest.mark.asyncio
 async def test_verify_screen_pilot_answer(tui_fx):
     """Stage 16 — verify TUI: queue loads; Verify records via service; CURRENT untouched."""
-    from music_rig.tui.screens.verify import VerifyScreen
     from music_rig.tui.dialogs import ConfirmModal
+    from music_rig.tui.screens.verify import VerifyScreen
 
     app = RigApp(route="verify", object_id="Q-001")
     async with app.run_test(size=(120, 40)) as pilot:

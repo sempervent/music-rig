@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -18,9 +18,9 @@ from music_rig.models import (
 )
 from music_rig.rig_views import (
     format_channels,
-    format_path_list,
     format_patchbay,
     format_patchbay_list,
+    format_path_list,
     path_tree_for,
 )
 from music_rig.store import (
@@ -30,7 +30,6 @@ from music_rig.store import (
     load_todo,
     save_todo,
 )
-from music_rig.todo_service import set_todo_status
 
 runner = CliRunner()
 
@@ -61,9 +60,7 @@ def studio(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     docs_todo = tmp_path / "todo.md"
     docs_wish = tmp_path / "wishlist.md"
     docs_q = tmp_path / "open-questions.md"
-    docs_todo.write_text(
-        "x\n<!-- rig:todo:start -->\n<!-- rig:todo:end -->\n", encoding="utf-8"
-    )
+    docs_todo.write_text("x\n<!-- rig:todo:start -->\n<!-- rig:todo:end -->\n", encoding="utf-8")
     docs_wish.write_text(
         "x\n<!-- rig:wishlist:start -->\n<!-- rig:wishlist:end -->\n", encoding="utf-8"
     )
@@ -259,7 +256,7 @@ def studio(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(store, "PATCHBAYS_PATH", patchbays)
     monkeypatch.setattr(store, "ROUTING_PATH", routing)
 
-    clock = FakeClock(datetime(2026, 9, 10, 22, 35, 0, tzinfo=timezone.utc))
+    clock = FakeClock(datetime(2026, 9, 10, 22, 35, 0, tzinfo=UTC))
     return {
         "sessions": sessions,
         "changes": changes,
@@ -280,9 +277,7 @@ def studio(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 def test_session_lifecycle(studio):
     clock = studio["clock"]
     sessions = studio["sessions"]
-    s = session_service.start_session(
-        "Just play", clock=clock, sessions_dir=sessions
-    )
+    s = session_service.start_session("Just play", clock=clock, sessions_dir=sessions)
     assert s.id == "SES-20260910-223500"
     assert s.status.value == "ACTIVE"
     assert s.ended_at is None
@@ -301,9 +296,7 @@ def test_session_lifecycle(studio):
         (sessions / f"{active.id}.yaml").read_text(encoding="utf-8")
     )
 
-    duration = session_service.format_duration(
-        active.started_at, None, now=clock()
-    )
+    duration = session_service.format_duration(active.started_at, None, now=clock())
     assert duration == "16m"
 
     clock.advance(minutes=1)
@@ -436,16 +429,13 @@ def test_views_from_fixtures(studio):
     detail = format_patchbay("PB-B", patchbays_path=studio["patchbays"])
     assert "miniKORG" in detail
     assert "UNKNOWN" in detail
-    unknown = format_patchbay(
-        "PB-B", unknown_only=True, patchbays_path=studio["patchbays"]
-    )
+    unknown = format_patchbay("PB-B", unknown_only=True, patchbays_path=studio["patchbays"])
     assert "Verified" not in unknown
     assert "miniKORG" in unknown
 
     paths = format_path_list(routing_path=studio["routing"])
     assert "space" in paths
-    header, tree = path_tree_for("space", routing_path=studio["routing"])
-    rendered = tree.__rich__() if False else str(tree)
+    _header, tree = path_tree_for("space", routing_path=studio["routing"])
     # Use console render
     from rich.console import Console
 
@@ -483,9 +473,7 @@ def test_doctor_and_status(studio, monkeypatch):
     from music_rig import inbox_service
 
     inbox_service.capture_text("cap", inbox_path=studio["inbox"])
-    session_service.start_session(
-        "x", clock=studio["clock"], sessions_dir=studio["sessions"]
-    )
+    session_service.start_session("x", clock=studio["clock"], sessions_dir=studio["sessions"])
     text2 = build_doctor_text(
         todo_path=studio["todo"],
         wishlist_path=studio["wish"],
@@ -502,9 +490,7 @@ def test_doctor_and_status(studio, monkeypatch):
     assert "OPEN inbox" in text2
     assert "Active session" in text2
 
-    monkeypatch.setattr(
-        "music_rig.doctor.git_summary", lambda: (None, None)
-    )
+    monkeypatch.setattr("music_rig.doctor.git_summary", lambda: (None, None))
     text3 = build_doctor_text(
         todo_path=studio["todo"],
         wishlist_path=studio["wish"],

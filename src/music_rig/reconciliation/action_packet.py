@@ -27,8 +27,8 @@ def build_action_packet(
     from music_rig.reconciliation.operation_renderer import render_cli
     from music_rig.reconciliation.operations import RigOperation
     from music_rig.reconciliation.suggestions import (
-        SuggestionKind,
         ActionSuggestion,
+        SuggestionKind,
         render_suggestion,
         suggest_finalize,
     )
@@ -45,11 +45,7 @@ def build_action_packet(
         }
     target = None
     if question.target is not None:
-        target = {
-            k: v
-            for k, v in question.target.model_dump().items()
-            if v is not None
-        }
+        target = {k: v for k, v in question.target.model_dump().items() if v is not None}
     finalize_suggestion = suggest_finalize(
         question.id,
         confirm_current_reconciled=True,
@@ -92,9 +88,7 @@ def build_action_packet(
         },
         "suggested_command_families": suggested_command_families,
         # PRESENTATION: rendered from families for older agent JSON consumers.
-        "suggested_current_commands": [
-            render_suggestion(s) for s in family_suggestions
-        ],
+        "suggested_current_commands": [render_suggestion(s) for s in family_suggestions],
         "suggestions": [s.to_dict() for s in family_suggestions],
         "candidate_operations": candidate_operations or [],
         "finalize_operation": finalize_op.to_dict(),

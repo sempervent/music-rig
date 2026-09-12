@@ -6,23 +6,20 @@ from pathlib import Path
 from typing import Any
 
 from music_rig import current_service, inventory_state
+from music_rig import store as store_mod
 from music_rig.channel_state import propose_set_source
 from music_rig.midi_state import (
     propose_ableton_set,
     propose_set_channel,
-    propose_set_clock_destination,
     propose_set_clock_master,
 )
-from music_rig.models import GearCondition, OwnershipStatus
+from music_rig.models import GearCondition, InventoryDocument, InventoryItem, OwnershipStatus
 from music_rig.routing_state import propose_set_mode as routing_propose_set_mode
-from music_rig import store as store_mod
 from music_rig.store import (
     StoreError,
     load_inventory,
     parse_existing_yaml,
-    write_documents,
 )
-from music_rig.models import InventoryDocument, InventoryItem
 from music_rig.tui.editable import ApplyResult, BaseEditableAdapter, WorkingRecord
 from music_rig.tui.fields import FieldSpec, FieldType, enum_spec, readonly_spec, text_spec
 
@@ -44,14 +41,18 @@ class GearEditableAdapter(BaseEditableAdapter):
             text_spec("manufacturer", "Manufacturer"),
             text_spec("model", "Model"),
             text_spec("category", "Category", required=True),
-            FieldSpec(name="quantity", label="Quantity", type=FieldType.INT, required=True, min_value=1),
+            FieldSpec(
+                name="quantity", label="Quantity", type=FieldType.INT, required=True, min_value=1
+            ),
             enum_spec("ownership_status", "Ownership", [s.value for s in OwnershipStatus]),
             enum_spec("condition", "Condition", [s.value for s in GearCondition]),
             text_spec("location", "Location"),
             text_spec("notes", "Notes", multiline=True),
         ]
 
-    def list_records(self, *, status_filter: str | None = None, search: str = "") -> list[dict[str, Any]]:
+    def list_records(
+        self, *, status_filter: str | None = None, search: str = ""
+    ) -> list[dict[str, Any]]:
         needle = search.casefold()
         rows = []
         for g in load_inventory().items:
@@ -153,7 +154,14 @@ def _yaml_rows(path: Path, key: str, id_fn, cell_fn, search_fn) -> list[dict[str
     else:
         return []
     for iid, obj in items:
-        rows.append({"id": str(iid), "cells": cell_fn(iid, obj), "search_text": search_fn(iid, obj), "raw": obj})
+        rows.append(
+            {
+                "id": str(iid),
+                "cells": cell_fn(iid, obj),
+                "search_text": search_fn(iid, obj),
+                "raw": obj,
+            }
+        )
     return rows
 
 
@@ -174,7 +182,9 @@ class ChannelsEditableAdapter(BaseEditableAdapter):
             text_spec("source", "Source", help="Empty clears source"),
         ]
 
-    def list_records(self, *, status_filter: str | None = None, search: str = "") -> list[dict[str, Any]]:
+    def list_records(
+        self, *, status_filter: str | None = None, search: str = ""
+    ) -> list[dict[str, Any]]:
         from music_rig.channel_state import load_raw
 
         data = load_raw()
@@ -254,7 +264,9 @@ class RoutingEditableAdapter(BaseEditableAdapter):
             ),
         ]
 
-    def list_records(self, *, status_filter: str | None = None, search: str = "") -> list[dict[str, Any]]:
+    def list_records(
+        self, *, status_filter: str | None = None, search: str = ""
+    ) -> list[dict[str, Any]]:
         from music_rig.routing_state import load_raw
 
         data = load_raw()
@@ -295,8 +307,16 @@ class RoutingEditableAdapter(BaseEditableAdapter):
 
         data = load_raw()
         info = (data.get("named_paths") or {}).get(record_id) or {}
-        lines = [f"# {record_id}", "", f"Status: {info.get('status') or '—'}", "", "## Branches / nodes"]
-        for bid, br in ((info.get("branches") or {}) if isinstance(info.get("branches"), dict) else {}).items():
+        lines = [
+            f"# {record_id}",
+            "",
+            f"Status: {info.get('status') or '—'}",
+            "",
+            "## Branches / nodes",
+        ]
+        for bid, br in (
+            (info.get("branches") or {}) if isinstance(info.get("branches"), dict) else {}
+        ).items():
             lines.append(f"### {bid}")
             for i, n in enumerate((br or {}).get("nodes") or []):
                 if isinstance(n, dict):
@@ -340,11 +360,15 @@ class MidiEditableAdapter(BaseEditableAdapter):
         return [
             readonly_spec("kind", "Kind"),
             readonly_spec("id", "ID"),
-            text_spec("value", "Value", help="Channel number, clock endpoint, or Ableton port field"),
+            text_spec(
+                "value", "Value", help="Channel number, clock endpoint, or Ableton port field"
+            ),
             text_spec("notes", "Notes", multiline=True),
         ]
 
-    def list_records(self, *, status_filter: str | None = None, search: str = "") -> list[dict[str, Any]]:
+    def list_records(
+        self, *, status_filter: str | None = None, search: str = ""
+    ) -> list[dict[str, Any]]:
         from music_rig.midi_state import load_raw
 
         raw = load_raw()
@@ -366,17 +390,31 @@ class MidiEditableAdapter(BaseEditableAdapter):
                 summary = f"{link.get('source')} -> {link.get('destination')}"
                 blob = f"{rid} {summary}"
                 if not needle or needle in blob.casefold():
-                    rows.append({"id": rid, "cells": ["link", lid, summary[:40]], "search_text": blob})
+                    rows.append(
+                        {"id": rid, "cells": ["link", lid, summary[:40]], "search_text": blob}
+                    )
         master = (raw.get("clock") or {}).get("master") or {}
         if isinstance(master, dict):
             ep = str(master.get("endpoint_ref") or "—")
-            rows.append({"id": "clock:master", "cells": ["clock", "master", ep], "search_text": f"clock {ep}"})
+            rows.append(
+                {
+                    "id": "clock:master",
+                    "cells": ["clock", "master", ep],
+                    "search_text": f"clock {ep}",
+                }
+            )
         for port in raw.get("ableton_ports") or []:
             if isinstance(port, dict):
                 pid = str(port.get("id") or "")
                 rid = f"ableton:{pid}"
                 summary = f"track={port.get('track')} sync={port.get('sync')}"
-                rows.append({"id": rid, "cells": ["ableton", pid, summary[:40]], "search_text": f"{rid} {summary}"})
+                rows.append(
+                    {
+                        "id": rid,
+                        "cells": ["ableton", pid, summary[:40]],
+                        "search_text": f"{rid} {summary}",
+                    }
+                )
         return rows
 
     def get_record(self, record_id: str) -> dict[str, Any]:
@@ -452,12 +490,21 @@ class ControllersEditableAdapter(BaseEditableAdapter):
             readonly_spec("gear", "Gear"),
             readonly_spec("context", "Context"),
             readonly_spec("control", "Control"),
-            enum_spec("availability", "Availability", ("AVAILABLE", "BROKEN", "UNKNOWN"), required=False),
+            enum_spec(
+                "availability", "Availability", ("AVAILABLE", "BROKEN", "UNKNOWN"), required=False
+            ),
             text_spec("evidence", "Evidence", multiline=True),
-            text_spec("notes", "Notes", multiline=True, help="BROKEN+mapped invariant enforced by control_state"),
+            text_spec(
+                "notes",
+                "Notes",
+                multiline=True,
+                help="BROKEN+mapped invariant enforced by control_state",
+            ),
         ]
 
-    def list_records(self, *, status_filter: str | None = None, search: str = "") -> list[dict[str, Any]]:
+    def list_records(
+        self, *, status_filter: str | None = None, search: str = ""
+    ) -> list[dict[str, Any]]:
         from music_rig.control_state import load_raw
 
         raw = load_raw()
@@ -590,7 +637,9 @@ class AbletonEditableAdapter(BaseEditableAdapter):
             text_spec("notes", "Notes", multiline=True),
         ]
 
-    def list_records(self, *, status_filter: str | None = None, search: str = "") -> list[dict[str, Any]]:
+    def list_records(
+        self, *, status_filter: str | None = None, search: str = ""
+    ) -> list[dict[str, Any]]:
         raw = parse_existing_yaml(store_mod.ABLETON_PATH)
         if not isinstance(raw, dict):
             return []
@@ -613,7 +662,13 @@ class AbletonEditableAdapter(BaseEditableAdapter):
                 blob = f"{rid} {name}"
                 if needle and needle not in blob.casefold():
                     continue
-                rows.append({"id": rid, "cells": [kind, str(kid)[:20], name[:40] or "—"], "search_text": blob})
+                rows.append(
+                    {
+                        "id": rid,
+                        "cells": [kind, str(kid)[:20], name[:40] or "—"],
+                        "search_text": blob,
+                    }
+                )
         return rows
 
     def get_record(self, record_id: str) -> dict[str, Any]:
@@ -641,7 +696,7 @@ class AbletonEditableAdapter(BaseEditableAdapter):
 
     def commit(self, working: WorkingRecord, *, render: bool = True) -> ApplyResult:
         working.ensure_current()
-        from music_rig.store import write_text_files, _dump_yaml
+        from music_rig.store import _dump_yaml, write_text_files
 
         raw = parse_existing_yaml(store_mod.ABLETON_PATH)
         if not isinstance(raw, dict):
@@ -695,7 +750,9 @@ class PerformanceEditableAdapter(BaseEditableAdapter):
             ),
         ]
 
-    def list_records(self, *, status_filter: str | None = None, search: str = "") -> list[dict[str, Any]]:
+    def list_records(
+        self, *, status_filter: str | None = None, search: str = ""
+    ) -> list[dict[str, Any]]:
         from music_rig.performance_state import load_document
 
         doc = load_document()
@@ -707,7 +764,9 @@ class PerformanceEditableAdapter(BaseEditableAdapter):
             if isinstance(block, dict):
                 iterable = block.items()
             elif isinstance(block, list):
-                iterable = ((str(x.get("id") if isinstance(x, dict) else i), x) for i, x in enumerate(block))
+                iterable = (
+                    (str(x.get("id") if isinstance(x, dict) else i), x) for i, x in enumerate(block)
+                )
             else:
                 continue
             for kid, obj in iterable:
@@ -719,7 +778,13 @@ class PerformanceEditableAdapter(BaseEditableAdapter):
                 blob = f"{rid} {summary}"
                 if needle and needle not in blob.casefold():
                     continue
-                rows.append({"id": rid, "cells": [kind, str(kid)[:20], summary[:40] or "—"], "search_text": blob})
+                rows.append(
+                    {
+                        "id": rid,
+                        "cells": [kind, str(kid)[:20], summary[:40] or "—"],
+                        "search_text": blob,
+                    }
+                )
         return rows
 
     def get_record(self, record_id: str) -> dict[str, Any]:
@@ -757,7 +822,9 @@ class PerformanceEditableAdapter(BaseEditableAdapter):
         if "evidence" in working.mutations and working.baseline["kind"] == "bindings":
             from music_rig.performance_state import propose_set_evidence
 
-            preview, data = propose_set_evidence(working.baseline["id"], working.mutations["evidence"])
+            preview, data = propose_set_evidence(
+                working.baseline["id"], working.mutations["evidence"]
+            )
             current_service.commit_performance(data, preview, render=render)
             msg = preview.message
         else:
@@ -785,12 +852,16 @@ class BackupEditableAdapter(BaseEditableAdapter):
         return [
             readonly_spec("id", "ID"),
             text_spec("label", "Label"),
-            readonly_spec("locator_key", "Locator key", help="Paths live in .rig.local.yaml — not edited here"),
+            readonly_spec(
+                "locator_key", "Locator key", help="Paths live in .rig.local.yaml — not edited here"
+            ),
             text_spec("notes", "Notes", multiline=True),
             text_spec("manual_instructions", "Manual instructions", multiline=True),
         ]
 
-    def list_records(self, *, status_filter: str | None = None, search: str = "") -> list[dict[str, Any]]:
+    def list_records(
+        self, *, status_filter: str | None = None, search: str = ""
+    ) -> list[dict[str, Any]]:
         raw = parse_existing_yaml(store_mod.BACKUPS_PATH)
         if not isinstance(raw, dict):
             return []
@@ -834,7 +905,7 @@ class BackupEditableAdapter(BaseEditableAdapter):
 
     def commit(self, working: WorkingRecord, *, render: bool = True) -> ApplyResult:
         working.ensure_current()
-        from music_rig.store import write_text_files, _dump_yaml
+        from music_rig.store import _dump_yaml, write_text_files
 
         raw = parse_existing_yaml(store_mod.BACKUPS_PATH)
         if not isinstance(raw, dict):

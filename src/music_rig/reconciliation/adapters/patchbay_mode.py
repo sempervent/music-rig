@@ -41,15 +41,11 @@ class PatchbayModeAdapter(ReconciliationAdapter):
         bay = target.bay.strip().upper()
         if target.pair:
             try:
-                upper_n, lower_n, upper, lower = patchbay_state.resolve_pair(
-                    bay, target.pair, data
-                )
+                upper_n, lower_n, upper, lower = patchbay_state.resolve_pair(bay, target.pair, data)
             except StoreError:
                 return None
             snap = patchbay_state._pair_snapshot(upper_n, lower_n, upper, lower)
-            pair_label = (
-                f"{upper_n}/{lower_n}" if lower_n is not None else str(upper_n)
-            )
+            pair_label = f"{upper_n}/{lower_n}" if lower_n is not None else str(upper_n)
             return {
                 "bay": bay,
                 "pair": pair_label,
@@ -90,8 +86,7 @@ class PatchbayModeAdapter(ReconciliationAdapter):
                 ActionSuggestion(
                     kind=SuggestionKind.TARGET,
                     intent=(
-                        f"question target set {question.id} "
-                        f"--domain patchbay.mode --bay PB-B --yes"
+                        f"question target set {question.id} --domain patchbay.mode --bay PB-B --yes"
                     ),
                     description="Set target.bay for patchbay.mode",
                     code="missing_target_field",
@@ -181,7 +176,7 @@ class PatchbayModeAdapter(ReconciliationAdapter):
             unknown = [p for p in pairs if p["mode"] == "unknown"]
             candidates: list[str] = []
             suggestions: list[ActionSuggestion] = []
-            for p in (unknown or pairs):
+            for p in unknown or pairs:
                 pair_label = (
                     f"{p['upper_n']}/{p['lower_n']}"
                     if p["lower_n"] is not None
@@ -323,9 +318,7 @@ class PatchbayModeAdapter(ReconciliationAdapter):
             ReconciliationState.CURRENT_MATCHES,
             ReconciliationState.READY_TO_FINALIZE,
         }:
-            raise StoreError(
-                f"Cannot apply {question.id} in state {plan.state.value}"
-            )
+            raise StoreError(f"Cannot apply {question.id} in state {plan.state.value}")
         if not yes and not dry_run:
             raise StoreError("apply requires --yes (or --dry-run)")
         target = question.target

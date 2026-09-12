@@ -9,8 +9,8 @@ from textual.screen import Screen
 from textual.widgets import DataTable, Footer, Static
 
 from music_rig import question_service
-from music_rig.reconciliation import service as reconcile_service
 from music_rig.models import ReconciliationState
+from music_rig.reconciliation import service as reconcile_service
 from music_rig.store import StoreError
 from music_rig.tui.header import RigHeader
 
@@ -313,9 +313,7 @@ class ReconcileScreen(Screen):
                     return
                 pair = selected[0]
                 try:
-                    question_service.set_target(
-                        q.id, pair=pair, dry_run=False, render=True
-                    )
+                    question_service.set_target(q.id, pair=pair, dry_run=False, render=True)
                 except StoreError as exc:
                     self.notify(str(exc), severity="error")
                     return

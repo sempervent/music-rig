@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
-from music_rig.models import NamedPath, RoutingDocument, RoutingNode
 from music_rig import routing_state
-from music_rig.store import ROUTING_PATH
+from music_rig.models import NamedPath, RoutingDocument, RoutingNode
 
 
 def _load_doc(data: dict[str, Any] | None = None) -> RoutingDocument:
@@ -92,11 +90,7 @@ def _flatten_for_doc(path: NamedPath) -> list[str]:
             lines.append(label)
         else:
             lines.append(f"{pad}-> {label}")
-        attached = [
-            (bid, b)
-            for bid, b in path.branches.items()
-            if b.attach == node.id
-        ]
+        attached = [(bid, b) for bid, b in path.branches.items() if b.attach == node.id]
         before = [x for x in attached if x[1].position != "after"]
         after = [x for x in attached if x[1].position == "after"]
         for _bid, br in before:
@@ -154,9 +148,7 @@ def render_pedal_chains_section(data: dict[str, Any] | None = None) -> str:
         lines.append("")
         lines.append(_text_block(_flatten_for_doc(paths["dirty"])))
         lines.append("")
-        lines.append(
-            "Intent: gain, drive, dirt, classic stompbox abuse."
-        )
+        lines.append("Intent: gain, drive, dirt, classic stompbox abuse.")
         lines.append("")
         lines.append(
             "**Note:** TR-2 is **not** in this branch. It lives in the SPACE / "
@@ -190,11 +182,11 @@ def render_pedal_chains_section(data: dict[str, Any] | None = None) -> str:
         post = [n for n in aux.branches["main"].nodes if n.id in ("ch-1", "alesis-return")]
         if post:
             # include JOYO OUT conceptually
-            lines.append(_text_block(["JOYO OUT", *[f"-> {routing_state.node_display(n)}" for n in post]]))
+            lines.append(
+                _text_block(["JOYO OUT", *[f"-> {routing_state.node_display(n)}" for n in post]])
+            )
             lines.append("")
-        lines.append(
-            "Path is mono through JOYO; CH-1 is the stereo stage."
-        )
+        lines.append("Path is mono through JOYO; CH-1 is the stereo stage.")
         lines.append("")
 
     return "\n".join(lines).rstrip() + "\n"
@@ -222,9 +214,7 @@ def render_aux_send_loop_mermaid(data: dict[str, Any] | None = None) -> str:
     if space:
         send = space.branches.get("sy1-send")
         if send:
-            sy_loop = " -> ".join(
-                n.label for n in send.nodes if n.id != "sy1-return"
-            )
+            sy_loop = " -> ".join(n.label for n in send.nodes if n.id != "sy1-return")
         if "ls2-a" in space.branches:
             loop_a = " -> ".join(n.label for n in space.branches["ls2-a"].nodes)
         if "ls2-b" in space.branches:

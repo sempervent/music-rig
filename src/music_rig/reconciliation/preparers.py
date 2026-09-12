@@ -5,10 +5,9 @@ Stages document working sets and conflict claims for agent transactions.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any
-
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from typing import Any
 
 from music_rig.models import (
     ChangeStatus,
@@ -345,9 +344,7 @@ def prepare_path_set_evidence(
             )
         q = question_service.get_question(str(qid), questions_path=ctx.paths.questions)
         if q.verification_result is None:
-            raise StoreError(
-                "path.set_evidence VERIFIED forbidden without verification_result"
-            )
+            raise StoreError("path.set_evidence VERIFIED forbidden without verification_result")
         outcome = q.verification_result.outcome.value
         if outcome in {"FAILED_TEST", "INCONCLUSIVE", "SKIPPED"}:
             raise StoreError(
@@ -438,7 +435,7 @@ def prepare_finalize_manual(
     if "agent-interpreted" not in recon_note.casefold():
         recon_note = f"[agent-interpreted / manually reconciled] {recon_note}".strip()
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     updated_q = OpenQuestion(
         **{**q.model_dump(), "reconciled_at": now, "reconciliation_note": recon_note}
     )
@@ -528,9 +525,7 @@ def prepare_open_clarification(
             and q.question.strip() == text
             and not q.answer.strip()
         ):
-            raise StoreError(
-                f"Open clarification already exists as {q.id} for {parent_id}"
-            )
+            raise StoreError(f"Open clarification already exists as {q.id} for {parent_id}")
     area = str(op.args.get("area") or parent.area).strip() or parent.area
     new_id = qdoc.next_id()
     child = OpenQuestion(
@@ -545,9 +540,7 @@ def prepare_open_clarification(
         clarifies_question=parent_id,
         resolved_at=None,
     )
-    working["questions"] = OpenQuestionsDocument(
-        questions=[*qdoc.questions, child]
-    )
+    working["questions"] = OpenQuestionsDocument(questions=[*qdoc.questions, child])
     return PreparedOperation(
         operation=op,
         touched_documents=["questions"],
@@ -582,9 +575,7 @@ def materialize_working_docs(
             if ctx.paths.patchbays.exists()
             else None
         )
-        text = patchbay_state.dump_with_header(
-            working["patchbays"], existing_text=existing
-        )
+        text = patchbay_state.dump_with_header(working["patchbays"], existing_text=existing)
         errors = patchbay_state.validate_patchbays_doc(working["patchbays"])
         if errors:
             raise StoreError("Patchbay validation failed: " + "; ".join(errors))
@@ -592,30 +583,22 @@ def materialize_working_docs(
 
     if "channels" in working:
         existing = (
-            ctx.paths.channels.read_text(encoding="utf-8")
-            if ctx.paths.channels.exists()
-            else None
+            ctx.paths.channels.read_text(encoding="utf-8") if ctx.paths.channels.exists() else None
         )
         errors = channel_state.validate_channel_map(working["channels"])
         if errors:
             raise StoreError("Channel map validation failed: " + "; ".join(errors))
-        text = channel_state.dump_with_header(
-            working["channels"], existing_text=existing
-        )
+        text = channel_state.dump_with_header(working["channels"], existing_text=existing)
         payloads.append((ctx.paths.channels, text))
 
     if "routing" in working:
         existing = (
-            ctx.paths.routing.read_text(encoding="utf-8")
-            if ctx.paths.routing.exists()
-            else None
+            ctx.paths.routing.read_text(encoding="utf-8") if ctx.paths.routing.exists() else None
         )
         errors = routing_state.validate_routing_doc(working["routing"])
         if errors:
             raise StoreError("Routing validation failed: " + "; ".join(errors))
-        text = routing_state.dump_with_header(
-            working["routing"], existing_text=existing
-        )
+        text = routing_state.dump_with_header(working["routing"], existing_text=existing)
         payloads.append((ctx.paths.routing, text))
 
     if "inventory" in working:
@@ -627,9 +610,7 @@ def materialize_working_docs(
         errors = inventory_state.validate_inventory_doc(working["inventory"])
         if errors:
             raise StoreError("Inventory validation failed: " + "; ".join(errors))
-        text = inventory_state.dump_with_header(
-            working["inventory"], existing_text=existing
-        )
+        text = inventory_state.dump_with_header(working["inventory"], existing_text=existing)
         payloads.append((ctx.paths.inventory, text))
 
     if "questions" in working:
@@ -651,17 +632,13 @@ def materialize_working_docs(
     if "todo" in working:
         tdoc = working["todo"]
         assert isinstance(tdoc, TodoDocument)
-        payloads.append(
-            (ctx.paths.todo, _dump_yaml(tdoc.model_dump(mode="json")))
-        )
+        payloads.append((ctx.paths.todo, _dump_yaml(tdoc.model_dump(mode="json"))))
 
     if "changes" in working:
         from music_rig.models import ChangesDocument
 
         cdoc = working["changes"]
         assert isinstance(cdoc, ChangesDocument)
-        payloads.append(
-            (ctx.paths.changes, _dump_yaml(cdoc.model_dump(mode="json")))
-        )
+        payloads.append((ctx.paths.changes, _dump_yaml(cdoc.model_dump(mode="json"))))
 
     return payloads, finalize_plan

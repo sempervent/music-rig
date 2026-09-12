@@ -15,10 +15,13 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "coverage>=7.16,<8",
+    "pre-commit>=4,<5",
     "pytest>=8.3,<9",
     "pytest-asyncio>=1.4.0",
     "pytest-cov>=7.1,<8",
     "pytest-xdist>=3.6,<4",
+    "ruff>=0.11,<1",
+    "ryl>=0.1",
 ]
 docs = [
     "mkdocs>=1.6,<1.7",
@@ -50,9 +53,10 @@ addopts = [
     "auto",
     "--cov=music_rig",
     "--cov-report=term-missing:skip-covered",
+    "--cov-fail-under=80",
 ]
 # -n auto → pytest_xdist_auto_num_workers in tests/conftest.py → max(1, cpu_count - 2)
-# Enforce --cov-fail-under=75 on the full suite (CI + local validation below).
+# Full suite enforces 80% coverage via --cov-fail-under=80 (CI + local validation).
 # Subset / debug: uv run pytest path -n0 --cov-fail-under=0
 markers = [
     "unit: fast isolated unit tests",
@@ -81,3 +85,61 @@ exclude_lines = [
     "if TYPE_CHECKING:",
     "raise NotImplementedError",
 ]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["src", "tests", "scripts"]
+extend-exclude = ["site", ".venv", "assets"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "UP"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+# ryl enables no rules by default; explicit enable/disable below.
+[tool.ryl.files]
+yaml = ["*.yaml", "*.yml", ".pre-commit-config.yaml"]
+
+[tool.ryl.rules]
+anchors = "enable"
+braces = "enable"
+brackets = "enable"
+colons = "enable"
+commas = "enable"
+document-end = "disable"
+document-start = "disable"
+empty-lines = "enable"
+hyphens = "enable"
+key-duplicates = "enable"
+key-ordering = "disable"
+new-line-at-end-of-file = "enable"
+new-lines = "enable"
+trailing-spaces = "enable"
+quoted-strings = "disable"
+octal-values = "disable"
+float-values = "disable"
+empty-values = "disable"
+
+# Repo YAML uses flush list markers under keys; do not force indent-sequences rewrites.
+[tool.ryl.rules.indentation]
+indent-sequences = "whatever"
+
+[tool.ryl.rules.line-length]
+max = 120
+allow-non-breakable-words = true
+allow-non-breakable-inline-mappings = true
+
+[tool.ryl.rules.comments]
+level = "warning"
+
+[tool.ryl.rules.comments-indentation]
+level = "warning"
+
+[tool.ryl.rules.truthy]
+level = "warning"
+check-keys = false
+allowed-values = ["true", "false", "on"]

@@ -197,9 +197,7 @@ def test_acquisition_payloads_and_transaction(inventory_fx):
 def test_routing_gear_ref_validation(inventory_fx):
     data = routing_state.load_raw(inventory_fx["routing"])
     data["named_paths"]["test"]["branches"]["main"]["nodes"][0]["gear_ref"] = "missing"
-    errors = routing_state.validate_routing_doc(
-        data, inventory_path=inventory_fx["inventory"]
-    )
+    errors = routing_state.validate_routing_doc(data, inventory_path=inventory_fx["inventory"])
     assert any("does not resolve" in error for error in errors)
 
 

@@ -16,7 +16,6 @@ from music_rig.tui.screens.questions import QuestionsScreen
 from music_rig.tui.screens.reconcile import ReconcileScreen
 from music_rig.tui.screens.verify import VerifyScreen
 
-
 APP_CSS = """
 Screen {
     background: $surface;
@@ -162,9 +161,7 @@ class RigApp(App[None]):
             return
         if key == "patchbay":
             if object_id:
-                self.push_screen(
-                    PatchbayEditorScreen(object_id, initial_pair=pair)
-                )
+                self.push_screen(PatchbayEditorScreen(object_id, initial_pair=pair))
             else:
                 self.push_screen(PatchbayListScreen())
             return

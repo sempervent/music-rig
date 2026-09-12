@@ -5,8 +5,8 @@ from __future__ import annotations
 from music_rig.actor import ActorKind
 from music_rig.models import ReconciliationState
 from music_rig.reconciliation.suggestions import (
-    SuggestionKind,
     ActionSuggestion,
+    SuggestionKind,
     render_suggestion,
     suggest_resolve,
 )

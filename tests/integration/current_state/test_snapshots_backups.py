@@ -96,13 +96,9 @@ def test_snapshot_collision_errors(tmp_path: Path):
     data = _mini_data_dir(tmp_path)
     out = tmp_path / "snaps"
     clock = _clock_at("2026-09-11T19:41:00")
-    snapshot_service.create_snapshot(
-        output_dir=out, data_dir=data, clock=clock, root=tmp_path
-    )
+    snapshot_service.create_snapshot(output_dir=out, data_dir=data, clock=clock, root=tmp_path)
     with pytest.raises(StoreError, match="already exists"):
-        snapshot_service.create_snapshot(
-            output_dir=out, data_dir=data, clock=clock, root=tmp_path
-        )
+        snapshot_service.create_snapshot(output_dir=out, data_dir=data, clock=clock, root=tmp_path)
 
 
 def test_snapshot_tamper_fails_verify(tmp_path: Path):
@@ -135,9 +131,7 @@ def test_snapshot_diff_detects_change(tmp_path: Path):
         clock=_clock_at("2026-09-11T19:43:01"),
         root=tmp_path,
     )
-    diff = snapshot_service.diff_snapshots(
-        first.snapshot_id, second.snapshot_id, snapshots_dir=out
-    )
+    diff = snapshot_service.diff_snapshots(first.snapshot_id, second.snapshot_id, snapshots_dir=out)
     assert "data/b.yaml" in diff["changed"]
 
 
@@ -149,10 +143,7 @@ def test_backup_plan_and_status_without_local_config():
     by_id = {item.item.id: item for item in statuses}
     assert by_id["repository-state"].readiness == backup_state.BackupReadiness.READY
     assert by_id["controller-mappings"].readiness == backup_state.BackupReadiness.MANUAL
-    assert (
-        by_id["pfl-jam-ableton-set"].readiness
-        == backup_state.BackupReadiness.NOT_CONFIGURED
-    )
+    assert by_id["pfl-jam-ableton-set"].readiness == backup_state.BackupReadiness.NOT_CONFIGURED
 
 
 def test_backup_create_partial_manual(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -183,9 +174,7 @@ def test_backup_create_copies_configured_file(tmp_path: Path):
     set_file.write_text("ableton-set", encoding="utf-8")
     local = tmp_path / ".rig.local.yaml"
     local.write_text(
-        "paths:\n"
-        f"  pfl_jam_ableton_set: {set_file}\n"
-        f"  backup_root: {tmp_path / 'archives'}\n",
+        f"paths:\n  pfl_jam_ableton_set: {set_file}\n  backup_root: {tmp_path / 'archives'}\n",
         encoding="utf-8",
     )
     # Use a minimal backups doc with only repository + file copy critical

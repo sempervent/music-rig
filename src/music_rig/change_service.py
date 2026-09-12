@@ -2,18 +2,18 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Callable
 
+from music_rig import session_service
 from music_rig.inbox_service import default_clock
 from music_rig.models import (
     ChangeCategory,
     ChangeRecord,
-    ChangeStatus,
     ChangesDocument,
+    ChangeStatus,
 )
-from music_rig import session_service
 from music_rig.store import StoreError, load_changes, save_changes, write_documents
 
 Clock = Callable[[], datetime]

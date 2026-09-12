@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from music_rig.models import ReconciliationState
 
 
-class Capability(str, Enum):
+class Capability(StrEnum):
     APPLY_AND_VERIFY = "APPLY_AND_VERIFY"
     # Human must observe; after verification_result, adapter may apply evidence/value.
     # Historical name VERIFY_ONLY kept for CLI/compat; behavior is human-verify-then-apply.
@@ -19,7 +19,7 @@ class Capability(str, Enum):
     UNSUPPORTED = "UNSUPPORTED"
 
 
-class PlanOperationKind(str, Enum):
+class PlanOperationKind(StrEnum):
     SET_CURRENT_VALUE = "SET_CURRENT_VALUE"
     SET_EVIDENCE_VERIFIED = "SET_EVIDENCE_VERIFIED"
     SET_EVIDENCE_UNKNOWN = "SET_EVIDENCE_UNKNOWN"
@@ -51,7 +51,7 @@ def op(
     return payload
 
 
-class VerificationStatus(str, Enum):
+class VerificationStatus(StrEnum):
     MATCH = "MATCH"
     MISMATCH = "MISMATCH"
     UNVERIFIABLE = "UNVERIFIABLE"

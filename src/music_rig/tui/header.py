@@ -81,9 +81,7 @@ class RigHeader(Widget):
     @property
     def screen_sub_title(self) -> str:
         screen_sub_title = self.screen.sub_title
-        return (
-            screen_sub_title if screen_sub_title is not None else self.app.sub_title
-        )
+        return screen_sub_title if screen_sub_title is not None else self.app.sub_title
 
     def format_title(self) -> Content:
         return self.app.format_title(self.screen_title, self.screen_sub_title)

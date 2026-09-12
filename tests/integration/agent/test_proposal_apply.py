@@ -3,18 +3,14 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
-import pytest
-import yaml
+
 from typer.testing import CliRunner
-from music_rig import agent as agent_mod
-from music_rig import patchbay_state, question_service
+
+from music_rig import patchbay_state
 from music_rig.agent import (
     AgentReconciliationProposal,
     ProposalStatus,
     apply_proposal,
-    build_agent_packet,
-    validate_proposal,
 )
 from music_rig.cli import app
 from music_rig.models import QuestionStatus
@@ -23,18 +19,11 @@ from music_rig.reconciliation.checks import (
     QuestionConvergenceCheck,
     run_checks,
 )
-from music_rig.reconciliation.context import ReconciliationContext, ReconciliationPaths
-from music_rig.reconciliation.operation_registry import (
-    allowlisted_kinds,
-    get_spec,
-    validate_operation_shape,
-)
-from music_rig.reconciliation.operation_renderer import render_cli
 from music_rig.reconciliation.operations import RigOperation
-from music_rig.store import StoreError, load_questions
-from music_rig import store as store_mod
+from music_rig.store import load_questions
 
 runner = CliRunner()
+
 
 def test_sweep_isolates_malformed_artifact(fx20, monkeypatch):
     """One inspect error must not silence other findings."""
@@ -51,6 +40,7 @@ def test_sweep_isolates_malformed_artifact(fx20, monkeypatch):
     assert by_id["Q-201"].status is FindingStatus.ERROR
     assert by_id["Q-200"].status in {FindingStatus.BLOCKED, FindingStatus.READY}
     assert "simulated" in by_id["Q-201"].summary
+
 
 def test_model_mapping_apply_dry_run_and_write(fx20):
     ops = [
@@ -96,6 +86,7 @@ def test_model_mapping_apply_dry_run_and_write(fx20):
     assert q.status == QuestionStatus.RESOLVED
     assert q.reconciled_at is None  # finalize not in this proposal
 
+
 def test_cli_agent_packet_and_validate(fx20, tmp_path):
     r = runner.invoke(app, ["agent", "packet", "Q-200", "--json"])
     assert r.exit_code == 0, r.output
@@ -120,8 +111,5 @@ def test_cli_agent_packet_and_validate(fx20, tmp_path):
     prop_path.write_text(json.dumps(proposal), encoding="utf-8")
     r2 = runner.invoke(app, ["agent", "validate", str(prop_path), "--json"])
     assert r2.exit_code == 0, r2.output
-    r3 = runner.invoke(
-        app, ["agent", "apply", str(prop_path), "--dry-run", "--json"]
-    )
+    r3 = runner.invoke(app, ["agent", "apply", str(prop_path), "--dry-run", "--json"])
     assert r3.exit_code == 0, r3.output
-

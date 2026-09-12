@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from music_rig import channel_state, current_service, patchbay_state
+from music_rig import change_service, channel_state, current_service, patchbay_state
 from music_rig.current_projections import (
     render_alesis_section,
     render_patchbays_section,
@@ -14,7 +14,6 @@ from music_rig.current_projections import (
 from music_rig.models import ChangeCategory, QuestionStatus
 from music_rig.render import check_render_sync, render_docs
 from music_rig.store import StoreError, load_questions
-from music_rig import change_service
 
 
 @pytest.fixture
@@ -185,21 +184,24 @@ def test_patchbay_generation_deterministic(current_fx):
         diagram_tascam=current_fx["diag_t"],
         write=True,
     )
-    assert check_render_sync(
-        todo_path=current_fx["todo"],
-        wishlist_path=current_fx["wish"],
-        questions_path=current_fx["questions"],
-        patchbays_path=current_fx["patchbays"],
-        channel_map_path=current_fx["channels"],
-        docs_todo=current_fx["docs_todo"],
-        docs_wishlist=current_fx["docs_wish"],
-        docs_questions=current_fx["docs_q"],
-        docs_patchbays=current_fx["docs_pb"],
-        docs_tascam=current_fx["docs_t"],
-        docs_alesis=current_fx["docs_a"],
-        diagram_patchbays=current_fx["diag_pb"],
-        diagram_tascam=current_fx["diag_t"],
-    ) == []
+    assert (
+        check_render_sync(
+            todo_path=current_fx["todo"],
+            wishlist_path=current_fx["wish"],
+            questions_path=current_fx["questions"],
+            patchbays_path=current_fx["patchbays"],
+            channel_map_path=current_fx["channels"],
+            docs_todo=current_fx["docs_todo"],
+            docs_wishlist=current_fx["docs_wish"],
+            docs_questions=current_fx["docs_q"],
+            docs_patchbays=current_fx["docs_pb"],
+            docs_tascam=current_fx["docs_t"],
+            docs_alesis=current_fx["docs_a"],
+            diagram_patchbays=current_fx["diag_pb"],
+            diagram_tascam=current_fx["diag_t"],
+        )
+        == []
+    )
     before = current_fx["docs_pb"].read_text(encoding="utf-8")
     render_docs(
         todo_path=current_fx["todo"],
@@ -256,9 +258,7 @@ def test_patchbay_set_mode_and_dry_run(current_fx):
     with pytest.raises(StoreError):
         patchbay_state.propose_set_mode("PB-B", "5", "normal", path=current_fx["patchbays"])
     with pytest.raises(StoreError):
-        patchbay_state.propose_set_mode(
-            "PB-B", "1", "bogus", path=current_fx["patchbays"]
-        )
+        patchbay_state.propose_set_mode("PB-B", "1", "bogus", path=current_fx["patchbays"])
 
 
 def test_patchbay_verify_batch_and_skip(current_fx):
@@ -271,9 +271,7 @@ def test_patchbay_verify_batch_and_skip(current_fx):
     current_service.commit_patchbay(
         data, preview, render=False, patchbays_path=current_fx["patchbays"]
     )
-    pairs = patchbay_state.list_pairs(
-        "PB-B", patchbay_state.load_raw(current_fx["patchbays"])
-    )
+    pairs = patchbay_state.list_pairs("PB-B", patchbay_state.load_raw(current_fx["patchbays"]))
     modes = {f"{p['upper_n']}/{p['lower_n']}": p["mode"] for p in pairs}
     assert modes["1/25"] == "half-normal"
     assert modes["2/26"] == "thru"
@@ -308,9 +306,7 @@ def test_channel_mutations(current_fx):
     row = channel_state.load_raw(current_fx["channels"])["tascam"][8]
     assert row["source"] == "Example Source"
     assert row["status"] == "CURRENT"
-    clear_p, clear_d = channel_state.clear_source(
-        "tascam", 8, path=current_fx["channels"]
-    )
+    clear_p, clear_d = channel_state.clear_source("tascam", 8, path=current_fx["channels"])
     assert clear_p.after["status"] == "UNASSIGNED"
     current_service.commit_channel(
         clear_d, clear_p, render=False, channel_map_path=current_fx["channels"]
@@ -319,9 +315,7 @@ def test_channel_mutations(current_fx):
     assert cleared["source"] is None
     assert cleared["status"] == "UNASSIGNED"
     with pytest.raises(StoreError):
-        channel_state.propose_set_source(
-            "tascam", 99, "x", path=current_fx["channels"]
-        )
+        channel_state.propose_set_source("tascam", 99, "x", path=current_fx["channels"])
 
 
 def test_channel_set_source_promotes_unassigned_to_current(current_fx):

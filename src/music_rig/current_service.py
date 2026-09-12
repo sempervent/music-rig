@@ -2,44 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Callable
 
-from music_rig.inbox_service import default_clock
-from music_rig.models import (
-    ChangeRecord,
-    ChangeStatus,
-    ChangesDocument,
-    CurrentPreview,
-    OpenQuestion,
-    OpenQuestionsDocument,
-    QuestionStatus,
-    InventoryDocument,
-    TodoDocument,
-    WishlistDocument,
-)
-from music_rig.render import render_docs
-from music_rig.store import (
-    ABLETON_PATH,
-    CHANGES_PATH,
-    CHANNEL_MAP_PATH,
-    PATCHBAYS_PATH,
-    QUESTIONS_PATH,
-    ROUTING_PATH,
-    INVENTORY_PATH,
-    MIDI_PATH,
-    CONTROLLERS_PATH,
-    PERFORMANCE_PATH,
-    TODO_PATH,
-    WISHLIST_PATH,
-    StoreError,
-    _dump_yaml,
-    load_changes,
-    load_questions,
-    load_todo,
-    write_text_files,
-)
 from music_rig import (
     ableton_state,
     channel_state,
@@ -49,6 +15,39 @@ from music_rig import (
     patchbay_state,
     performance_state,
     routing_state,
+)
+from music_rig.inbox_service import default_clock
+from music_rig.models import (
+    ChangeRecord,
+    ChangesDocument,
+    ChangeStatus,
+    CurrentPreview,
+    OpenQuestion,
+    OpenQuestionsDocument,
+    QuestionStatus,
+    TodoDocument,
+    WishlistDocument,
+)
+from music_rig.render import render_docs
+from music_rig.store import (
+    ABLETON_PATH,
+    CHANGES_PATH,
+    CHANNEL_MAP_PATH,
+    CONTROLLERS_PATH,
+    INVENTORY_PATH,
+    MIDI_PATH,
+    PATCHBAYS_PATH,
+    PERFORMANCE_PATH,
+    QUESTIONS_PATH,
+    ROUTING_PATH,
+    TODO_PATH,
+    WISHLIST_PATH,
+    StoreError,
+    _dump_yaml,
+    load_changes,
+    load_questions,
+    load_todo,
+    write_text_files,
 )
 
 Clock = Callable[[], datetime]
@@ -195,12 +194,8 @@ def _commit(
     payloads: list[tuple[Path, str]] = [(primary_path, primary_text)]
 
     if resolve_q and qdoc is not None and q_key is not None:
-        qdoc = _with_resolved_question(
-            qdoc, q_key, answer, change_id=c_key, clock=clock
-        )
-        payloads.append(
-            (questions_path or QUESTIONS_PATH, _dump_questions_yaml(qdoc))
-        )
+        qdoc = _with_resolved_question(qdoc, q_key, answer, change_id=c_key, clock=clock)
+        payloads.append((questions_path or QUESTIONS_PATH, _dump_questions_yaml(qdoc)))
 
     if apply_chg and cdoc is not None and c_key is not None:
         # If we also resolved a question, refresh cdoc for bidirectional link first
@@ -225,9 +220,7 @@ def _commit(
                 if q_key not in qrefs:
                     qrefs.append(q_key)
                     updated_items.append(
-                        ChangeRecord(
-                            **{**item.model_dump(), "related_questions": qrefs}
-                        )
+                        ChangeRecord(**{**item.model_dump(), "related_questions": qrefs})
                     )
                 else:
                     updated_items.append(item)
@@ -456,9 +449,7 @@ def commit_midi(
     docs_questions=None,
 ) -> CurrentPreview:
     target = midi_path or MIDI_PATH
-    errors = midi_state.validate_midi_doc(
-        proposed_data, inventory_path=inventory_path
-    )
+    errors = midi_state.validate_midi_doc(proposed_data, inventory_path=inventory_path)
     if errors:
         raise StoreError("MIDI validation failed: " + "; ".join(errors))
     existing = target.read_text(encoding="utf-8") if target.exists() else None
@@ -666,9 +657,7 @@ def commit_acquisition(
     payloads = [
         (
             inv_target,
-            inventory_state.dump_with_header(
-                proposed_inventory, existing_text=existing
-            ),
+            inventory_state.dump_with_header(proposed_inventory, existing_text=existing),
         ),
         (
             wishlist_path or WISHLIST_PATH,
@@ -681,9 +670,7 @@ def commit_acquisition(
     if current_todo.model_dump(mode="json") != proposed_todo.model_dump(mode="json"):
         payloads.append((todo_target, todo_text))
     if resolve_q and qdoc is not None and q_key is not None:
-        qdoc = _with_resolved_question(
-            qdoc, q_key, answer, change_id=c_key, clock=clock
-        )
+        qdoc = _with_resolved_question(qdoc, q_key, answer, change_id=c_key, clock=clock)
         payloads.append((questions_path or QUESTIONS_PATH, _dump_questions_yaml(qdoc)))
     if apply_chg and cdoc is not None and c_key is not None:
         cdoc = _with_applied_change(cdoc, c_key, question_id=q_key)

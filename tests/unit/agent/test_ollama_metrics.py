@@ -3,15 +3,9 @@
 from __future__ import annotations
 
 import json
-import pytest
-from music_rig.models import ReconciliationState
-from music_rig.progress import CollectingProgress, ProgressEvent, ProgressPhase, ProgressTracker
-from music_rig.reconciliation.dispatch import (
-    DispatchMode,
-    HUMAN_BLOCKER_CODES,
-    classify_reconciliation_dispatch,
-)
-from music_rig.reconciliation.types import Capability, Plan
+
+from music_rig.progress import CollectingProgress, ProgressPhase, ProgressTracker
+
 
 def test_progress_json_isolation():
     """Progress sink must not be required for JSON; CollectingProgress is clean."""
@@ -23,6 +17,7 @@ def test_progress_json_isolation():
     # Event serializes without Rich markup
     blob = json.dumps(sink.events[0].to_dict())
     assert "generating" in blob
+
 
 def test_ollama_metrics_parser():
     from music_rig.agent.ollama_provider import extract_ollama_metrics
@@ -39,6 +34,7 @@ def test_ollama_metrics_parser():
     assert m["prompt_eval_count"] == 2104
     assert m["total_s"] == 34.2
     assert "invented" not in m
+
 
 def test_benchmark_format_includes_header():
     from music_rig.agent.benchmark import format_benchmark_table
@@ -62,4 +58,3 @@ def test_benchmark_format_includes_header():
     )
     assert "OLLAMA RECONCILIATION BENCHMARK" in text
     assert "qwen3.5:latest" in text
-

@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from typer.testing import CliRunner
-
 import pytest
+from typer.testing import CliRunner
 
 from music_rig import performance_state
 from music_rig.cli import app
@@ -105,9 +104,7 @@ def test_bind_and_unbind_round_trip_in_memory():
     )
     assert preview.changed
     assert any(item["id"] == "test-next-scene" for item in data["bindings"])
-    preview, data = performance_state.propose_unbind(
-        "test-next-scene", data=data
-    )
+    preview, data = performance_state.propose_unbind("test-next-scene", data=data)
     assert preview.changed
     assert not any(item["id"] == "test-next-scene" for item in data["bindings"])
 
@@ -138,12 +135,16 @@ def test_verify_batch_is_transactional_in_memory():
         ]
     )
     assert preview.changed
-    assert next(
-        item for item in data["bindings"] if item["id"] == "streamdeck-obs-safe-stop-rec"
-    )["evidence"] == "VERIFIED"
-    assert next(item for item in data["recovery"] if item["id"] == "wrong-scene")[
-        "evidence"
-    ] == "VERIFIED"
+    assert (
+        next(item for item in data["bindings"] if item["id"] == "streamdeck-obs-safe-stop-rec")[
+            "evidence"
+        ]
+        == "VERIFIED"
+    )
+    assert (
+        next(item for item in data["recovery"] if item["id"] == "wrong-scene")["evidence"]
+        == "VERIFIED"
+    )
 
 
 def test_now_play_remains_available_with_partial_readiness():

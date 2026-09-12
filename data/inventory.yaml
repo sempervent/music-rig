@@ -331,7 +331,7 @@ items:
     category: controllers
     quantity: 1
     ownership_status: OWNED
-    notes: Encoder #6 broken
+    notes: "Encoder #6 broken"
     condition: ISSUE
   - id: elgato-stream-deck-plus
     name: Elgato Stream Deck+

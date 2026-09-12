@@ -129,7 +129,9 @@ class EditableDomainAdapter(Protocol):
     id: str
     label: str
 
-    def list_records(self, *, status_filter: str | None = None, search: str = "") -> list[dict[str, Any]]:
+    def list_records(
+        self, *, status_filter: str | None = None, search: str = ""
+    ) -> list[dict[str, Any]]:
         """Return row dicts with at least `id` and `cells` (list[str]) and `search_text`."""
         ...
 
@@ -137,29 +139,21 @@ class EditableDomainAdapter(Protocol):
         """Flat field map used by the form."""
         ...
 
-    def get_field_specs(self) -> list[FieldSpec]:
-        ...
+    def get_field_specs(self) -> list[FieldSpec]: ...
 
-    def source_path(self) -> Path | None:
-        ...
+    def source_path(self) -> Path | None: ...
 
-    def create_working(self, record_id: str) -> WorkingRecord:
-        ...
+    def create_working(self, record_id: str) -> WorkingRecord: ...
 
-    def validate_working(self, working: WorkingRecord) -> list[str]:
-        ...
+    def validate_working(self, working: WorkingRecord) -> list[str]: ...
 
-    def diff(self, working: WorkingRecord) -> list[DiffRow]:
-        ...
+    def diff(self, working: WorkingRecord) -> list[DiffRow]: ...
 
-    def commit(self, working: WorkingRecord, *, render: bool = True) -> ApplyResult:
-        ...
+    def commit(self, working: WorkingRecord, *, render: bool = True) -> ApplyResult: ...
 
-    def detail_markdown(self, record_id: str) -> str:
-        ...
+    def detail_markdown(self, record_id: str) -> str: ...
 
-    def columns(self) -> list[str]:
-        ...
+    def columns(self) -> list[str]: ...
 
     def filter_cycle(self) -> tuple[str, ...] | None:
         """Optional status filter cycle (e.g. OPEN/RESOLVED/ALL)."""
@@ -175,8 +169,7 @@ class EditableDomainAdapter(Protocol):
         record_id: str,
         *,
         payload: dict[str, Any] | None = None,
-    ) -> ApplyResult:
-        ...
+    ) -> ApplyResult: ...
 
 
 class BaseEditableAdapter:
@@ -215,7 +208,11 @@ class BaseEditableAdapter:
             value = merged.get(name)
             if spec.required and (value is None or value == "" or value == []):
                 errors.append(f"{spec.label} is required")
-            if spec.type.value == "ENUM" and value not in (None, "") and value not in spec.enum_values:
+            if (
+                spec.type.value == "ENUM"
+                and value not in (None, "")
+                and value not in spec.enum_values
+            ):
                 errors.append(f"{spec.label} must be one of {', '.join(spec.enum_values)}")
             if spec.type.value == "INT" and value not in (None, ""):
                 try:

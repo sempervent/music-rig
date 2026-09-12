@@ -7,12 +7,12 @@ here as the source of truth.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 from uuid import uuid4
 
 
-class OperationMutability(str, Enum):
+class OperationMutability(StrEnum):
     READ_ONLY = "read_only"
     MUTATING = "mutating"
 

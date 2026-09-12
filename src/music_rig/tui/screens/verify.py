@@ -13,8 +13,8 @@ from music_rig.presentation import blocker_message
 from music_rig.reconciliation import service as reconcile_service
 from music_rig.store import StoreError
 from music_rig.tui.dialogs import ConfirmModal, HelpScreen, InputModal
-from music_rig.tui.pickers import ReferencePickerModal
 from music_rig.tui.header import RigHeader
+from music_rig.tui.pickers import ReferencePickerModal
 
 
 class VerifyScreen(Screen):
@@ -148,13 +148,9 @@ class VerifyScreen(Screen):
             lines.append("")
             lines.append("**Related**")
             for w in related:
-                lines.append(
-                    f"- {w.get('id')} {w.get('priority')} {w.get('status')}"
-                )
+                lines.append(f"- {w.get('id')} {w.get('priority')} {w.get('status')}")
         lines.append("")
-        lines.append(
-            "v Worked/Answer · f Failed · u Unknown · s Skip · n Next · c Reconcile"
-        )
+        lines.append("v Worked/Answer · f Failed · u Unknown · s Skip · n Next · c Reconcile")
         detail.update("\n".join(lines))
 
     def action_back(self) -> None:
@@ -193,9 +189,7 @@ class VerifyScreen(Screen):
             return
         self._record_outcome(item.question_id, "unknown", value="UNKNOWN")
 
-    def _record_outcome(
-        self, question_id: str, outcome: str, *, value: str | None = None
-    ) -> None:
+    def _record_outcome(self, question_id: str, outcome: str, *, value: str | None = None) -> None:
         def _confirmed(ok: bool | None) -> None:
             if not ok:
                 return
@@ -270,12 +264,7 @@ class VerifyScreen(Screen):
         if route is None:
             self.notify(f"No TUI route for {domain}", severity="warning")
             return
-        object_id = (
-            target.get("bay")
-            or target.get("gear")
-            or target.get("path")
-            or None
-        )
+        object_id = target.get("bay") or target.get("gear") or target.get("path") or None
         self.app.open_domain(route, object_id)
 
     def action_edit_target(self) -> None:
@@ -322,9 +311,7 @@ class VerifyScreen(Screen):
                     picker_choices,
                     multi=False,
                 ),
-                lambda selected: _after_value(
-                    selected[0] if selected else None
-                ),
+                lambda selected: _after_value(selected[0] if selected else None),
             )
             return
 

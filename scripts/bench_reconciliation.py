@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import tempfile
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import yaml
@@ -28,7 +28,7 @@ def _write_synthetic(root: Path, n: int) -> None:
     questions = []
     todos = []
     changes = []
-    now = datetime(2026, 9, 11, 21, 0, 0, tzinfo=timezone.utc).isoformat()
+    now = datetime(2026, 9, 11, 21, 0, 0, tzinfo=UTC).isoformat()
     for i in range(1, n + 1):
         qid = f"Q-{i:03d}"
         tid = f"RIG-{i:03d}"
@@ -72,9 +72,7 @@ def _write_synthetic(root: Path, n: int) -> None:
         )
 
     def dump(name: str, payload: dict) -> None:
-        (root / name).write_text(
-            yaml.safe_dump(payload, sort_keys=False), encoding="utf-8"
-        )
+        (root / name).write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
 
     dump("open-questions.yaml", {"questions": questions})
     dump("todo.yaml", {"tasks": todos, "next_session": []})
@@ -120,9 +118,9 @@ def _count_loads(ctx: ReconciliationContext, qid: str) -> dict[str, int]:
         counts["changes"] += 1
         return real_c(path)
 
-    import music_rig.store as store_mod
     import music_rig.question_service as qsvc
     import music_rig.reconciliation.service as svc
+    import music_rig.store as store_mod
 
     originals = {
         "store_q": store_mod.load_questions,

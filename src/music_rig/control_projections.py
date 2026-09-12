@@ -48,10 +48,7 @@ def render_controller_mappings_section(doc: ControllersDocument) -> str:
     for controller in doc.controllers:
         controls = [control for context in controller.contexts for control in context.controls]
         evidence = sorted(
-            {
-                context.evidence.value
-                for context in controller.contexts
-            }
+            {context.evidence.value for context in controller.contexts}
             | {control.evidence.value for control in controls}
         )
         lines.append(
@@ -87,4 +84,3 @@ def render_controller_mappings_section(doc: ControllersDocument) -> str:
             lines.append("| — | — | — | — | — | — | UNKNOWN | UNKNOWN | No contexts modeled |")
     lines.append("")
     return "\n".join(lines)
-

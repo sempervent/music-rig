@@ -3,24 +3,14 @@
 from __future__ import annotations
 
 import json
-import sys
-from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
-from threading import Thread
+
 import pytest
-import yaml
-from typer.testing import CliRunner
+
 from music_rig.agent.cursor_provider import CursorProvider, parse_cursor_envelope
 from music_rig.agent.errors import ProviderInvalidResponseError
-from music_rig.agent.ollama_provider import OllamaProvider
-from music_rig.agent.prompt import build_planner_prompt
-from music_rig.agent.turns import AgentTurnKind, agent_turn_json_schema
-from music_rig.agent.turns import agent_turn_json_schema as schema_fn
-from music_rig.cli import app
-from music_rig.local_config import load_local_config, update_agent_config
-from music_rig.reconciliation.run import reconcile_run
-from music_rig.reconciliation.types import Capability
-from music_rig.models import ReconciliationState
+from music_rig.agent.turns import AgentTurnKind
+
 
 def _fake_cursor_script(tmp: Path, mode: str = "ok") -> Path:
     script = tmp / "fake_cursor.py"
@@ -80,6 +70,7 @@ def _fake_cursor_script(tmp: Path, mode: str = "ok") -> Path:
     script.chmod(0o755)
     return script
 
+
 def test_parse_cursor_envelope_valid():
     turn = parse_cursor_envelope(
         {
@@ -99,12 +90,14 @@ def test_parse_cursor_envelope_valid():
     )
     assert turn.kind is AgentTurnKind.NO_SAFE_PLAN
 
+
 def test_cursor_provider_argv_ask_mode_no_workspace(tmp_path, monkeypatch):
     calls = []
 
     def fake_run(argv, **kwargs):
         calls.append({"argv": argv, "kwargs": kwargs})
         if "--version" in argv:
+
             class R:
                 returncode = 0
                 stdout = "fake-version\n"
@@ -147,6 +140,7 @@ def test_cursor_provider_argv_ask_mode_no_workspace(tmp_path, monkeypatch):
     assert main["kwargs"].get("shell") is False
     assert diag.get("workspace_flag") is False
 
+
 def test_cursor_prose_no_ops_invalid(tmp_path, monkeypatch):
     def fake_run(argv, **kwargs):
         class R:
@@ -162,4 +156,3 @@ def test_cursor_prose_no_ops_invalid(tmp_path, monkeypatch):
     prov = CursorProvider(executable="agent")
     with pytest.raises(ProviderInvalidResponseError):
         prov.handshake()
-

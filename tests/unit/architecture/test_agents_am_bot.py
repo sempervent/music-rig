@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 from music_rig.store import ROOT
 
@@ -47,9 +46,7 @@ def test_agents_md_workflow_rig_commands_include_am_bot():
                 offenders.append(line)
             if re.match(r"^rig (?!--am-bot)", line):
                 offenders.append(line)
-    assert not offenders, "AGENTS.md rig examples missing --am-bot:\n" + "\n".join(
-        offenders
-    )
+    assert not offenders, "AGENTS.md rig examples missing --am-bot:\n" + "\n".join(offenders)
 
 
 def test_skills_md_agent_workflow_mentions_am_bot():

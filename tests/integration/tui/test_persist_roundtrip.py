@@ -4,16 +4,16 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
+
 import pytest
 import yaml
+
 from music_rig import store
 from music_rig.patchbay_state import list_pairs, load_raw
 from music_rig.store import StoreError, load_questions
 from music_rig.tui.app import RigApp
-from music_rig.tui.editable_domains import registry
-from music_rig.tui.modes import EditorMode, parse_command
-from music_rig.tui.save_outcome import SaveOutcome
-from music_rig.tui.working import ConcurrentModificationError, WorkingDocument
+from music_rig.tui.working import ConcurrentModificationError
+
 
 @pytest.mark.asyncio
 async def test_answer_persists_and_question_visible(tui_fx):
@@ -45,6 +45,7 @@ async def test_answer_persists_and_question_visible(tui_fx):
         assert "visible-answer-persist" in detail
         assert "Unrelated MIDI clock?" in detail
 
+
 @pytest.mark.asyncio
 async def test_resolve_does_not_invent_verification_result(tui_fx):
     app = RigApp(route="question", object_id="Q-002")
@@ -63,6 +64,7 @@ async def test_resolve_does_not_invent_verification_result(tui_fx):
     assert q.status.value == "RESOLVED"
     assert q.answer == "resolved-only"
     assert q.verification_result is None
+
 
 @pytest.mark.asyncio
 async def test_patchbay_mode_persist_and_reopen(tui_fx, monkeypatch):
@@ -97,6 +99,7 @@ async def test_patchbay_mode_persist_and_reopen(tui_fx, monkeypatch):
         detail = str(app2.screen.query_one("#detail").content)
         assert "normal" in detail.lower()
 
+
 @pytest.mark.asyncio
 async def test_patchbay_space_cycles_mode_staged(tui_fx):
     app = RigApp(route="patchbay", object_id="PB-B")
@@ -108,6 +111,7 @@ async def test_patchbay_space_cycles_mode_staged(tui_fx):
         dirty = str(app.screen.query_one("#dirty-label").content)
         assert "unsaved" in dirty
         assert tui_fx["patchbays"].read_text(encoding="utf-8") == before
+
 
 @pytest.mark.asyncio
 async def test_select_mode_modal_enter_esc(tui_fx):
@@ -125,6 +129,7 @@ async def test_select_mode_modal_enter_esc(tui_fx):
 
         assert isinstance(app.screen, PatchbayEditorScreen)
 
+
 @pytest.mark.asyncio
 async def test_patchbay_related_question_shows_text(tui_fx):
     app = RigApp(route="patchbay", object_id="PB-B")
@@ -134,12 +139,13 @@ async def test_patchbay_related_question_shows_text(tui_fx):
         assert "Q-001" in detail
         assert "What mode is PB-B 1/25?" in detail
 
+
 def test_round_trip_todo_wishlist_gear(tui_fx):
-    from music_rig.tui.editable_domains.todo import TodoEditableAdapter
-    from music_rig.tui.editable_domains.planning import WishlistEditableAdapter
-    from music_rig.tui.editable_domains.current import GearEditableAdapter
-    from music_rig.models import WishPriority, WishStatus, WishlistItem
     from music_rig import wishlist_service
+    from music_rig.models import WishlistItem, WishPriority, WishStatus
+    from music_rig.tui.editable_domains.current import GearEditableAdapter
+    from music_rig.tui.editable_domains.planning import WishlistEditableAdapter
+    from music_rig.tui.editable_domains.todo import TodoEditableAdapter
 
     todo = TodoEditableAdapter()
     w = todo.create_working("RIG-001")
@@ -169,6 +175,7 @@ def test_round_trip_todo_wishlist_gear(tui_fx):
     gear.commit(gw, render=False)
     assert gear.get_record("test-gear")["notes"] == "stage18-gear-note"
 
+
 def test_round_trip_controller_ableton_performance_backup(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
@@ -190,12 +197,12 @@ def test_round_trip_controller_ableton_performance_backup(
     for name in prod_hashes:
         shutil.copy(root / "data" / name, tmp_path / name)
 
-    import music_rig.control_state as cs
-    import music_rig.performance_state as ps
     import music_rig.backup_state as bs
+    import music_rig.control_state as cs
     import music_rig.current_service as cur
     import music_rig.inventory_state as inv_state
     import music_rig.midi_state as midi_state
+    import music_rig.performance_state as ps
 
     path_map = {
         "CONTROLLERS_PATH": tmp_path / "controllers.yaml",
@@ -268,6 +275,7 @@ def test_round_trip_controller_ableton_performance_backup(
     for name, before in prod_hashes.items():
         assert (root / "data" / name).read_bytes() == before, f"production {name} mutated"
 
+
 @pytest.mark.asyncio
 async def test_add_question_todo_wish_inbox_change_gear(tui_fx):
     from music_rig.tui.screens.create import (
@@ -300,8 +308,7 @@ async def test_add_question_todo_wish_inbox_change_gear(tui_fx):
         await pilot.click("#confirm")
         await pilot.pause()
     todo_ids = [
-        t["id"]
-        for t in yaml.safe_load(tui_fx["todo"].read_text(encoding="utf-8"))["tasks"]
+        t["id"] for t in yaml.safe_load(tui_fx["todo"].read_text(encoding="utf-8"))["tasks"]
     ]
     assert "RIG-002" in todo_ids
 
@@ -316,8 +323,7 @@ async def test_add_question_todo_wish_inbox_change_gear(tui_fx):
         await pilot.click("#confirm")
         await pilot.pause()
     wish_names = [
-        i["item"]
-        for i in yaml.safe_load(tui_fx["wish"].read_text(encoding="utf-8"))["items"]
+        i["item"] for i in yaml.safe_load(tui_fx["wish"].read_text(encoding="utf-8"))["items"]
     ]
     assert "Wish Stage18" in wish_names
 
@@ -357,6 +363,7 @@ async def test_add_question_todo_wish_inbox_change_gear(tui_fx):
     inv = yaml.safe_load(tui_fx["inventory"].read_text(encoding="utf-8"))
     assert any("Stage18 Widget" in (i.get("name") or "") for i in inv.get("items") or [])
 
+
 def test_failed_commit_retains_mutations(tui_fx, monkeypatch):
     from music_rig.tui.editable_domains.questions import QuestionsEditableAdapter
 
@@ -373,6 +380,7 @@ def test_failed_commit_retains_mutations(tui_fx, monkeypatch):
     assert working.is_dirty
     assert working.get("notes") == "keep-me"
 
+
 def test_concurrent_modification_retains(tui_fx):
     from music_rig.tui.editable_domains.questions import QuestionsEditableAdapter
 
@@ -385,4 +393,3 @@ def test_concurrent_modification_retains(tui_fx):
         adapter.commit(working, render=False)
     assert working.is_dirty
     assert working.get("notes") == "mine"
-

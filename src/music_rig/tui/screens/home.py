@@ -8,8 +8,8 @@ from textual.containers import Vertical
 from textual.screen import Screen
 from textual.widgets import DataTable, Footer, Static
 
-from music_rig.tui.navigation import home_rows
 from music_rig.tui.header import RigHeader
+from music_rig.tui.navigation import home_rows
 
 
 class HomeScreen(Screen):

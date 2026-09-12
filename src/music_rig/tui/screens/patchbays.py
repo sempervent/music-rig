@@ -15,9 +15,9 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import DataTable, Footer, Static
 
-from music_rig.patchbay_state import list_pairs, load_raw
-from music_rig.store import StoreError
 from music_rig import store as store_mod
+from music_rig.patchbay_state import list_pairs
+from music_rig.store import StoreError
 from music_rig.tui.adapters import patchbays as pb
 from music_rig.tui.debug import format_error
 from music_rig.tui.dialogs import (
@@ -28,11 +28,11 @@ from music_rig.tui.dialogs import (
     InputModal,
     SelectModeModal,
 )
+from music_rig.tui.header import RigHeader
 from music_rig.tui.modes import VIM_HELP_COMMON, EditorMode, ModeController, parse_command
 from music_rig.tui.save_outcome import SaveOutcome
 from music_rig.tui.widgets import mode_cell
 from music_rig.tui.working import ConcurrentModificationError, WorkingDocument
-from music_rig.tui.header import RigHeader
 
 MODE_CYCLE = ("unknown", "normal", "half-normal", "thru")
 
@@ -111,9 +111,7 @@ class PatchbayListScreen(Screen):
 
     def action_help(self) -> None:
         self.app.push_screen(
-            HelpScreen(
-                "Patchbay list\n\nEnter open bay editor\nCtrl+r refresh\nEsc/q back"
-            )
+            HelpScreen("Patchbay list\n\nEnter open bay editor\nCtrl+r refresh\nEsc/q back")
         )
 
 
@@ -226,7 +224,11 @@ class PatchbayEditorScreen(Screen):
             table.move_cursor(row=self._pair_keys.index(select_pair))
         elif select_pair:
             for i, key in enumerate(self._pair_keys):
-                if key == select_pair or key.startswith(f"{select_pair}/") or key.split("/")[0] == select_pair:
+                if (
+                    key == select_pair
+                    or key.startswith(f"{select_pair}/")
+                    or key.split("/")[0] == select_pair
+                ):
                     table.move_cursor(row=i)
                     break
         self._update_detail()
@@ -515,9 +517,7 @@ class PatchbayEditorScreen(Screen):
                     if pb.pair_key(p) == pair:
                         before = str(p.get("mode") or "unknown")
                         break
-                parts.append(
-                    f"pair {pair} mode: {before.upper()} → {str(value).upper()}"
-                )
+                parts.append(f"pair {pair} mode: {before.upper()} → {str(value).upper()}")
             elif key == "model":
                 bay = (self._working.baseline.get("patchbays") or {}).get(self.bay_id) or {}
                 before = str(bay.get("hardware_model") or "unknown")

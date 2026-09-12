@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Sequence
+from collections.abc import Sequence
+from dataclasses import dataclass
+from enum import StrEnum
+from typing import Any
 
 
-class FieldType(str, Enum):
+class FieldType(StrEnum):
     TEXT = "TEXT"
     MULTILINE = "MULTILINE"
     ENUM = "ENUM"
@@ -35,7 +36,7 @@ class FieldSpec:
     multiline: bool = False
     rename_only: bool = False
     read_only: bool = False
-    nested_fields: tuple["FieldSpec", ...] = ()
+    nested_fields: tuple[FieldSpec, ...] = ()
     max_items: int | None = None
     min_value: int | None = None
     max_value: int | None = None

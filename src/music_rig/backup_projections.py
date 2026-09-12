@@ -16,11 +16,7 @@ AUTOMATION_BANNER = (
 
 
 def _cell(value: object) -> str:
-    return (
-        str(value if value not in (None, "") else "—")
-        .replace("|", "\\|")
-        .replace("\n", " ")
-    )
+    return str(value if value not in (None, "") else "—").replace("|", "\\|").replace("\n", " ")
 
 
 def render_backups_doc(doc: BackupsDocument) -> str:
@@ -124,9 +120,7 @@ def render_automation_readiness_doc(performance: PerformanceDocument) -> str:
     )
     for action in performance.actions[:12]:
         kinds = ", ".join(effect.kind.value for effect in action.effects) or "—"
-        lines.append(
-            f"| {action.id} | {len(action.effects)} | {_cell(kinds)} |"
-        )
+        lines.append(f"| {action.id} | {len(action.effects)} | {_cell(kinds)} |")
     lines.extend(
         [
             "",
