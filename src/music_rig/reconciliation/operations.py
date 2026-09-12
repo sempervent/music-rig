@@ -1,4 +1,8 @@
-"""Structured RigOperation — allowlisted intent, not shell strings."""
+"""Typed RigOperation actions — allowlisted intent, not shell strings.
+
+CLI presentation is produced by operation_renderer / suggestions, never stored
+here as the source of truth.
+"""
 
 from __future__ import annotations
 

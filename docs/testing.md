@@ -72,3 +72,13 @@ uv run pytest path/to/tests -n0 --cov-fail-under=0
 
 CLI (`music_rig.cli`) and TUI packages are omitted from coverage; domain and
 service modules are the gate.
+
+## Reconciliation
+
+See [reconciliation.md](reconciliation.md) for module ownership, authority flow,
+and where CLI suggestions are rendered. Manual load benchmarks:
+
+```bash
+uv run python scripts/bench_reconciliation.py
+```
+

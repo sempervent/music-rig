@@ -1,4 +1,7 @@
-"""Allowlisted RigOperation registry + prepare/dispatch."""
+"""Typed action registry — allowlisted RigOperation specs + prepare/dispatch.
+
+Maps operation kinds to preparers and executors. Not presentation, not path assembly.
+"""
 
 from __future__ import annotations
 

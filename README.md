@@ -100,6 +100,8 @@ Clean paths use preamp → A/B/Y before the confirmed TASCAM clean legs (5/6/7).
 - [Reamp and DI notes](docs/reamp-and-di.md)
 - [Troubleshooting log](docs/troubleshooting.md)
 - [Open questions](docs/open-questions.md) — unresolved facts
+- [Reconciliation](docs/reconciliation.md) — question ↔ CURRENT engine architecture
+- [Testing](docs/testing.md) — suite layout and markers
 
 ## Planning CLI (`rig`)
 

@@ -1,4 +1,7 @@
-"""Prepare/stage helpers for agent transactions (prepare != commit)."""
+"""Prepare mutations without commit (prepare != commit).
+
+Stages document working sets and conflict claims for agent transactions.
+"""
 
 from __future__ import annotations
 

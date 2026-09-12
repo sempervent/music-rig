@@ -1,4 +1,8 @@
-"""Authoritative reconciliation dispatch — who can make progress next."""
+"""DECISION/ROUTING only.
+
+Classifies who can make progress next (HUMAN / DETERMINISTIC / AGENT / …).
+Does not load documents, apply mutations, or render CLI strings.
+"""
 
 from __future__ import annotations
 

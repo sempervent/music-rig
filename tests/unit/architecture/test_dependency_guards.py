@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import re
 from pathlib import Path
 
 from music_rig.store import ROOT
@@ -28,8 +29,20 @@ def _py_files(package: Path) -> list[Path]:
     return sorted(p for p in package.rglob("*.py") if p.name != "__pycache__")
 
 
+def _re_search_cli_tui(src: str) -> bool:
+    return bool(
+        re.search(
+            r"from music_rig\.(cli|tui)\b|import music_rig\.(cli|tui)\b",
+            src,
+        )
+    )
+
+
 def test_reconciliation_core_must_not_import_cli_or_tui():
-    """reconciliation package (excluding nothing) must not pull CLI or TUI."""
+    """reconciliation core must not pull CLI or TUI.
+
+    operation_renderer may format CLI *strings* but must not import cli/tui packages.
+    """
     recon = SRC / "reconciliation"
     forbidden_prefixes = ("music_rig.cli", "music_rig.tui")
     forbidden_roots = {"cli", "tui"}
@@ -39,35 +52,21 @@ def test_reconciliation_core_must_not_import_cli_or_tui():
         for mod in mods:
             if mod in forbidden_roots or mod.startswith(forbidden_prefixes):
                 offenders.append(f"{path.relative_to(ROOT)} imports {mod}")
-            if mod == "music_rig":
-                # bare music_rig import is ok; check from music_rig import cli
-                pass
         src = path.read_text(encoding="utf-8")
-        if re_search_cli_tui(src):
+        if _re_search_cli_tui(src):
             offenders.append(f"{path.relative_to(ROOT)} references music_rig.cli/tui")
     assert not offenders, "\n".join(offenders)
 
 
-def re_search_cli_tui(src: str) -> bool:
-    import re
-
-    return bool(
-        re.search(
-            r"from music_rig\.(cli|tui)\b|import music_rig\.(cli|tui)\b",
-            src,
-        )
-    )
-
-
-def test_operations_must_not_import_rich_or_textual():
-    """operation_registry / operations / preparers stay presentation-free."""
+def test_operations_model_must_not_import_rich_or_textual():
+    """operations / registry / preparers stay presentation-framework-free."""
     targets = [
         SRC / "reconciliation" / "operations.py",
         SRC / "reconciliation" / "operation_registry.py",
         SRC / "reconciliation" / "preparers.py",
+        SRC / "reconciliation" / "suggestions.py",
         SRC / "reconciliation" / "operation_renderer.py",
     ]
-    # operation_renderer may format strings without rich — still ban rich/textual
     forbidden = {"rich", "textual"}
     offenders: list[str] = []
     for path in targets:

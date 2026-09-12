@@ -29,4 +29,6 @@ The design goal is not purity. It is controllable chaos: clean captures availabl
 | [Todo](todo.md) | Accepted work to do next |
 | [Wishlist](wishlist.md) | Speculative purchases and ideas (not commitments) |
 | [Open questions](open-questions.md) | Unresolved facts |
+| [Reconciliation](reconciliation.md) | Question ↔ CURRENT engine architecture |
+| [Testing](testing.md) | Suite layout, markers, coverage gate |
 | [Inventory](inventory.md) | What is owned |
