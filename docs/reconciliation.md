@@ -76,4 +76,4 @@ inspect every item; that is separate from per-plan load duplication.
 
 - [Testing](testing.md) — suite layout and markers
 - [Open questions](open-questions.md) — human-facing Q view
-- [AGENTS.md](../AGENTS.md) — bot must use `--am-bot`
+- Root `AGENTS.md` — bot must use `--am-bot` on every `rig` invocation
