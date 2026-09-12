@@ -359,7 +359,8 @@ questions:
   related_todos:
   - RIG-036
   related_changes: []
-  answer: ''
+  answer: UNKNOWN — device templates have no names visible (HUMAN Stage 25 live validation).
+  answer_actor: BOT
   notes: ''
   reconciliation_note: ''
   target:

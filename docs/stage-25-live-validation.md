@@ -53,16 +53,18 @@ Modes: `normal` · `half-normal` · `thru` · `UNKNOWN`
 
 | Pair (upper/lower) | What is patched | CURRENT mode | HUMAN sees |
 |---|---|---|---|
-| **1 / 25** | miniKORG L → TASCAM IN 3 | unknown | |
-| **2 / 26** | miniKORG R → TASCAM IN 4 | unknown | |
-| **3 / 27** | SR-18 L → TASCAM IN 11 | unknown | |
-| **4 / 28** | SR-18 R → TASCAM IN 12 | unknown | |
-| **7 / 31** | Privia L → Alesis CH 5 | unknown | |
-| **8 / 32** | Privia R → Alesis CH 6 | unknown | |
+| **1 / 25** | miniKORG L → TASCAM IN 3 | normal | normal |
+| **2 / 26** | miniKORG R → TASCAM IN 4 | normal | normal |
+| **3 / 27** | SR-18 L → TASCAM IN 11 | normal | normal |
+| **4 / 28** | SR-18 R → TASCAM IN 12 | normal | normal |
+| **7 / 31** | Privia L → Alesis CH 5 | normal | normal |
+| **8 / 32** | Privia R → Alesis CH 6 | normal | normal |
 
-Optional (unassigned uppers — only if quick): 9/33, 10/34, 11/35, 12/36.
+Optional (unassigned uppers — only if quick): 9/33, 10/34, 11/35, 12/36 — HUMAN: all normal.
 
 Record answers in TUI for Q-008 (set `target.pair` per pair if the UI requires it, or one text answer listing all pairs).
+
+**Session result (chat):** all represented pairs `normal`. BOT drafted Q-008; HUMAN must finalize without `--am-bot`.
 
 ### J. MIDI Thru5 fan-out (RIG-037 remainder)
 
@@ -81,6 +83,8 @@ Already VERIFIED — do **not** re-check unless wrong:
 | OUT 4 | |
 | OUT 5 | |
 
+**Session result (chat):** destinations are **SL-2, SR-18, miniKORG, KAOSS** (set, not ordered). OUT number → device mapping still **UNKNOWN**. Input from U6MIDI OUT 1 already VERIFIED.
+
 Also note: any other U6MIDI DIN/USB cables you see that matter for clock/controllers (or `UNKNOWN`).
 
 ### K. Q-017 — ReMOTE ZeRO SL templates
@@ -90,6 +94,8 @@ Also note: any other U6MIDI DIN/USB cables you see that matter for clock/control
 **ACTION:** On the ZeRO SL, read which templates are **actually loaded** (device display / template list). Do **not** use encoder **#6** (broken).
 
 **EXPECTED:** Template name list, or `UNKNOWN`.
+
+**Session result (chat):** templates have no names → **UNKNOWN**. BOT drafted Q-017; HUMAN must answer + verify-record without `--am-bot`.
 
 **OPTIONAL behavior spot-check (one control only):** pick one healthy mapped control (not #6); move it once; note whether the intended Ableton target moves. PASS / FAIL / UNKNOWN.
 
@@ -103,6 +109,8 @@ Q-014 already set Ableton master **VERIFIED** in CURRENT. Smoke step F tests it 
 
 **HUMAN:** Does this session satisfy RIG-031’s Definition of Done?  
 **YES** / **NO** (no negotiation)
+
+**Session result (chat):** **YES** — HUMAN must run `uv run rig todo done RIG-031` (no `--am-bot`).
 
 ### M. Reference jam (~5–10 min)
 

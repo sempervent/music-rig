@@ -185,6 +185,12 @@ What exact FCB1010 switch map is assigned in banks 00/01/02?
 
 **Reconciliation note:** agent-interpreted HUMAN bank-00 FCB map into controllers.yaml notes. Banks 01/02 unobserved; RIG-035 left READY; no verify-record invented.
 
+### Q-017 — OPEN
+
+Which ReMOTE ZeRO SL templates are actually loaded on the device?
+
+**Answer:** UNKNOWN — device templates have no names visible (HUMAN Stage 25 live validation).
+
 ### Q-018 — RESOLVED
 
 What are the exact active tracks in the current PFL jam Ableton set?

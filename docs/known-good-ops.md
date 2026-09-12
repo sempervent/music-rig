@@ -91,8 +91,7 @@ Result log:
 
 ## Still open (blocks “fully known” but not necessarily “can play”)
 
-- Q-008 PB-B normalization modes
-- Q-017 ZeRO templates loaded
-- Thru5 downstream fan-out (RIG-037 remainder)
-- RIG-031 HUMAN DoD for clock docs wording
-- Physical smoke / reference jam PASS checkboxes above
+- Q-008 PB-B modes — CURRENT set to `normal` for represented pairs; HUMAN answer still DRAFT (needs finalize without `--am-bot`)
+- Q-017 ZeRO templates — HUMAN: no names → UNKNOWN (BOT draft only; needs answer + verify-record)
+- Thru5 OUT destinations reported (SL-2, SR-18, miniKORG, KAOSS); OUT number → device map UNKNOWN (RIG-037)
+- RIG-031 DoD — HUMAN YES in chat; needs `rig todo done RIG-031` without `--am-bot`

@@ -101,11 +101,14 @@ def midi_files(tmp_path: Path) -> tuple[Path, Path]:
 def test_production_midi_is_conservative_and_valid():
     doc = midi_state.load_document()
     assert midi_state.validate_midi_doc(midi_state.load_raw()) == []
-    assert len(doc.devices) == 12
+    assert len(doc.devices) == 13
     assert len(doc.endpoints) == 2
     assert len(doc.connections) == 2
     assert {c.source for c in doc.connections} == {"behringer-fcb1010", "cme-u6midi-pro"}
     assert all(c.status == MidiEvidenceStatus.VERIFIED for c in doc.connections)
+    assert "alesis-sr-18" in {d.gear_ref for d in doc.devices}
+    # Thru5 OUT→device links remain untyped until HUMAN supplies OUT numbers.
+    assert not any("thru5" in c.source for c in doc.connections)
     assert len(doc.channels) == 4
     assert all(item.status == MidiEvidenceStatus.INTENDED for item in doc.channels)
     assert doc.clock.master is not None

@@ -32,7 +32,7 @@ Channel 16 INTENDED. Q-016 HUMAN (bank 00): switches select/arm tracks 1–10 an
 
 ## novation-remote-zero-sl
 
-Templates listed as design direction (RIG-036). Which templates are loaded is OPEN (Q-017). Encoder #6 is physically broken — do not assign active mappings to it.
+Templates listed as design direction (RIG-036). Stage 25 HUMAN observation for Q-017: templates have no names visible → UNKNOWN. Encoder #6 is physically broken — do not assign active mappings to it.
 
 | Context | Kind | Control | Type | Availability | Message | Target | Evidence | Notes |
 |---|---|---|---|---|---|---|---|---|

@@ -410,7 +410,10 @@ tasks:
   definition_of_done: Physical USB + DIN paths; U6MIDI Pro routes/filters; Thru5 WC role;
     clock master + destinations; channels (Privia 1, padKONTROL 10, ZeRO 15, FCB 16); Ableton
     Track/Sync/Remote settings; feedback prevention; All Notes Off path; MIDI-monitor tested
-  notes: Owned CME gear — operate, don’t repurchase
+  notes: >-
+    Owned CME gear — operate, don’t repurchase.
+    Stage 25 HUMAN: Thru5 OUT destinations = SL-2, SR-18, miniKORG, KAOSS;
+    OUT number→device map still UNKNOWN. U6MIDI OUT1→Thru5 IN1 VERIFIED.
   waiting_on: null
   next_session_why: null
 - id: RIG-038
