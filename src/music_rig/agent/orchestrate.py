@@ -14,7 +14,12 @@ from music_rig.agent.errors import (
     ProviderTimeoutError,
 )
 from music_rig.agent.inspection import InspectionRequest, execute_inspection
-from music_rig.agent.provider import AgentTurnKind, CommandProvider, load_agent_local_config
+from music_rig.agent.provider import (
+    AgentTurnKind,
+    TurnProvider,
+    load_agent_local_config,
+    resolve_provider,
+)
 from music_rig.agent.transaction import (
     commit_transaction,
     prepare_transaction,
@@ -46,7 +51,7 @@ def run_provider_loop(
     packet: dict[str, Any],
     *,
     ctx: ReconciliationContext,
-    provider: CommandProvider,
+    provider: TurnProvider,
     max_rounds: int | None = None,
 ) -> dict[str, Any]:
     """Iterate provider turns until READY / clarification / no-safe-plan / limit."""
@@ -70,7 +75,22 @@ def run_provider_loop(
         turns.append({"turn": turn.to_dict(), "diagnostics": diag})
 
         if turn.kind is AgentTurnKind.NEEDS_MORE_CONTEXT:
-            if not turn.inspection_requests:
+            inspection_reqs = (
+                turn.inspection_as_requests()
+                if hasattr(turn, "inspection_as_requests")
+                else []
+            )
+            if not inspection_reqs:
+                # dataclass-era fallback
+                from music_rig.agent.inspection import InspectionRequest
+
+                inspection_reqs = [
+                    InspectionRequest.from_dict(r.to_dict() if hasattr(r, "to_dict") else r)
+                    if not isinstance(r, InspectionRequest)
+                    else r
+                    for r in getattr(turn, "inspection_requests", []) or []
+                ]
+            if not inspection_reqs:
                 return {
                     "ok": False,
                     "status": AgentTurnKind.NO_SAFE_PLAN.value,
@@ -79,7 +99,7 @@ def run_provider_loop(
                     "context": context,
                     "proposal": None,
                 }
-            fingerprints = [r.fingerprint() for r in turn.inspection_requests]
+            fingerprints = [r.fingerprint() for r in inspection_reqs]
             if all(fp in seen_requests for fp in fingerprints):
                 return {
                     "ok": False,
@@ -89,7 +109,7 @@ def run_provider_loop(
                     "context": context,
                     "proposal": None,
                 }
-            for req in turn.inspection_requests:
+            for req in inspection_reqs:
                 fp = req.fingerprint()
                 seen_requests.add(fp)
                 result = execute_inspection(req, ctx=ctx)
@@ -167,42 +187,82 @@ def format_plan_review(
     postconditions: list[Any],
     finalize: bool,
     atomic: bool = True,
+    provider_label: str | None = None,
 ) -> str:
     lines = [
-        "AGENT RECONCILIATION PLAN",
+        "RECONCILIATION PLAN",
         "",
         f"Question: {question_id}",
-        "",
-        "Human answer:",
-        human_answer or "(empty)",
-        "",
-        "Agent interpretation:",
-        rationale or "(none)",
-        "",
-        "Operations:",
     ]
+    if provider_label:
+        lines.append(f"Planner: {provider_label}")
+    lines.extend(
+        [
+            "",
+            "Human answer:",
+            human_answer or "(empty)",
+            "",
+            "Interpretation:",
+            rationale or "(none)",
+            "",
+            "Proposed updates:",
+        ]
+    )
     if not operations:
         lines.append("(none)")
     for i, op in enumerate(operations, 1):
-        lines.append(f"{i}. {op.kind}")
-        lines.append(f"   {render_human(op)}")
-        for k, v in sorted(op.args.items()):
-            lines.append(f"   {k}: {v}")
+        lines.append(f"{i}. {_human_op_line(op)}")
     lines.append("")
     lines.append("Postconditions:")
     if postconditions:
         for p in postconditions:
             lines.append(f"- {p}")
     else:
-        lines.append("- (default: question remains RESOLVED; answer non-empty)")
+        lines.append("- question remains RESOLVED; answer non-empty")
     lines.append("")
-    lines.append("Artifacts after successful apply:")
-    lines.append(f"{question_id} -> RECONCILED" if finalize else f"{question_id} -> (finalize not requested)")
+    lines.append("After successful apply:")
+    lines.append(
+        f"{question_id} → RECONCILED"
+        if finalize
+        else f"{question_id} → (finalize not requested)"
+    )
     lines.append("")
     lines.append(f"Atomic transaction: {'YES' if atomic else 'NO'}")
     lines.append("")
     lines.append("No changes have been written.")
+    lines.append("")
+    lines.append("Details (operation kinds):")
+    for op in operations:
+        lines.append(f"- {op.kind} ({op.operation_id})")
     return "\n".join(lines)
+
+
+def _human_op_line(op: RigOperation) -> str:
+    args = op.args
+    if op.kind == "patchbay.set_model":
+        return f"Update {args.get('bay_id')} model → {args.get('model')}"
+    if op.kind == "patchbay.set_mode":
+        return f"Set {args.get('bay_id')} {args.get('jack_spec')} mode → {args.get('mode')}"
+    if op.kind == "channels.set_source":
+        return (
+            f"Set {args.get('device')} channel {args.get('channel')} "
+            f"source → {args.get('source')}"
+        )
+    if op.kind == "channels.clear_source":
+        return f"Clear {args.get('device')} channel {args.get('channel')} source"
+    if op.kind == "path.move":
+        return f"Move node {args.get('node')} on path {args.get('path_id')}"
+    if op.kind == "path.insert":
+        return f"Insert node {args.get('node_id')} on path {args.get('path_id')}"
+    if op.kind == "path.remove":
+        return f"Remove node {args.get('node')} from path {args.get('path_id')}"
+    if op.kind == "path.set_mode":
+        return f"Set path {args.get('path_id')} node {args.get('node')} mode → {args.get('mode')}"
+    if op.kind == "gear.set_location":
+        return f"Set gear {args.get('gear_id')} location → {args.get('location')}"
+    if op.kind == "question.finalize_manual":
+        return f"Finalize {args.get('question_id')}"
+    return render_human(op)
 
 
 def autonomous_reconcile(
@@ -213,13 +273,13 @@ def autonomous_reconcile(
     apply: bool = False,
     yes: bool = False,
     dry_run: bool = True,
-    provider: CommandProvider | None = None,
+    provider: TurnProvider | None = None,
+    provider_name: str | None = None,
+    ollama_model: str | None = None,
     root=None,
 ) -> dict[str, Any]:
     """Provider loop → validate → prepare transaction → optional apply."""
     from music_rig.agent import (
-        ProposalStatus,
-        apply_proposal,
         build_agent_packet,
         validate_proposal,
     )
@@ -230,20 +290,29 @@ def autonomous_reconcile(
     run_id = audit.new_run_id()
 
     try:
-        prov = provider or CommandProvider.from_local_config(root=root)
+        prov = provider or resolve_provider(
+            root=root,
+            provider=provider_name,
+            ollama_model=ollama_model,
+            allow_fallback=provider_name is None,
+        )
     except ProviderNotConfiguredError as exc:
         return {
             "ok": False,
             "provider_configured": False,
             "artifact_id": qid,
             "packet_hash": packet.get("packet_hash"),
-            "message": (
-                "No provider configured.\n"
-                f"Use: uv run rig agent packet {qid} --json"
-            ),
+            "message": str(exc),
+            "setup_hint": "uv run rig agent provider setup",
             "error": str(exc),
             "code": exc.code,
         }
+
+    provider_label = getattr(prov, "provider_type", provider_name or "provider")
+    if provider_label == "ollama" and hasattr(prov, "model"):
+        provider_label = f"ollama / {prov.model}"
+    elif provider_label == "cursor":
+        provider_label = "Cursor"
 
     try:
         loop = run_provider_loop(packet, ctx=ctx, provider=prov)
@@ -251,7 +320,9 @@ def autonomous_reconcile(
         record = {
             "artifact": qid,
             "packet_hash": packet.get("packet_hash"),
-            "provider_type": "command",
+            "provider_type": getattr(prov, "provider_type", "unknown"),
+            "provider_version": None,
+            "model": getattr(prov, "model", None),
             "error": str(exc),
             "code": getattr(exc, "code", "PROVIDER_ERROR"),
             "dry_run": dry_run,
@@ -262,6 +333,7 @@ def autonomous_reconcile(
             "ok": False,
             "artifact_id": qid,
             "packet_hash": packet.get("packet_hash"),
+            "provider": getattr(prov, "provider_type", None),
             "code": getattr(exc, "code", "PROVIDER_ERROR"),
             "error": str(exc),
             "run_id": run_id,
@@ -272,7 +344,7 @@ def autonomous_reconcile(
             {
                 "artifact": qid,
                 "packet_hash": packet.get("packet_hash"),
-                "provider_type": "command",
+                "provider_type": getattr(prov, "provider_type", "unknown"),
                 "turns": loop.get("turns"),
                 "status": loop["status"],
                 "clarification_questions": loop.get("clarification_questions"),
@@ -300,7 +372,7 @@ def autonomous_reconcile(
             {
                 "artifact": qid,
                 "packet_hash": packet.get("packet_hash"),
-                "provider_type": "command",
+                "provider_type": getattr(prov, "provider_type", "unknown"),
                 "turns": loop.get("turns"),
                 "status": loop.get("status"),
                 "reason": loop.get("reason"),
@@ -327,7 +399,7 @@ def autonomous_reconcile(
             {
                 "artifact": qid,
                 "packet_hash": packet.get("packet_hash"),
-                "provider_type": "command",
+                "provider_type": getattr(prov, "provider_type", "unknown"),
                 "turns": loop.get("turns"),
                 "proposal": proposal.to_dict(),
                 "validation": validation,
@@ -418,11 +490,15 @@ def autonomous_reconcile(
         postconditions=proposal.expected_postconditions,
         finalize=bool(prepared.finalize_plan),
         atomic=True,
+        provider_label=provider_label,
     )
 
     result: dict[str, Any] = {
         "ok": True,
         "artifact_id": qid,
+        "provider": getattr(prov, "provider_type", None),
+        "provider_label": provider_label,
+        "model": getattr(prov, "model", None),
         "packet_hash": packet.get("packet_hash"),
         "provider_turns": loop.get("turns"),
         "context": loop.get("context"),
@@ -448,7 +524,7 @@ def autonomous_reconcile(
             {
                 "artifact": qid,
                 "packet_hash": packet.get("packet_hash"),
-                "provider_type": "command",
+                "provider_type": getattr(prov, "provider_type", "unknown"),
                 "turns": loop.get("turns"),
                 "proposal": proposal.to_dict(),
                 "validation": validation,
@@ -481,7 +557,7 @@ def autonomous_reconcile(
         {
             "artifact": qid,
             "packet_hash": packet.get("packet_hash"),
-            "provider_type": "command",
+            "provider_type": getattr(prov, "provider_type", "unknown"),
             "turns": loop.get("turns"),
             "proposal": proposal.to_dict(),
             "validation": validation,

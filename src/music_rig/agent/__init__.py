@@ -550,14 +550,15 @@ def capabilities() -> dict[str, Any]:
         "operations": ops,
         "autonomy_levels": ["PLAN_ONLY", "APPLY_SAFE", "APPLY_AND_FINALIZE"],
         "workflow": [
+            "uv run rig agent provider setup",
+            "uv run rig reconcile run Q-xxx",
+            "uv run rig reconcile run Q-xxx --apply --yes",
+        ],
+        "advanced_workflow": [
             "uv run rig agent packet Q-xxx --json",
             "uv run rig agent validate proposal.json",
             "uv run rig agent apply proposal.json --dry-run",
             "uv run rig agent apply proposal.json --yes",
-            "uv run rig agent reconcile Q-xxx",
-            "uv run rig agent reconcile Q-xxx --dry-run --json",
-            "uv run rig agent reconcile Q-xxx --apply --yes",
-            "uv run rig agent provider status",
         ],
         "truth_boundaries": TRUTH_BOUNDARIES,
     }

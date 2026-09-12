@@ -10,13 +10,17 @@ paths:
   kaoss_backup: null
   controller_mappings_export: null
 
-# Optional agent provider (stdio command). Not required for packet/validate/apply.
+# Prefer: `uv run rig agent provider setup`
 # agent:
-#   provider: command
-#   argv:
-#     - /path/to/agent-wrapper
+#   provider: cursor          # or ollama | command
+#   fallback: null            # optional: ollama
 #   timeout_seconds: 120
-#   env_forward:
-#     - MY_API_KEY_NAME_ONLY
-#   max_context_rounds: 5
-#   max_stdout_bytes: 1000000
+#   cursor:
+#     executable: null        # default: agent
+#     model: null             # Cursor default when unset
+#   ollama:
+#     base_url: http://127.0.0.1:11434
+#     model: qwen3.5:latest
+#   # Advanced only:
+#   # provider: command
+#   # argv: [/path/to/wrapper]

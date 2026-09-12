@@ -113,18 +113,19 @@ question_target_app = typer.Typer(
 )
 reconcile_app = typer.Typer(
     help=(
-        "Reconcile questions/changes into CURRENT via adapters (CLI-first). "
-        "VERIFY_ONLY domains never promote INTENDED→VERIFIED via apply. "
-        "Use plan → apply → verify → finalize; sweep never answers OPEN."
+        "Reconcile answered Questions into CURRENT. "
+        "Normal entrypoint: `rig reconcile run`. "
+        "Also: plan, apply, verify, finalize, sweep. "
+        "Sweep never answers OPEN questions."
     ),
     invoke_without_command=True,
     no_args_is_help=False,
 )
 agent_app = typer.Typer(
     help=(
-        "Agent-assisted reconciliation: packet → proposal → validate → apply. "
-        "Agents propose allowlisted RigOperations; the rig validates and dispatches. "
-        "No YAML edits, no shell, no invented VERIFIED evidence."
+        "Provider configuration and advanced packet/proposal tooling. "
+        "Ordinary reconciliation: `rig reconcile run`. "
+        "Advanced: packet → validate → apply for debugging/integrations."
     ),
     no_args_is_help=True,
 )
@@ -4108,6 +4109,52 @@ def reconcile_main(ctx: typer.Context) -> None:
         _fail(str(exc))
 
 
+@reconcile_app.command("run")
+def reconcile_run_cmd(
+    question_id: str,
+    apply: bool = typer.Option(False, "--apply"),
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(True, "--dry-run/--write"),
+    provider: str | None = typer.Option(None, "--provider", help="cursor|ollama|command"),
+    model: str | None = typer.Option(None, "--model", help="Ollama model override"),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Normal end-to-end reconciliation (deterministic or configured agent). Preview by default."""
+    from music_rig.reconciliation.run import reconcile_run
+
+    try:
+        result = reconcile_run(
+            question_id,
+            apply=apply,
+            yes=yes,
+            dry_run=False if (apply and yes) else dry_run,
+            provider=provider,
+            ollama_model=model,
+        )
+    except StoreError as exc:
+        if as_json:
+            console.print_json(data=err_payload("store_error", str(exc)))
+            raise typer.Exit(1)
+        _fail(str(exc))
+
+    if as_json:
+        console.print_json(data=ok_payload("reconcile.run", result))
+        raise typer.Exit(0 if result.get("ok") else 1)
+
+    console.print("[bold]RECONCILE RUN[/bold]")
+    console.print(f"Question: {result.get('artifact_id')}")
+    console.print(f"Mode: {result.get('mode')}")
+    if result.get("provider_label") or result.get("provider"):
+        console.print(f"Planner: {result.get('provider_label') or result.get('provider')}")
+    if result.get("plan_review"):
+        console.print("")
+        console.print(result["plan_review"])
+    else:
+        console.print(result.get("message") or "")
+    if not result.get("ok"):
+        raise typer.Exit(1)
+
+
 def _reconcile_emit(payload: dict, *, as_json: bool, exit_code: int = 0) -> None:
     if as_json:
         # Plain JSON only — no Rich markup / ANSI.
@@ -4451,26 +4498,39 @@ def agent_provider_status_cmd(
     if as_json:
         console.print_json(data=ok_payload("agent.provider.status", result))
         return
-    console.print("[bold]AGENT PROVIDER STATUS[/bold]")
-    console.print(f"Configured: {result['configured']}")
-    console.print(f"Provider type: {result['provider_type']}")
-    console.print(f"Executable: {result['executable']}")
+    console.print("[bold]AGENT RECONCILIATION[/bold]")
+    console.print(f"Provider: {result.get('provider_type') or '(none)'}")
+    console.print(f"Status: {result.get('status')}")
+    detail = result.get("detail") or {}
+    for key, value in detail.items():
+        if key == "models" and isinstance(value, list):
+            console.print(f"Models: {len(value)}")
+            continue
+        console.print(f"{key.replace('_', ' ').title()}: {value}")
     console.print(f"Timeout: {result['timeout_seconds']}s")
-    console.print(
-        "Forwarded env names: "
-        + (", ".join(result["forwarded_environment_variable_names"]) or "(none)")
-    )
+    if result.get("fallback"):
+        console.print(f"Fallback: {result['fallback']}")
+    detected = result.get("detected") or {}
+    ollama = detected.get("ollama") or {}
+    if result.get("provider_type") != "ollama" and ollama.get("available"):
+        console.print(
+            f"Ollama available ({ollama.get('model_count', 0)} models) — optional fallback"
+        )
+    if not result.get("configured"):
+        console.print(result.get("message") or "")
 
 
 @provider_app.command("test")
 def agent_provider_test_cmd(
+    provider: str | None = typer.Option(None, "--provider"),
+    model: str | None = typer.Option(None, "--model", help="Ollama model override"),
     as_json: bool = typer.Option(False, "--json"),
 ) -> None:
     from music_rig.agent.errors import AgentError
     from music_rig.agent.provider import provider_test
 
     try:
-        result = provider_test()
+        result = provider_test(provider=provider, ollama_model=model)
     except AgentError as exc:
         if as_json:
             console.print_json(data=err_payload(exc.code, str(exc)))
@@ -4480,7 +4540,110 @@ def agent_provider_test_cmd(
         console.print_json(data=ok_payload("agent.provider.test", result))
         return
     console.print("[bold]AGENT PROVIDER TEST[/bold]")
-    console.print_json(data=result)
+    console.print(f"Provider: {result.get('provider')}")
+    console.print(f"Turn: {(result.get('turn') or {}).get('kind')}")
+    console.print("No repository mutations.")
+
+
+@provider_app.command("use")
+def agent_provider_use_cmd(
+    provider: str = typer.Argument(..., help="cursor | ollama | command"),
+    model: str | None = typer.Option(None, "--model", help="Ollama model"),
+    executable: str | None = typer.Option(None, "--executable", help="Cursor executable"),
+    base_url: str | None = typer.Option(None, "--base-url", help="Ollama base URL"),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Set the default reconciliation provider in .rig.local.yaml."""
+    from music_rig.local_config import update_agent_config
+
+    name = provider.strip().lower()
+    if name not in {"cursor", "ollama", "command"}:
+        _fail("provider must be cursor, ollama, or command")
+    if name == "ollama" and not model:
+        _fail("ollama requires --model <installed-model>")
+    try:
+        cfg = update_agent_config(
+            provider=name,
+            cursor_executable=executable,
+            ollama_model=model if name == "ollama" else None,
+            ollama_base_url=base_url,
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+    payload = {"provider": cfg.agent.provider, "ollama": cfg.agent.ollama.model_dump()}
+    if as_json:
+        console.print_json(data=ok_payload("agent.provider.use", payload))
+        return
+    console.print(f"Provider set to {name}")
+    if name == "ollama":
+        console.print(f"Model: {model}")
+
+
+@provider_app.command("setup")
+def agent_provider_setup_cmd(
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Interactive provider detection and selection (writes .rig.local.yaml only)."""
+    from music_rig.agent.provider import detect_providers
+    from music_rig.local_config import update_agent_config
+
+    detected = detect_providers()
+    if as_json:
+        console.print_json(data=ok_payload("agent.provider.setup", detected))
+        return
+    console.print("[bold]AGENT PROVIDERS[/bold]")
+    console.print("")
+    console.print("1. Cursor")
+    c = detected["cursor"]
+    console.print(
+        f"   {'✓' if c['available'] else '✗'} agent CLI "
+        f"{'found' if c['available'] else 'not found'}"
+    )
+    if c.get("version"):
+        console.print(f"   version: {c['version']}")
+    console.print("")
+    console.print("2. Ollama")
+    o = detected["ollama"]
+    console.print(
+        f"   {'✓' if o['available'] else '✗'} {o['base_url']} "
+        f"{'reachable' if o['available'] else 'not reachable'}"
+    )
+    if o.get("models"):
+        console.print("   models:")
+        for name in o["models"]:
+            console.print(f"     {name}")
+    console.print("")
+    choice = typer.prompt("Choose reconciliation provider", default="cursor").strip().lower()
+    if choice in {"1", "cursor"}:
+        if not c["available"]:
+            _fail("Cursor agent CLI not found")
+        update_agent_config(provider="cursor")
+        console.print("Provider set to cursor")
+        return
+    if choice in {"2", "ollama"}:
+        if not o["available"]:
+            _fail("Ollama is not reachable")
+        models = o.get("models") or []
+        if not models:
+            _fail("No Ollama models installed")
+        if len(models) == 1:
+            model = models[0]
+            console.print(f"Using only installed model: {model}")
+        else:
+            console.print("Select a model:")
+            for i, name in enumerate(models, 1):
+                console.print(f"  {i}. {name}")
+            pick = typer.prompt("Model number or name")
+            if pick.isdigit() and 1 <= int(pick) <= len(models):
+                model = models[int(pick) - 1]
+            else:
+                model = pick.strip()
+            if model not in models:
+                _fail(f"Unknown model {model!r}")
+        update_agent_config(provider="ollama", ollama_model=model)
+        console.print(f"Provider set to ollama / {model}")
+        return
+    _fail("Choose cursor or ollama")
 
 
 @agent_app.command("packet")
@@ -4573,83 +4736,20 @@ def agent_reconcile_cmd(
     dry_run: bool = typer.Option(True, "--dry-run/--write"),
     apply: bool = typer.Option(False, "--apply"),
     yes: bool = typer.Option(False, "--yes"),
-    autonomy: str = typer.Option("PLAN_ONLY", "--autonomy"),
+    provider: str | None = typer.Option(None, "--provider"),
+    model: str | None = typer.Option(None, "--model"),
 ) -> None:
-    """Plan-first autonomous reconcile (provider optional; default writes nothing)."""
-    from music_rig.agent.orchestrate import AutonomyLevel, autonomous_reconcile
-    from music_rig.agent.provider import provider_status
-
-    try:
-        level = AutonomyLevel(autonomy.upper())
-    except ValueError:
-        _fail(f"unknown autonomy level {autonomy!r}")
-
-    # Without provider, fall back to packet preview
-    status = provider_status()
-    if not status.get("configured"):
-        from music_rig import agent as agent_mod
-
-        try:
-            packet = agent_mod.build_agent_packet(question_id)
-        except StoreError as exc:
-            if as_json:
-                console.print_json(data=err_payload("store_error", str(exc)))
-                raise typer.Exit(1)
-            _fail(str(exc))
-        result = {
-            "artifact_id": question_id.upper(),
-            "provider_configured": False,
-            "packet_hash": packet.get("packet_hash"),
-            "final_human_answer": packet.get("final_human_answer"),
-            "reconciliation_state": packet.get("reconciliation_state"),
-            "autonomy": level.value,
-            "message": (
-                "No agent provider configured.\n"
-                f"Use:\n  uv run rig agent packet {question_id.upper()} --json\n"
-                "  uv run rig agent validate proposal.json\n"
-                "  uv run rig agent apply proposal.json --dry-run"
-            ),
-            "next_commands": [
-                f"uv run rig agent packet {question_id.upper()} --json",
-                "uv run rig agent validate proposal.json",
-                "uv run rig agent apply proposal.json --dry-run",
-            ],
-        }
-        if as_json:
-            console.print_json(data=ok_payload("agent.reconcile", result))
-            return
-        console.print("[bold]AGENT RECONCILIATION[/bold]")
-        console.print(result["message"])
-        return
-
-    if apply and yes and level is AutonomyLevel.PLAN_ONLY:
-        level = AutonomyLevel.APPLY_SAFE
-
-    try:
-        result = autonomous_reconcile(
-            question_id,
-            autonomy=level,
-            apply=apply,
-            yes=yes,
-            dry_run=False if (apply and yes) else dry_run,
-        )
-    except StoreError as exc:
-        if as_json:
-            console.print_json(data=err_payload("store_error", str(exc)))
-            raise typer.Exit(1)
-        _fail(str(exc))
-
-    if as_json:
-        console.print_json(data=ok_payload("agent.reconcile", result))
-        raise typer.Exit(0 if result.get("ok") else 1)
-    console.print("[bold]AGENT RECONCILIATION PLAN[/bold]")
-    if result.get("plan_review"):
-        console.print(result["plan_review"])
-    else:
-        console.print_json(data=result)
-    if not result.get("ok"):
-        raise typer.Exit(1)
-    console.print(result["message"])
+    """Advanced alias for `rig reconcile run` (same orchestration)."""
+    # Delegate to the unified entrypoint — do not diverge.
+    reconcile_run_cmd(
+        question_id,
+        apply=apply,
+        yes=yes,
+        dry_run=dry_run,
+        provider=provider,
+        model=model,
+        as_json=as_json,
+    )
 
 
 @reconcile_app.command("change")

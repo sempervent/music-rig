@@ -161,6 +161,10 @@ uv run rig question todo Q-008
 # What still needs reconciliation?
 uv run rig reconcile
 uv run rig reconcile queue --json
+# Normal end-to-end (deterministic or Cursor/Ollama planner):
+uv run rig agent provider setup   # once
+uv run rig reconcile run Q-008
+uv run rig reconcile run Q-008 --apply --yes
 uv run rig reconcile plan question Q-008 --json
 uv run rig reconcile change CHG-001
 uv run rig reconcile question Q-008

@@ -330,51 +330,60 @@ The TUI is a **human editor** over the same services as the CLI. Agents should p
   navigate (never push a sibling then dismiss the child). See `docs/tui.md`.
 - `rig tui --debug` / `RIG_DEBUG=1` for pipeline diagnostics only.
 
-## Agent-Assisted Reconciliation
+## Reconciliation (human)
 
-The agent does **not** mutate YAML. The agent proposes **RigOperations**.
-The rig validates, prepares one atomic transaction, and only then may apply.
+One-time provider setup:
+
+```bash
+uv run rig agent provider setup
+# or:
+uv run rig agent provider use cursor
+uv run rig agent provider use ollama --model <installed-model>
+```
+
+Normal use:
+
+```bash
+uv run rig reconcile run Q-xxx
+uv run rig reconcile run Q-xxx --apply --yes
+uv run rig reconcile run Q-xxx --provider ollama --model <model>
+```
+
+TUI: select Question → Reconcile (`g`). Uses deterministic adapters when possible;
+otherwise the configured Cursor/Ollama planner.
 
 ```text
 Human answers Question
         ↓
-rig reconcile plan
+rig reconcile run
         ↓
-deterministic adapter? → normal reconciliation
-agent interpretation?  → uv run rig agent reconcile Q-xxx
+deterministic adapter? → plan/apply/finalize path
+agent interpretation?  → Cursor/Ollama planner → review → apply
 ```
 
-Provider-configured path (plan-only by default):
+### Advanced integration / debugging
 
-```bash
-uv run rig agent provider status
-uv run rig agent reconcile Q-xxx
-uv run rig agent reconcile Q-xxx --dry-run --json
-uv run rig agent reconcile Q-xxx --apply --yes
-```
-
-Provider-less path remains fully supported:
+External agents already working in the repo may still use:
 
 ```bash
 uv run rig agent packet Q-xxx --json
-# external agent → proposal.json
 uv run rig agent validate proposal.json
 uv run rig agent apply proposal.json --dry-run
 uv run rig agent apply proposal.json --yes
-uv run rig agent capabilities --json
 ```
 
-Trust rules:
+### Trust rules
 
 - Provider output is **untrusted input**.
 - RigOperation validation is authoritative.
 - Successful provider execution does **not** mean successful reconciliation.
 - Successful atomic transaction + postconditions do.
-- Do not invent human observations or reinterpret ambiguous answers.
-- If packet context is insufficient, the provider may return
-  `NEEDS_MORE_CONTEXT` with typed inspection requests — do not guess.
-- Do not set `evidence=VERIFIED` without a Stage 17 `verification_result`.
-- Model-level answers must not invent unique inventory unit IDs.
+- **CursorProvider is a planner.** Do not allow Cursor's coding/file tools to
+  bypass RigOperation execution. Invoked with `--mode=ask` outside the repo.
+- **Ollama output is untrusted structured input.** JSON-schema compliance does
+  not make proposed operations authoritative.
+- Do not invent human observations or unit IDs from model-only answers.
+- Do not set `evidence=VERIFIED` without Stage 17 `verification_result`.
 - Sweep remains deterministic; it may list `agent_candidates[]` but never
   launches a provider.
 

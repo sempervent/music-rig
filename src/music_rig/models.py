@@ -1193,17 +1193,34 @@ class LocalPathsConfig(BaseModel):
     controller_mappings_export: str | None = None
 
 
+class CursorProviderLocalConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    executable: str | None = None
+    model: str | None = None
+
+
+class OllamaProviderLocalConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    base_url: str = "http://127.0.0.1:11434"
+    model: str | None = None
+
+
 class AgentLocalConfig(BaseModel):
     """Machine-local agent provider settings (never committed secrets)."""
 
     model_config = ConfigDict(extra="forbid")
 
-    provider: str | None = None
-    argv: list[str] = Field(default_factory=list)
+    provider: str | None = None  # cursor | ollama | command
+    fallback: str | None = None  # optional: ollama | cursor | command
+    argv: list[str] = Field(default_factory=list)  # command provider only
     timeout_seconds: int = Field(default=120, ge=1, le=600)
     env_forward: list[str] = Field(default_factory=list)
     max_context_rounds: int = Field(default=5, ge=1, le=10)
     max_stdout_bytes: int = Field(default=1_000_000, ge=1024, le=5_000_000)
+    cursor: CursorProviderLocalConfig = Field(default_factory=CursorProviderLocalConfig)
+    ollama: OllamaProviderLocalConfig = Field(default_factory=OllamaProviderLocalConfig)
 
 
 class LocalConfig(BaseModel):

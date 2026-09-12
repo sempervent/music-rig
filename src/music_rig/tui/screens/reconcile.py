@@ -24,7 +24,7 @@ class ReconcileScreen(Screen):
         Binding("a", "apply", "Apply"),
         Binding("v", "verify", "Verify"),
         Binding("f", "finalize", "Finalize"),
-        Binding("g", "agent_plan", "Agent Plan"),
+        Binding("g", "agent_plan", "Reconcile"),
         Binding("o", "open_target", "Open Target"),
         Binding("e", "edit_target", "Edit Target"),
         Binding("l", "open_related", "Related"),
@@ -225,42 +225,20 @@ class ReconcileScreen(Screen):
         )
 
     def action_agent_plan(self) -> None:
-        """Agent Plan — background provider reconcile preview (or CLI fallback)."""
+        """Reconcile — deterministic or configured Cursor/Ollama planner."""
         item = self._selected()
         if item is None or item.artifact_type != "question":
-            self.notify("Select a question for Agent Plan", severity="warning")
+            self.notify("Select a question to Reconcile", severity="warning")
             return
-        from music_rig.agent.provider import provider_status
-        from music_rig.tui.dialogs import HelpScreen
         from music_rig.tui.screens.agent_plan import AgentPlanScreen
-
-        if not provider_status().get("configured"):
-            try:
-                from music_rig.agent import build_agent_packet
-
-                packet = build_agent_packet(item.artifact_id)
-            except Exception as exc:  # noqa: BLE001
-                self.notify(f"Agent packet failed: {exc}", severity="error")
-                return
-            body = (
-                "No provider configured.\n\n"
-                f"Packet hash: {packet.get('packet_hash')}\n"
-                f"Answer: {packet.get('final_human_answer') or '—'}\n\n"
-                "Use:\n"
-                f"  uv run rig agent packet {item.artifact_id} --json\n"
-                "  uv run rig agent validate proposal.json\n"
-                "  uv run rig agent apply proposal.json --dry-run\n"
-            )
-            self.app.push_screen(HelpScreen(body))
-            return
 
         def _done(result: dict | None) -> None:
             if result and result.get("ok") and result.get("applied"):
-                self.notify(f"Applied agent plan for {item.artifact_id}")
+                self.notify(f"Applied reconciliation for {item.artifact_id}")
                 self.action_refresh()
             elif result is not None:
                 self.notify(
-                    result.get("message") or "Agent plan finished",
+                    result.get("message") or "Reconcile finished",
                     severity="information",
                 )
 

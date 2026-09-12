@@ -75,3 +75,57 @@ def has_any_configured_path(config: LocalConfig | None) -> bool:
         getattr(config.paths, key) not in (None, "")
         for key in sorted(LOCAL_PATH_KEYS)
     )
+
+
+def save_local_config(
+    config: LocalConfig,
+    *,
+    path: Path | None = None,
+    root: Path | None = None,
+) -> Path:
+    """Write machine-local config (gitignored). Never touches canonical data/."""
+    target = path or local_config_path(root)
+    payload = config.model_dump(mode="json")
+    # Drop empty nested defaults for readability
+    text = yaml.safe_dump(
+        payload,
+        sort_keys=False,
+        allow_unicode=True,
+        default_flow_style=False,
+        width=88,
+    )
+    target.write_text(text, encoding="utf-8")
+    return target
+
+
+def update_agent_config(
+    *,
+    provider: str | None = None,
+    fallback: str | None = None,
+    cursor_executable: str | None = None,
+    cursor_model: str | None = None,
+    ollama_base_url: str | None = None,
+    ollama_model: str | None = None,
+    argv: list[str] | None = None,
+    root: Path | None = None,
+) -> LocalConfig:
+    """Merge agent settings into local config and save."""
+    existing = load_local_config(root=root) or LocalConfig()
+    agent = existing.agent.model_copy(deep=True)
+    if provider is not None:
+        agent.provider = provider
+    if fallback is not None:
+        agent.fallback = fallback or None
+    if cursor_executable is not None:
+        agent.cursor.executable = cursor_executable or None
+    if cursor_model is not None:
+        agent.cursor.model = cursor_model or None
+    if ollama_base_url is not None:
+        agent.ollama.base_url = ollama_base_url
+    if ollama_model is not None:
+        agent.ollama.model = ollama_model or None
+    if argv is not None:
+        agent.argv = list(argv)
+    updated = existing.model_copy(update={"agent": agent}, deep=True)
+    save_local_config(updated, root=root)
+    return updated
