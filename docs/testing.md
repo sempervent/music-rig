@@ -90,6 +90,12 @@ uv run ruff format .
 uv run ryl check .
 ```
 
+Docs build (CI + local quality gate):
+
+```bash
+uv run mkdocs build --strict
+```
+
 ## Reconciliation
 
 See [reconciliation.md](reconciliation.md) for module ownership, authority flow,

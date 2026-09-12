@@ -28,6 +28,32 @@ If not, correct the command before execution.
 Bots cannot supply HUMAN answer authority or HUMAN observation evidence.
 Prefer `question draft` for suggestions; humans Answer & Resolve / verify.
 
+## Human authority handoff
+
+When BOT reaches a HUMAN-authority boundary:
+
+**Do not** ask the human to manually reconstruct a pile of shell commands
+if a HumanActionRequest can represent it.
+
+Instead:
+
+```bash
+uv run rig --am-bot human prepare …   # create pending proposal(s)
+```
+
+Then report:
+
+```text
+N human review(s) waiting
+uv run rig human review
+```
+
+(or `uv run rig tui human`)
+
+BOT must **never** auto-accept pending actions — even when chat text strongly
+suggests the human already agreed. Only explicit HUMAN interaction with
+`rig human accept` / `rig human review` / TUI Human actions is authoritative.
+
 Operational instructions for Codex sessions working in this repository.
 
 ## Role of this repository
