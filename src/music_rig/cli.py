@@ -1383,19 +1383,25 @@ def session_status_cmd() -> None:
 
 @session_app.command("note")
 def session_note_cmd(text: str) -> None:
+    existed = session_service.find_active() is not None
     try:
         session = session_service.add_note(text)
     except StoreError as exc:
         _fail(str(exc))
+    if not existed:
+        console.print(f"Started {session.id} (auto)")
     console.print(f"NOTE added to {session.id}")
 
 
 @session_app.command("discovery")
 def session_discovery_cmd(text: str) -> None:
+    existed = session_service.find_active() is not None
     try:
         session = session_service.add_discovery(text)
     except StoreError as exc:
         _fail(str(exc))
+    if not existed:
+        console.print(f"Started {session.id} (auto)")
     console.print(f"DISCOVERY added to {session.id}")
 
 
@@ -1427,10 +1433,13 @@ def session_complete_task_cmd(
 
 @session_app.command("capture")
 def session_capture_cmd(text: str) -> None:
+    existed = session_service.find_active() is not None
     try:
         session, item = session_service.session_capture(text)
     except StoreError as exc:
         _fail(str(exc))
+    if not existed:
+        console.print(f"Started {session.id} (auto)")
     console.print(f"Captured {item.id}")
     console.print(f"Added to active session {session.id}")
 
