@@ -2,6 +2,7 @@
 # Not tasks (see data/todo.yaml). Not wishlist ideas (see data/wishlist.yaml).
 # Question = unknown fact. Resolving a question records an answer; it does NOT
 # automatically rewrite CURRENT routing/docs.
+# verification: guides human inspection only — never invent answers from it.
 questions:
 - id: Q-001
   question: Where does the non-clean leg of each A/B/Y splitter go (acoustic, bass, electric)?
@@ -15,6 +16,15 @@ questions:
   resolved_at: null
   reconciled_at: null
   reconciliation_note: ''
+  verification:
+    kind: ROUTING_VISUAL
+    prompt: At the rack, follow each A/B/Y splitter's non-clean output cable to its
+      physical destination. Record acoustic, bass, and electric separately. Do not
+      invent destinations from docs.
+    answer_type: TEXT
+    choices: []
+    ref_domain: null
+  verification_note: ''
 - id: Q-002
   question: Does acoustic have an Alesis channel assignment, or only the TASCAM 5 clean path?
   area: Routing
@@ -27,6 +37,17 @@ questions:
   resolved_at: null
   reconciled_at: null
   reconciliation_note: ''
+  verification:
+    kind: ROUTING_VISUAL
+    prompt: Trace the acoustic clean path. YES = an Alesis channel is physically used;
+      NO = TASCAM-only; UNKNOWN if not inspectable now.
+    answer_type: BOOL
+    choices:
+    - 'YES'
+    - 'NO'
+    - 'UNKNOWN'
+    ref_domain: null
+  verification_note: ''
 - id: Q-003
   question: What exact jack(s) receive CH-1 stereo back into the Alesis?
   area: Routing
@@ -39,6 +60,14 @@ questions:
   resolved_at: null
   reconciled_at: null
   reconciliation_note: ''
+  verification:
+    kind: ROUTING_VISUAL
+    prompt: Visually identify the Alesis jack(s) that receive CH-1 stereo return. Name
+      the physical jacks; do not guess from the mixer map.
+    answer_type: TEXT
+    choices: []
+    ref_domain: null
+  verification_note: ''
 - id: Q-004
   question: Does physical KAOSS monitor/capture match documented Monitor Out → KAOSS → TASCAM
     9/10?
@@ -55,6 +84,17 @@ questions:
   target:
     domain: routing.verify
     path: kaoss
+  verification:
+    kind: ROUTING_COMPARE
+    prompt: Compare physical KAOSS monitor/capture cabling to documented Monitor Out →
+      KAOSS → TASCAM 9/10. YES = matches; NO = differs (note how); UNKNOWN if not checked.
+    answer_type: BOOL
+    choices:
+    - 'YES'
+    - 'NO'
+    - 'UNKNOWN'
+    ref_domain: null
+  verification_note: ''
 - id: Q-005
   question: Should the PYLE-PRO dual DI live near the Privia, near the JOYO output, or near
     clean instrument taps?
@@ -68,6 +108,14 @@ questions:
   resolved_at: null
   reconciled_at: null
   reconciliation_note: ''
+  verification:
+    kind: MANUAL_FACT
+    prompt: Decide placement from how you actually play (or record UNKNOWN). Not a cabling
+      invent-from-manual exercise.
+    answer_type: TEXT
+    choices: []
+    ref_domain: null
+  verification_note: ''
 - id: Q-006
   question: Should LS-2 also remain a bass split/blend tool outside its CURRENT SPACE role?
   area: Routing
@@ -80,6 +128,17 @@ questions:
   resolved_at: null
   reconciled_at: null
   reconciliation_note: ''
+  verification:
+    kind: MANUAL_FACT
+    prompt: Based on how you use the LS-2 in practice — YES keep bass split/blend role;
+      NO SPACE-only; UNKNOWN if undecided.
+    answer_type: BOOL
+    choices:
+    - 'YES'
+    - 'NO'
+    - 'UNKNOWN'
+    ref_domain: null
+  verification_note: ''
 - id: Q-007
   question: Which physical unit is PB-A / PB-B / PB-C / PB-D (ART P48 vs Behringer PX3000)?
   area: Patchbay
@@ -94,6 +153,15 @@ questions:
   reconciliation_note: ''
   target:
     domain: inventory.patchbay_mapping
+  verification:
+    kind: PATCHBAY_UNIT
+    prompt: At the rack, read faceplate/serial for each bay letter. Answer with a short
+      mapping (e.g. PB-A=art-p48-1; PB-B=…). Prefer inventory unit ids art-p48-* /
+      behringer-px3000-* when known.
+    answer_type: TEXT
+    choices: []
+    ref_domain: null
+  verification_note: ''
 - id: Q-008
   question: What normalization mode (normal / half-normal / thru) is each populated PB-B pair
     set to?
@@ -110,6 +178,19 @@ questions:
   target:
     domain: patchbay.mode
     bay: PB-B
+  verification:
+    kind: PATCHBAY_MODE
+    prompt: Inspect the physical PB-B normalization switches for each populated pair.
+      Answer one mode when recording a single pair (set target.pair first); use UNKNOWN
+      if not checked. Do not invent modes from manuals.
+    answer_type: ENUM
+    choices:
+    - normal
+    - half-normal
+    - thru
+    - 'UNKNOWN'
+    ref_domain: null
+  verification_note: ''
 - id: Q-009
   question: What are the rear-panel assignments for PB-A, PB-C, and PB-D?
   area: Patchbay
@@ -123,6 +204,14 @@ questions:
   resolved_at: null
   reconciled_at: null
   reconciliation_note: ''
+  verification:
+    kind: MANUAL_FACT
+    prompt: Inspect rear-panel wiring on PB-A, PB-C, PB-D. Record what is plugged in or
+      explicitly UNKNOWN / intentionally open.
+    answer_type: TEXT
+    choices: []
+    ref_domain: null
+  verification_note: ''
 - id: Q-010
   question: What (if anything) should feed PB-B upper 9–12 into lower 33–36?
   area: Patchbay
@@ -135,6 +224,14 @@ questions:
   resolved_at: null
   reconciled_at: null
   reconciliation_note: ''
+  verification:
+    kind: MANUAL_FACT
+    prompt: Decide intended sources for PB-B upper 9–12 → lower 33–36, or record
+      intentionally unused. Do not invent sources.
+    answer_type: TEXT
+    choices: []
+    ref_domain: null
+  verification_note: ''
 - id: Q-011
   question: Do the physical DIRTY and SPACE boards match docs/pedal-chains.md?
   area: Pedals / power
@@ -147,6 +244,17 @@ questions:
   resolved_at: null
   reconciled_at: null
   reconciliation_note: ''
+  verification:
+    kind: BOARD_COMPARE
+    prompt: Walk DIRTY and SPACE boards against docs/pedal-chains.md. YES = match; NO =
+      note mismatches; UNKNOWN if not fully checked.
+    answer_type: BOOL
+    choices:
+    - 'YES'
+    - 'NO'
+    - 'UNKNOWN'
+    ref_domain: null
+  verification_note: ''
 - id: Q-012
   question: Where are Flamma Mod and PH-2 right now (disconnected, stored, elsewhere)?
   area: Pedals / power
@@ -159,6 +267,14 @@ questions:
   resolved_at: null
   reconciled_at: null
   reconciliation_note: ''
+  verification:
+    kind: INVENTORY_LOCATION
+    prompt: Physically locate Flamma Mod and PH-2. Record location (board / drawer /
+      bag / UNKNOWN).
+    answer_type: TEXT
+    choices: []
+    ref_domain: null
+  verification_note: ''
 - id: Q-013
   question: What is each CURRENT pedal’s voltage, current draw, and power-supply assignment?
   area: Pedals / power
@@ -171,6 +287,14 @@ questions:
   resolved_at: null
   reconciled_at: null
   reconciliation_note: ''
+  verification:
+    kind: POWER_AUDIT
+    prompt: For each CURRENT pedal, read label/PSU assignment and record V / mA / supply
+      outlet. Prefer measured/label facts over catalog guesses.
+    answer_type: TEXT
+    choices: []
+    ref_domain: null
+  verification_note: ''
 - id: Q-014
   question: Is Ableton definitely the master clock in practice, or do KAOSS/SL-2 sometimes
     lead?
@@ -186,6 +310,18 @@ questions:
   reconciliation_note: ''
   target:
     domain: midi.clock_master
+  verification:
+    kind: MIDI_CLOCK
+    prompt: During a short jam, observe which device leads tempo. Pick the observed master
+      endpoint id, or UNKNOWN.
+    answer_type: ENUM
+    choices:
+    - ableton
+    - kaoss-replay
+    - sl-2
+    - 'UNKNOWN'
+    ref_domain: null
+  verification_note: ''
 - id: Q-015
   question: What is the verified physical MIDI topology using U6MIDI Pro + Thru5 WC?
   area: MIDI
@@ -200,6 +336,14 @@ questions:
   reconciliation_note: ''
   target:
     domain: midi.verify
+  verification:
+    kind: MIDI_PHYSICAL
+    prompt: Trace U6MIDI Pro and Thru5 WC cables end-to-end. Describe the physical
+      topology you see (or UNKNOWN).
+    answer_type: TEXT
+    choices: []
+    ref_domain: null
+  verification_note: ''
 - id: Q-016
   question: What exact FCB1010 switch map is assigned in banks 00/01/02?
   area: MIDI
@@ -215,6 +359,15 @@ questions:
   target:
     domain: controls.verify
     gear: behringer-fcb1010
+  verification:
+    kind: CONTROLLER_MAPPING
+    prompt: On the FCB1010, inspect banks 00/01/02 switch assignments (or dump from
+      editor if that is how you verify). Record the observed map; do not invent from
+      wishlists.
+    answer_type: TEXT
+    choices: []
+    ref_domain: null
+  verification_note: ''
 - id: Q-017
   question: Which ReMOTE ZeRO SL templates are actually loaded on the device?
   area: MIDI
@@ -230,6 +383,14 @@ questions:
   target:
     domain: controls.verify
     gear: novation-remote-zero-sl
+  verification:
+    kind: CONTROLLER_MAPPING
+    prompt: On the ReMOTE ZeRO SL, check which templates are loaded. List template names
+      or UNKNOWN.
+    answer_type: TEXT
+    choices: []
+    ref_domain: null
+  verification_note: ''
 - id: Q-018
   question: What are the exact active tracks in the current PFL jam Ableton set?
   area: Performance / video
@@ -246,6 +407,14 @@ questions:
   target:
     domain: ableton.template
     path: pfl-jam
+  verification:
+    kind: ABLETON_SETTING
+    prompt: Open the current PFL jam Live set offline and list active tracks. Do not
+      invent from aspirational templates.
+    answer_type: TEXT
+    choices: []
+    ref_domain: null
+  verification_note: ''
 - id: Q-019
   question: What OBS camera angles are already covered by owned webcams?
   area: Performance / video
@@ -258,6 +427,14 @@ questions:
   resolved_at: null
   reconciled_at: null
   reconciliation_note: ''
+  verification:
+    kind: CAMERA_AUDIT
+    prompt: Inventory owned webcams and note which angles they already cover. No OBS
+      automation — observation only.
+    answer_type: TEXT
+    choices: []
+    ref_domain: null
+  verification_note: ''
 - id: Q-020
   question: What is the default one-player loop-building order (RC-1 vs KAOSS vs future RC-600)?
   area: Performance / video
@@ -270,3 +447,11 @@ questions:
   resolved_at: null
   reconciled_at: null
   reconciliation_note: ''
+  verification:
+    kind: WORKFLOW
+    prompt: Decide the default one-player loop order from how you actually jam (RC-1 /
+      KAOSS / future RC-600). UNKNOWN if still experimenting.
+    answer_type: TEXT
+    choices: []
+    ref_domain: null
+  verification_note: ''

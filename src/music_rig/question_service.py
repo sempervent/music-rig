@@ -137,6 +137,7 @@ def resolve_question(
     answer: str,
     *,
     related_change: str | None = None,
+    verification_note: str | None = None,
     clock: Clock = default_clock,
     render: bool = True,
     questions_path: Path | None = None,
@@ -179,20 +180,20 @@ def resolve_question(
                 updated_changes.append(item)
         changes_doc = ChangesDocument(items=updated_changes)
 
-    updated = OpenQuestion(
-        id=current.id,
-        question=current.question,
-        area=current.area,
-        status=QuestionStatus.RESOLVED,
-        related_todos=list(current.related_todos),
-        related_changes=change_ids,
-        answer=cleaned,
-        notes=current.notes,
-        resolved_at=clock(),
-        reconciled_at=None,
-        reconciliation_note="",
-        target=current.target,
+    data = current.model_dump()
+    data.update(
+        {
+            "status": QuestionStatus.RESOLVED,
+            "related_changes": change_ids,
+            "answer": cleaned,
+            "resolved_at": clock(),
+            "reconciled_at": None,
+            "reconciliation_note": "",
+        }
     )
+    if verification_note is not None:
+        data["verification_note"] = verification_note.strip()
+    updated = OpenQuestion.model_validate(data)
     new_qdoc = OpenQuestionsDocument(
         questions=[updated if q.id == key else q for q in qdoc.questions]
     )
@@ -622,6 +623,7 @@ def answer_question(
     *,
     dry_run: bool = False,
     related_change: str | None = None,
+    verification_note: str | None = None,
     clock: Clock = default_clock,
     render: bool = True,
     questions_path: Path | None = None,
@@ -644,6 +646,11 @@ def answer_question(
             current.reconciled_at.isoformat() if current.reconciled_at else None
         ),
     }
+    after_note = (
+        verification_note.strip()
+        if verification_note is not None
+        else current.verification_note
+    )
     if dry_run:
         return {
             "dry_run": True,
@@ -655,6 +662,7 @@ def answer_question(
                 "answer": cleaned,
                 "resolved_at": "(would set)",
                 "reconciled_at": None,
+                "verification_note": after_note,
             },
             "next_command": f"uv run rig reconcile plan question {current.id} --json",
             "message": "Answer recorded. CURRENT reconciliation still required.",
@@ -663,6 +671,7 @@ def answer_question(
         question_id,
         cleaned,
         related_change=related_change,
+        verification_note=verification_note,
         clock=clock,
         render=render,
         questions_path=questions_path,

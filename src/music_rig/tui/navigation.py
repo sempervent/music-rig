@@ -32,6 +32,13 @@ DOMAINS: list[DomainSpec] = [
         count_fn=_c(lambda c: f"{c.open_questions} open"),
     ),
     DomainSpec(
+        "verify",
+        "Verify",
+        "Planning",
+        aliases=("verification",),
+        count_fn=_c(lambda c: f"{c.open_questions} open"),
+    ),
+    DomainSpec(
         "todo",
         "TODO",
         "Planning",

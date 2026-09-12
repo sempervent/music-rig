@@ -108,10 +108,42 @@ def recommend_now(
     todo = load_todo(todo_path)
     skipped = _skipped_summary(todo.tasks)
 
+    def _with_verify_hints(rec: NowRecommendation, task_id: str) -> NowRecommendation:
+        from music_rig.verification_service import open_questions_for_todo
+
+        qids = open_questions_for_todo(task_id, questions_path=None)
+        if not qids:
+            return rec
+        cmds = list(rec.suggested_commands)
+        for qid in qids:
+            cmd = f"uv run rig verify run {qid}"
+            if cmd not in cmds:
+                cmds.append(cmd)
+        reason = rec.reason
+        hint = (
+            f" Open question(s) {', '.join(qids)} block progress — "
+            f"verify with `uv run rig verify run {qids[0]}`."
+        )
+        if "verify run" not in reason:
+            reason = reason + hint
+        return NowRecommendation(
+            kind=rec.kind,
+            primary_reference=rec.primary_reference,
+            title=rec.title,
+            reason=reason,
+            suggested_commands=cmds,
+            definition_of_done=rec.definition_of_done,
+            priority=rec.priority,
+            skipped_summary=rec.skipped_summary,
+            recent_event=rec.recent_event,
+            duration=rec.duration,
+            focus=rec.focus,
+        )
+
     in_progress = [t for t in todo.tasks if t.status == TodoStatus.IN_PROGRESS]
     if in_progress:
         task = _best_in_progress(in_progress)
-        return NowRecommendation(
+        rec = NowRecommendation(
             kind=NowKind.IN_PROGRESS,
             primary_reference=task.id,
             title=task.task,
@@ -124,6 +156,7 @@ def recommend_now(
             ],
             skipped_summary=skipped,
         )
+        return _with_verify_hints(rec, task.id)
 
     by_id = todo.task_map()
     for tid in todo.next_session:
@@ -138,7 +171,7 @@ def recommend_now(
             TodoStatus.CANCELLED,
         }:
             continue
-        return NowRecommendation(
+        rec = NowRecommendation(
             kind=NowKind.NEXT_SESSION,
             primary_reference=task.id,
             title=task.task,
@@ -151,10 +184,11 @@ def recommend_now(
             ],
             skipped_summary=skipped,
         )
+        return _with_verify_hints(rec, task.id)
 
     ready = _best_ready(todo.tasks)
     if ready is not None:
-        return NowRecommendation(
+        rec = NowRecommendation(
             kind=NowKind.READY,
             primary_reference=ready.id,
             title=ready.task,
@@ -171,6 +205,7 @@ def recommend_now(
             ],
             skipped_summary=skipped,
         )
+        return _with_verify_hints(rec, ready.id)
 
     return NowRecommendation(
         kind=NowKind.PLAY,

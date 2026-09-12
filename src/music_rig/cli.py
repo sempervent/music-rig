@@ -120,6 +120,15 @@ reconcile_app = typer.Typer(
     invoke_without_command=True,
     no_args_is_help=False,
 )
+verify_app = typer.Typer(
+    help=(
+        "Guided human verification for OPEN questions. "
+        "Guides observation; you supply facts (UNKNOWN is valid). "
+        "Answers go through question answer; CURRENT via reconcile — "
+        "never invent physical checks from manuals."
+    ),
+    no_args_is_help=True,
+)
 path_app = typer.Typer(help="Read-only CURRENT named paths.", no_args_is_help=True)
 gear_app = typer.Typer(help="Owned equipment inventory.", no_args_is_help=True)
 midi_app = typer.Typer(help="Read-only CURRENT MIDI state.", no_args_is_help=True)
@@ -185,6 +194,7 @@ app.add_typer(changes_app, name="changes")
 app.add_typer(question_app, name="question")
 question_app.add_typer(question_target_app, name="target")
 app.add_typer(reconcile_app, name="reconcile")
+app.add_typer(verify_app, name="verify")
 app.add_typer(path_app, name="path")
 app.add_typer(gear_app, name="gear")
 app.add_typer(midi_app, name="midi")
@@ -4294,6 +4304,501 @@ def reconcile_question_cmd(
         _fail(str(exc))
 
 
+def _verify_emit(payload: dict, *, as_json: bool, exit_code: int = 0) -> None:
+    if as_json:
+        typer.echo(json.dumps(payload, indent=2, default=str))
+    else:
+        if not payload.get("ok"):
+            err = payload.get("error") or {}
+            console.print(f"[red]{err.get('code', 'error')}:[/red] {err.get('message')}")
+    if exit_code:
+        raise typer.Exit(exit_code)
+
+
+def _print_verify_card(card: dict) -> None:
+    console.print(f"[bold]{card['question_id']}[/bold]  {card.get('area')}  "
+                  f"[{(card.get('verification') or {}).get('kind', '—')}]")
+    console.print(card.get("question") or "")
+    console.print("")
+    console.print(f"[bold]CURRENT[/bold]: {card.get('current')!r}")
+    prompt = card.get("prompt") or ""
+    if prompt:
+        console.print("")
+        console.print(f"[bold]How to check[/bold]: {prompt}")
+    accepted = card.get("accepted") or {}
+    console.print("")
+    console.print(
+        f"[bold]Accepted answers[/bold]: {accepted.get('answer_type')} "
+        f"{accepted.get('choices') or '(free text / UNKNOWN)'}"
+    )
+    if accepted.get("note"):
+        console.print(f"  {accepted['note']}")
+    recon = card.get("reconciliation") or {}
+    console.print("")
+    console.print(
+        f"[bold]Reconcile[/bold]: capability={recon.get('capability')} "
+        f"state={recon.get('state')} bucket={recon.get('after_answer_bucket')}"
+    )
+    from music_rig.presentation import blocker_message
+
+    for b in recon.get("blockers") or []:
+        console.print(f"  blocker: {blocker_message(b)}")
+    related = card.get("related_work") or []
+    if related:
+        console.print("")
+        console.print("[bold]Related work[/bold]")
+        for w in related:
+            if w.get("missing"):
+                console.print(f"  {w.get('id')} (missing)")
+            else:
+                mark = " ★next" if w.get("in_next_session") else ""
+                console.print(
+                    f"  {w.get('id')} {w.get('priority')} {w.get('status')}{mark} — "
+                    f"{w.get('task')}"
+                )
+
+
+@verify_app.command("queue")
+def verify_queue_cmd(
+    area: Optional[str] = typer.Option(None, "--area"),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """OPEN unanswered questions with verification metadata (prioritized)."""
+    from music_rig import verification_service
+    from music_rig.presentation import format_verify_queue_table
+
+    try:
+        items = verification_service.list_verify_queue(area=area)
+        payload = ok_payload(
+            "verify.queue",
+            {"items": [i.to_dict() for i in items], "count": len(items)},
+        )
+        if as_json:
+            _verify_emit(payload, as_json=True)
+            return
+        console.print(format_verify_queue_table(items, width=console.width))
+        console.print(f"[dim]{len(items)} guided OPEN question(s)[/dim]")
+    except StoreError as exc:
+        if as_json:
+            _verify_emit(
+                err_payload("store_error", str(exc)), as_json=True, exit_code=1
+            )
+            return
+        _fail(str(exc))
+
+
+@verify_app.command("next")
+def verify_next_cmd(
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Recommend the next guided verification and why."""
+    from music_rig import verification_service
+
+    try:
+        rec = verification_service.recommend_next()
+        if rec is None:
+            payload = ok_payload("verify.next", {"question_id": None, "message": "queue empty"})
+            if as_json:
+                _verify_emit(payload, as_json=True)
+                return
+            console.print("[dim]Verify queue empty.[/dim]")
+            return
+        payload = ok_payload("verify.next", rec)
+        if as_json:
+            _verify_emit(payload, as_json=True)
+            return
+        console.print(f"[bold]NEXT[/bold] {rec['question_id']}")
+        console.print(f"Why: {rec['why']}")
+        console.print(f"CURRENT hint: {rec.get('current_hint')!r}")
+        console.print(f"Start: {rec['start_command']}")
+    except StoreError as exc:
+        if as_json:
+            _verify_emit(
+                err_payload("store_error", str(exc)), as_json=True, exit_code=1
+            )
+            return
+        _fail(str(exc))
+
+
+@verify_app.command("show")
+def verify_show_cmd(
+    question_id: str,
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Verification card for one question."""
+    from music_rig import verification_service
+
+    try:
+        card = verification_service.build_card(question_id)
+        payload = ok_payload("verify.show", card)
+        if as_json:
+            _verify_emit(payload, as_json=True)
+            return
+        _print_verify_card(card)
+    except StoreError as exc:
+        if as_json:
+            _verify_emit(
+                err_payload("store_error", str(exc)), as_json=True, exit_code=1
+            )
+            return
+        _fail(str(exc))
+
+
+def _interactive_pick_answer(card: dict) -> str | None:
+    """Prompt for structured or free-text answer. None = cancel."""
+    accepted = card.get("accepted") or {}
+    choices = list(accepted.get("choices") or [])
+    at = accepted.get("answer_type")
+    console.print("")
+    console.print(
+        "Enter answer (or UNKNOWN). Empty / cancel aborts with no write."
+    )
+    if at in {"ENUM", "BOOL", "REF"} and choices:
+        for idx, choice in enumerate(choices, start=1):
+            console.print(f"  {idx}) {choice}")
+        console.print("  0) cancel")
+        raw = typer.prompt("Choice number or value", default="")
+        cleaned = raw.strip()
+        if not cleaned or cleaned == "0":
+            return None
+        if cleaned.isdigit():
+            n = int(cleaned)
+            if n == 0:
+                return None
+            if 1 <= n <= len(choices):
+                return choices[n - 1]
+        return cleaned
+    raw = typer.prompt("Answer", default="")
+    cleaned = raw.strip()
+    if not cleaned:
+        return None
+    return cleaned
+
+
+def _offer_reconcile_after_answer(question_id: str, *, answer_only: bool) -> None:
+    if answer_only:
+        console.print(
+            f"[dim]Answer-only: CURRENT unchanged. "
+            f"Next: uv run rig reconcile plan question {question_id}[/dim]"
+        )
+        return
+    from music_rig.presentation import blocker_message
+
+    try:
+        plan = reconcile_service.plan_question(question_id)
+    except StoreError as exc:
+        console.print(f"[yellow]Plan unavailable: {exc}[/yellow]")
+        return
+    console.print("")
+    console.print(f"[bold]Reconcile plan[/bold]  {plan.state.value}  "
+                  f"({plan.capability.value})")
+    if plan.current is not None:
+        console.print(f"CURRENT: {plan.current}")
+    if plan.desired is not None:
+        console.print(f"Desired: {plan.desired}")
+    for b in plan.blockers:
+        console.print(f"  blocker: {blocker_message(b)}")
+    for cmd in plan.suggested_commands[:4]:
+        console.print(f"  $ {cmd}")
+
+    if not typer.confirm("Reconcile now (plan actions)?", default=False):
+        console.print("[dim]Later: uv run rig reconcile plan question "
+                      f"{question_id}[/dim]")
+        return
+
+    state = plan.state.value
+    if state == "READY_TO_APPLY" and plan.capability.value == "APPLY_AND_VERIFY":
+        if typer.confirm("Apply CURRENT mutation?", default=False):
+            try:
+                result = reconcile_service.apply_question(question_id, yes=True)
+                console.print_json(data=result)
+            except (StoreError, NotImplementedError) as exc:
+                console.print(f"[red]apply failed: {exc}[/red]")
+                return
+            if typer.confirm("Verify?", default=True):
+                try:
+                    verified = reconcile_service.verify_question(question_id)
+                    console.print_json(data=verified)
+                except StoreError as exc:
+                    console.print(f"[red]verify failed: {exc}[/red]")
+                    return
+                if verified.get("verification") == "MATCH":
+                    if typer.confirm("Finalize?", default=False):
+                        try:
+                            fin = reconcile_service.finalize_question(
+                                question_id, yes=True
+                            )
+                            console.print_json(data=fin)
+                        except StoreError as exc:
+                            console.print(f"[red]finalize failed: {exc}[/red]")
+        return
+
+    if state in {"CURRENT_MATCHES", "READY_TO_FINALIZE"}:
+        if typer.confirm("Finalize (mark reconciled)?", default=False):
+            try:
+                fin = reconcile_service.finalize_question(question_id, yes=True)
+                console.print_json(data=fin)
+            except StoreError as exc:
+                console.print(f"[red]finalize failed: {exc}[/red]")
+        return
+
+    console.print(
+        "[yellow]Not auto-applicable — agent/manual steps required "
+        "(see blockers / suggested commands).[/yellow]"
+    )
+    if state == "NEEDS_AGENT_ACTION" and typer.confirm(
+        "Finalize with --no-current-change (explicit note)?", default=False
+    ):
+        note = typer.prompt("Reconciliation note", default="")
+        if not note.strip():
+            console.print("[dim]Skipped finalize — note required.[/dim]")
+            return
+        try:
+            fin = reconcile_service.finalize_question(
+                question_id,
+                yes=True,
+                no_current_change=True,
+                note=note.strip(),
+            )
+            console.print_json(data=fin)
+        except StoreError as exc:
+            console.print(f"[red]finalize failed: {exc}[/red]")
+
+
+@verify_app.command("run")
+def verify_run_cmd(
+    question_id: str,
+    answer_only: bool = typer.Option(
+        False, "--answer-only", help="Stop after recording answer (no CURRENT mutation)"
+    ),
+) -> None:
+    """Interactive guided verification at the physical rig."""
+    from music_rig import verification_service
+
+    try:
+        card = verification_service.build_card(question_id)
+    except StoreError as exc:
+        _fail(str(exc))
+    if card.get("status") != "OPEN":
+        _fail(f"{question_id} is {card.get('status')}; verify run expects OPEN")
+    _print_verify_card(card)
+    value = _interactive_pick_answer(card)
+    if value is None:
+        console.print("[dim]Cancelled — no write.[/dim]")
+        raise typer.Exit(0)
+    note_raw = typer.prompt("Observation note (optional)", default="")
+    note = note_raw.strip() or None
+    try:
+        result = verification_service.record_verified_answer(
+            question_id,
+            value,
+            note=note,
+            render=True,
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(
+        f"[green]Recorded[/green] {result.get('normalized_value')!r} "
+        f"(status RESOLVED; reconciled_at still null)"
+    )
+    _offer_reconcile_after_answer(question_id, answer_only=answer_only)
+
+
+@verify_app.command("answer")
+def verify_answer_cmd(
+    question_id: str,
+    value: str = typer.Option(..., "--value", help="Observed answer (UNKNOWN allowed)"),
+    note: Optional[str] = typer.Option(None, "--note", help="Observation note"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    yes: bool = typer.Option(False, "--yes"),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Noninteractive validate + normalize + record via question answer."""
+    from music_rig import verification_service
+
+    if not dry_run and not yes and not as_json:
+        if not typer.confirm(
+            f"Record answer for {question_id} as {value!r}?", default=False
+        ):
+            console.print("[dim]Aborted.[/dim]")
+            raise typer.Exit(0)
+    try:
+        result = verification_service.record_verified_answer(
+            question_id,
+            value,
+            note=note,
+            dry_run=dry_run,
+            yes=yes or as_json,
+            render=not dry_run,
+        )
+    except StoreError as exc:
+        if as_json:
+            _verify_emit(
+                err_payload("store_error", str(exc)), as_json=True, exit_code=1
+            )
+            return
+        _fail(str(exc))
+    out = {k: v for k, v in result.items() if k != "question"}
+    if result.get("question") is not None:
+        q = result["question"]
+        out["status"] = q.status.value
+        out["answer"] = q.answer
+        out["resolved_at"] = q.resolved_at.isoformat() if q.resolved_at else None
+        out["verification_note"] = q.verification_note
+    payload = ok_payload("verify.answer", out)
+    if as_json:
+        _verify_emit(payload, as_json=True)
+        return
+    console.print(result.get("message") or "Answer recorded.")
+    console.print(f"Normalized: {result.get('normalized_value')!r}")
+    if dry_run:
+        console.print("[dim]dry-run — no write[/dim]")
+    console.print(f"Next: {result.get('next_command')}")
+
+
+@verify_app.command("session")
+def verify_session_cmd(
+    area: Optional[str] = typer.Option(None, "--area"),
+    todo: Optional[str] = typer.Option(
+        None, "--todo", help="Prefer questions linked to this RIG id"
+    ),
+) -> None:
+    """One-at-a-time guided loop: Answer / Skip / Unknown / Quit."""
+    from music_rig import verification_service
+
+    try:
+        queue = verification_service.list_verify_queue(area=area)
+    except StoreError as exc:
+        _fail(str(exc))
+    if todo:
+        tid = todo.strip().upper()
+        linked = [i for i in queue if tid in i.related_todos]
+        rest = [i for i in queue if tid not in i.related_todos]
+        queue = linked + rest
+
+    answered = skipped = unknowned = 0
+    for item in queue:
+        console.print("")
+        console.print("─" * 60)
+        try:
+            card = verification_service.build_card(item.question_id)
+        except StoreError as exc:
+            console.print(f"[red]{exc}[/red]")
+            continue
+        _print_verify_card(card)
+        console.print("")
+        action = typer.prompt(
+            "Action: [A]nswer / [S]kip / [U]nknown / [Q]uit",
+            default="S",
+        ).strip().casefold()
+        if action in {"q", "quit"}:
+            break
+        if action in {"s", "skip", ""}:
+            skipped += 1
+            continue
+        if action in {"u", "unknown"}:
+            try:
+                verification_service.record_verified_answer(
+                    item.question_id, "UNKNOWN", render=True
+                )
+            except StoreError as exc:
+                console.print(f"[red]{exc}[/red]")
+                continue
+            unknowned += 1
+            answered += 1
+            if typer.confirm("Reconcile now?", default=False):
+                _offer_reconcile_after_answer(item.question_id, answer_only=False)
+            continue
+        if action in {"a", "answer"}:
+            value = _interactive_pick_answer(card)
+            if value is None:
+                skipped += 1
+                continue
+            note_raw = typer.prompt("Observation note (optional)", default="")
+            try:
+                verification_service.record_verified_answer(
+                    item.question_id,
+                    value,
+                    note=note_raw.strip() or None,
+                    render=True,
+                )
+            except StoreError as exc:
+                console.print(f"[red]{exc}[/red]")
+                continue
+            answered += 1
+            if value.strip().casefold() == "unknown":
+                unknowned += 1
+            if typer.confirm("Reconcile now?", default=False):
+                _offer_reconcile_after_answer(item.question_id, answer_only=False)
+            continue
+        console.print("[dim]Unrecognized — skipping.[/dim]")
+        skipped += 1
+
+    console.print("")
+    console.print(
+        f"[bold]Session summary[/bold]  answered={answered}  "
+        f"unknown={unknowned}  skipped={skipped}  remaining="
+        f"{max(0, len(queue) - answered - skipped)}"
+    )
+
+
+@verify_app.command("summary")
+def verify_summary_cmd(
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Grouped counts by area and after-answer capability."""
+    from music_rig import verification_service
+    from music_rig.presentation import format_verify_summary_table
+
+    try:
+        data = verification_service.summary()
+        payload = ok_payload("verify.summary", data)
+        if as_json:
+            _verify_emit(payload, as_json=True)
+            return
+        console.print(format_verify_summary_table(data, width=console.width))
+    except StoreError as exc:
+        if as_json:
+            _verify_emit(
+                err_payload("store_error", str(exc)), as_json=True, exit_code=1
+            )
+            return
+        _fail(str(exc))
+
+
+@verify_app.command("area")
+def verify_area_cmd(
+    area: str,
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Shortcut: verify queue filtered by area."""
+    from music_rig import verification_service
+    from music_rig.presentation import format_verify_queue_table
+
+    try:
+        items = verification_service.list_verify_queue(area=area)
+        payload = ok_payload(
+            "verify.area",
+            {
+                "area": area,
+                "items": [i.to_dict() for i in items],
+                "count": len(items),
+            },
+        )
+        if as_json:
+            _verify_emit(payload, as_json=True)
+            return
+        console.print(format_verify_queue_table(items, width=console.width))
+        console.print(f"[dim]{len(items)} item(s) in area matching {area!r}[/dim]")
+    except StoreError as exc:
+        if as_json:
+            _verify_emit(
+                err_payload("store_error", str(exc)), as_json=True, exit_code=1
+            )
+            return
+        _fail(str(exc))
+
+
 @question_app.command("list")
 def question_list_cmd(
     all_items: bool = typer.Option(False, "--all", help="All statuses"),
@@ -4712,7 +5217,7 @@ def tui_cmd(
     if domain is not None and normalize_route(domain) is None:
         _fail(
             f"Unknown TUI domain {domain!r}. "
-            "Try: question, patchbay, todo, wish, inbox, changes, gear, channels, "
+            "Try: question, verify, patchbay, todo, wish, inbox, changes, gear, channels, "
             "routing, midi, controls, ableton, performance, snapshot, backup, session, "
             "doctor, status, reconcile, automation"
         )

@@ -371,6 +371,36 @@ class QuestionTarget(BaseModel):
     context: str | None = None
 
 
+class QuestionVerification(BaseModel):
+    """How a human should inspect and answer an OPEN question (guide only).
+
+    Never invent answers from this metadata. Choices/schemas constrain input;
+    the human supplies the observed fact (UNKNOWN is valid).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: str = Field(min_length=1)
+    prompt: str = ""
+    answer_type: str = Field(min_length=1)  # ENUM | BOOL | REF | TEXT
+    choices: list[str] = Field(default_factory=list)
+    ref_domain: str | None = None
+
+    @model_validator(mode="after")
+    def _answer_type_rules(self) -> QuestionVerification:
+        at = self.answer_type.strip().upper()
+        if at not in {"ENUM", "BOOL", "REF", "TEXT"}:
+            raise ValueError(
+                f"answer_type must be ENUM|BOOL|REF|TEXT, got {self.answer_type!r}"
+            )
+        object.__setattr__(self, "answer_type", at)
+        if at in {"ENUM", "BOOL"} and not self.choices:
+            raise ValueError(f"{at} verification requires non-empty choices")
+        if at == "REF" and not (self.ref_domain and self.ref_domain.strip()):
+            raise ValueError("REF verification requires ref_domain")
+        return self
+
+
 class OwnershipStatus(str, Enum):
     OWNED = "OWNED"
     RETIRED = "RETIRED"
@@ -479,6 +509,8 @@ class OpenQuestion(BaseModel):
     reconciled_at: datetime | None = None
     reconciliation_note: str = ""
     target: QuestionTarget | None = None
+    verification: QuestionVerification | None = None
+    verification_note: str = ""
 
     @field_validator("related_todos", "related_changes")
     @classmethod
