@@ -9,11 +9,11 @@ items:
   created_at: '2026-09-12T17:38:35.738062-04:00'
   related_ids: []
   consequences: Resolves Q-008 as HUMAN FINAL answer (reconciled_at still null until reconcile).
-  status: PENDING
+  status: ACCEPTED
   proposed_value_original: All represented PB-B pairs are normal
-  accepted_value: null
-  accepted_by: null
-  accepted_at: null
+  accepted_value: All represented PB-B pairs are normal
+  accepted_by: HUMAN
+  accepted_at: '2026-09-12T17:50:46.296396-04:00'
   rejected_at: null
   superseded_reason: ''
   verification_outcome: null
@@ -28,11 +28,11 @@ items:
   created_at: '2026-09-12T17:38:35.982169-04:00'
   related_ids: []
   consequences: Resolves Q-017 answer as HUMAN. Observation may still be required separately.
-  status: PENDING
+  status: ACCEPTED
   proposed_value_original: UNKNOWN — templates have no names
-  accepted_value: null
-  accepted_by: null
-  accepted_at: null
+  accepted_value: UNKNOWN — templates have no names
+  accepted_by: HUMAN
+  accepted_at: '2026-09-12T17:51:05.303186-04:00'
   rejected_at: null
   superseded_reason: ''
   verification_outcome: null
@@ -47,11 +47,11 @@ items:
   created_at: '2026-09-12T17:38:36.230866-04:00'
   related_ids: []
   consequences: Writes HUMAN verification_result outcome=UNKNOWN on Q-017.
-  status: PENDING
+  status: ACCEPTED
   proposed_value_original: no named templates loaded
-  accepted_value: null
-  accepted_by: null
-  accepted_at: null
+  accepted_value: no named templates loaded
+  accepted_by: HUMAN
+  accepted_at: '2026-09-12T17:51:21.761019-04:00'
   rejected_at: null
   superseded_reason: ''
   verification_outcome: unknown
@@ -67,11 +67,11 @@ items:
   created_at: '2026-09-12T17:38:36.484446-04:00'
   related_ids: []
   consequences: Marks RIG-031 DONE via todo lifecycle.
-  status: PENDING
+  status: ACCEPTED
   proposed_value_original: midi-clock.md states verified CURRENT behavior, not only intent
-  accepted_value: null
-  accepted_by: null
-  accepted_at: null
+  accepted_value: midi-clock.md states verified CURRENT behavior, not only intent
+  accepted_by: HUMAN
+  accepted_at: '2026-09-12T17:51:27.833316-04:00'
   rejected_at: null
   superseded_reason: ''
   verification_outcome: null
@@ -89,13 +89,60 @@ items:
   related_ids: []
   consequences: Records HUMAN OUT map text on Thru5 notes; does NOT invent typed OUT→device
     links.
-  status: PENDING
+  status: ACCEPTED
   proposed_value_original: OUT1=?; OUT2=?; OUT3=?; OUT4=?; OUT5=?  (choose among SL-2, SR-18,
     miniKORG, KAOSS, UNUSED)
+  accepted_value: OUT1=?; OUT2=?; OUT3=?; OUT4=?; OUT5=?  (choose among SL-2, SR-18, miniKORG,
+    KAOSS, UNUSED)
+  accepted_by: HUMAN
+  accepted_at: '2026-09-12T17:51:42.336350-04:00'
+  rejected_at: null
+  superseded_reason: ''
+  verification_outcome: null
+  verification_note: null
+- id: HAR-006
+  action_type: HUMAN_CLARIFICATION
+  artifact_id: THRU5-OUT-MAP
+  prompt: Edit this value to the exact physical Thru5 OUT→device map. Placeholders with ?
+    will be rejected.
+  proposed_value: OUT1=<SL-2|SR-18|miniKORG|KAOSS|UNUSED>; OUT2=…; OUT3=…; OUT4=…; OUT5=…
+  explanation: HAR-005 was accepted with OUT1=? placeholders — that is not a physical map.
+    Trace each Thru5 OUT cable and fill OUT1–OUT5.
+  source_actor: BOT
+  created_at: '2026-09-12T17:55:18.155892-04:00'
+  related_ids: []
+  consequences: Records HUMAN OUT map; BOT will then create typed MIDI links. Accepting ?
+    placeholders is blocked.
+  status: SUPERSEDED
+  proposed_value_original: OUT1=<SL-2|SR-18|miniKORG|KAOSS|UNUSED>; OUT2=…; OUT3=…; OUT4=…;
+    OUT5=…
   accepted_value: null
   accepted_by: null
   accepted_at: null
   rejected_at: null
-  superseded_reason: ''
+  superseded_reason: replaced by newer proposal
+  verification_outcome: null
+  verification_note: null
+- id: HAR-007
+  action_type: HUMAN_CLARIFICATION
+  artifact_id: THRU5-OUT-MAP
+  prompt: 'EDIT before accept: replace each ? with SL-2, SR-18, miniKORG, KAOSS, or UNUSED
+    (exactly one unused). Trace cables on Thru5.'
+  proposed_value: OUT1=?; OUT2=?; OUT3=?; OUT4=?; OUT5=?
+  explanation: HAR-005 accepted placeholders by mistake. Concrete OUT numbers are required
+    before typed MIDI links.
+  source_actor: BOT
+  created_at: '2026-09-12T17:55:25.769806-04:00'
+  related_ids: []
+  consequences: Accept is rejected if any ? remains. On valid accept, BOT creates typed Thru5
+    OUT→device links.
+  status: SUPERSEDED
+  proposed_value_original: OUT1=?; OUT2=?; OUT3=?; OUT4=?; OUT5=?
+  accepted_value: null
+  accepted_by: null
+  accepted_at: null
+  rejected_at: null
+  superseded_reason: Human explicitly chose device-level Thru5 fanout; exact THRU jack assignment
+    is intentionally not tracked.
   verification_outcome: null
   verification_note: null

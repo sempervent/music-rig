@@ -20,12 +20,10 @@ Resolving a question records an answer. It does **not** automatically rewrite CU
 | ID | Area | Question | Related TODOs | Related Changes |
 |---|---|---|---|---|
 | Q-005 | Routing | Should the PYLE-PRO dual DI live near the Privia, near the JOYO output, or near clean instrument taps? | RIG-024 | — |
-| Q-008 | Patchbay | What normalization mode (normal / half-normal / thru) is each populated PB-B pair set to? | RIG-002 | — |
 | Q-009 | Patchbay | What are the rear-panel assignments for PB-A, PB-C, and PB-D? | RIG-005, RIG-040 | — |
 | Q-010 | Patchbay | What (if anything) should feed PB-B upper 9–12 into lower 33–36? | RIG-006 | — |
 | Q-012 | Pedals / power | Where are Flamma Mod and PH-2 right now (disconnected, stored, elsewhere)? | RIG-011 | — |
 | Q-013 | Pedals / power | What is each CURRENT pedal’s voltage, current draw, and power-supply assignment? | RIG-047 | — |
-| Q-017 | MIDI | Which ReMOTE ZeRO SL templates are actually loaded on the device? | RIG-036 | — |
 | Q-019 | Performance / video | What OBS camera angles are already covered by owned webcams? | RIG-042 | — |
 
 ## Deferred
@@ -44,10 +42,12 @@ Resolving a question records an answer. It does **not** automatically rewrite CU
 | Q-004 | Routing | Does physical KAOSS monitor/capture match documented Monitor Out → KAOSS → TASCAM 9/10? | RIG-010 | — |
 | Q-006 | Routing | Should LS-2 also remain a bass split/blend tool outside its CURRENT SPACE role? | RIG-025 | — |
 | Q-007 | Patchbay | Which physical unit is PB-A / PB-B / PB-C / PB-D (ART P48 vs Behringer PX3000)? | RIG-004 | — |
+| Q-008 | Patchbay | What normalization mode (normal / half-normal / thru) is each populated PB-B pair set to? | RIG-002 | — |
 | Q-011 | Pedals / power | Do the physical DIRTY and SPACE boards match docs/pedal-chains.md? | RIG-001 | — |
 | Q-014 | MIDI | Is Ableton definitely the master clock in practice, or do KAOSS/SL-2 sometimes lead? | RIG-031 | — |
 | Q-015 | MIDI | What is the verified physical MIDI topology using U6MIDI Pro + Thru5 WC? | RIG-037 | — |
 | Q-016 | MIDI | What exact FCB1010 switch map is assigned in banks 00/01/02? | RIG-035 | — |
+| Q-017 | MIDI | Which ReMOTE ZeRO SL templates are actually loaded on the device? | RIG-036 | — |
 | Q-018 | Performance / video | What are the exact active tracks in the current PFL jam Ableton set? | RIG-034, RIG-038 | — |
 | Q-020 | Performance / video | What is the default one-player loop-building order (RC-1 vs KAOSS vs future RC-600)? | RIG-038 | — |
 
@@ -125,11 +125,17 @@ Which physical unit is PB-A / PB-B / PB-C / PB-D (ART P48 vs Behringer PX3000)?
 
 **Reconciliation note:** [agent-interpreted / manually reconciled] Updated CURRENT hardware_model from final Q-007 answer: PB-A/B=ART P48, PB-C/D=Behringer PX3000 (model-level; unique unit IDs still unknown)
 
-### Q-008 — OPEN
+### Q-008 — RESOLVED
 
 What normalization mode (normal / half-normal / thru) is each populated PB-B pair set to?
 
-**Answer:** All represented PB-B pairs are normal (HUMAN Stage 25 live validation).
+**Answer:** All represented PB-B pairs are normal
+
+**Resolved at:** 2026-09-12T17:50:45.972922-04:00
+
+**Reconciled at:** 2026-09-12T17:54:57.803257-04:00
+
+**Reconciliation note:** [agent-interpreted / manually reconciled] HUMAN bay-wide attestation: all represented PB-B pairs normal; CURRENT already normal for all listed pairs
 
 ### Q-009 — OPEN
 
@@ -185,11 +191,17 @@ What exact FCB1010 switch map is assigned in banks 00/01/02?
 
 **Reconciliation note:** agent-interpreted HUMAN bank-00 FCB map into controllers.yaml notes. Banks 01/02 unobserved; RIG-035 left READY; no verify-record invented.
 
-### Q-017 — OPEN
+### Q-017 — RESOLVED
 
 Which ReMOTE ZeRO SL templates are actually loaded on the device?
 
-**Answer:** UNKNOWN — device templates have no names visible (HUMAN Stage 25 live validation).
+**Answer:** UNKNOWN — templates have no names
+
+**Resolved at:** 2026-09-12T17:51:04.980790-04:00
+
+**Reconciled at:** 2026-09-12T17:55:09.666013-04:00
+
+**Reconciliation note:** HUMAN answer+observation UNKNOWN — no named templates loaded; do not invent controller CURRENT mappings
 
 ### Q-018 — RESOLVED
 

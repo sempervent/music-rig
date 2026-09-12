@@ -2,8 +2,8 @@
 # Evidence statuses: VERIFIED | INTENDED | UNKNOWN
 # Do not treat INTENDED design as VERIFIED CURRENT fact.
 # Q-015 HUMAN: FCB1010 → U6MIDI Pro IN 1; U6MIDI Pro OUT 1 → Thru5 WC IN 1.
-# Stage 25 HUMAN: Thru5 OUT destinations are SL-2, SR-18, miniKORG, KAOSS;
-# OUT number → device mapping still UNKNOWN.
+# Stage 27 HUMAN: Thru5 device-level THRU fanout to SL-2, SR-18, miniKORG, KAOSS.
+# Individual physical THRU socket assignment intentionally not tracked.
 # Controller switch/knob maps are out of scope for this document (see controllers.yaml).
 
 endpoints:
@@ -16,31 +16,32 @@ endpoints:
 devices:
 - gear_ref: cme-u6midi-pro
   role: usb-midi-router
-  notes: >-
-    3 in / 3 out; route / merge / filter / remap — OWNED.
-    Q-015: receives FCB1010 on MIDI IN 1; sends to Thru5 WC on MIDI OUT 1.
+  notes: '3 in / 3 out; route / merge / filter / remap — OWNED. Q-015: receives FCB1010 on
+    MIDI IN 1; sends to Thru5 WC on MIDI OUT 1.'
 - gear_ref: cme-midi-thru5-wc
   role: midi-thru
-  notes: >-
-    Hardware thru distribution — OWNED; not a programmable remapper.
-    Q-015: fed from U6MIDI Pro OUT 1 into Thru5 WC IN 1.
-    Stage 25 HUMAN: OUT cables go to SL-2, SR-18, miniKORG, and KAOSS Replay;
-    which Thru5 OUT number maps to which device is still UNKNOWN.
+  notes: 'Hardware thru distribution — OWNED; not a programmable remapper. Q-015: fed from
+    U6MIDI Pro OUT 1 into Thru5 WC IN 1. HUMAN (Stage 27): device-level THRU fanout to SL-2,
+    SR-18, miniKORG, KAOSS. Individual physical THRU socket assignment intentionally not tracked.'
 - gear_ref: tascam-us-16x08
   role: audio-interface-midi
   notes: May participate in MIDI paths; exact CURRENT use UNKNOWN
 - gear_ref: korg-minikorg
   role: synth
-  notes: Stage 25 HUMAN — receives a Thru5 WC OUT (OUT number UNKNOWN)
+  notes: 'HUMAN — receives Thru5 WC THRU fanout (device-level; exact THRU socket not tracked).
+    Destination role: miniKORG.'
 - gear_ref: kaoss-replay
   role: sampler-effects
-  notes: Stage 25 HUMAN — receives a Thru5 WC OUT (OUT number UNKNOWN)
+  notes: 'HUMAN — receives Thru5 WC THRU fanout (device-level; exact THRU socket not tracked).
+    Destination role: KAOSS Replay.'
 - gear_ref: boss-sl-2
   role: pedal
-  notes: Stage 25 HUMAN — receives a Thru5 WC OUT (OUT number UNKNOWN)
+  notes: 'HUMAN — receives Thru5 WC THRU fanout (device-level; exact THRU socket not tracked).
+    Destination role: SL-2.'
 - gear_ref: alesis-sr-18
   role: drum-machine
-  notes: Stage 25 HUMAN — receives a Thru5 WC OUT (OUT number UNKNOWN)
+  notes: 'HUMAN — receives Thru5 WC THRU fanout (device-level; exact THRU socket not tracked).
+    Destination role: SR-18.'
 - gear_ref: casio-privia
   role: instrument
 - gear_ref: korg-padkontrol
@@ -71,6 +72,38 @@ connections:
   transport: DIN
   status: VERIFIED
   notes: ''
+- id: midi-link-003
+  source: cme-midi-thru5-wc
+  source_port: THRU
+  destination: boss-sl-2
+  destination_port: UNSPECIFIED
+  transport: DIN
+  status: VERIFIED
+  notes: Device-level fanout (HUMAN). Exact physical THRU jack intentionally not tracked.
+- id: midi-link-004
+  source: cme-midi-thru5-wc
+  source_port: THRU
+  destination: alesis-sr-18
+  destination_port: UNSPECIFIED
+  transport: DIN
+  status: VERIFIED
+  notes: Device-level fanout (HUMAN). Exact physical THRU jack intentionally not tracked.
+- id: midi-link-005
+  source: cme-midi-thru5-wc
+  source_port: THRU
+  destination: korg-minikorg
+  destination_port: UNSPECIFIED
+  transport: DIN
+  status: VERIFIED
+  notes: Device-level fanout (HUMAN). Exact physical THRU jack intentionally not tracked.
+- id: midi-link-006
+  source: cme-midi-thru5-wc
+  source_port: THRU
+  destination: kaoss-replay
+  destination_port: UNSPECIFIED
+  transport: DIN
+  status: VERIFIED
+  notes: Device-level fanout (HUMAN). Exact physical THRU jack intentionally not tracked.
 channels:
 - gear_ref: casio-privia
   channel: 1
@@ -112,7 +145,8 @@ clock:
 ableton_ports: []
 routes: []
 unknowns:
-- Thru5 WC fan-out destinations reported (SL-2, SR-18, miniKORG, KAOSS) but OUT port numbers UNKNOWN — RIG-037
+- Thru5 individual physical THRU socket → device assignment intentionally not tracked (device-level
+  fanout is CURRENT)
 - Remaining U6MIDI ports beyond IN 1 / OUT 1 — RIG-037
 - Ableton Preferences Track / Sync / Remote per port — RIG-037
 - Exact U6MIDI Pro programmed routes/filters — RIG-037

@@ -1,7 +1,15 @@
 flowchart LR
   %% Generated from data/midi.yaml; do not edit directly.
+  midi_alesis_sr_18["alesis-sr-18"]
   midi_behringer_fcb1010["behringer-fcb1010"]
+  midi_boss_sl_2["boss-sl-2"]
   midi_cme_midi_thru5_wc["cme-midi-thru5-wc"]
   midi_cme_u6midi_pro["cme-u6midi-pro"]
+  midi_kaoss_replay["kaoss-replay"]
+  midi_korg_minikorg["korg-minikorg"]
   midi_behringer_fcb1010 -->|"DIN: MIDI OUT → MIDI IN 1 [VERIFIED]"| midi_cme_u6midi_pro
   midi_cme_u6midi_pro -->|"DIN: MIDI OUT 1 → MIDI IN 1 [VERIFIED]"| midi_cme_midi_thru5_wc
+  midi_cme_midi_thru5_wc -->|"DIN: THRU → UNSPECIFIED [VERIFIED]"| midi_boss_sl_2
+  midi_cme_midi_thru5_wc -->|"DIN: THRU → UNSPECIFIED [VERIFIED]"| midi_alesis_sr_18
+  midi_cme_midi_thru5_wc -->|"DIN: THRU → UNSPECIFIED [VERIFIED]"| midi_korg_minikorg
+  midi_cme_midi_thru5_wc -->|"DIN: THRU → UNSPECIFIED [VERIFIED]"| midi_kaoss_replay
