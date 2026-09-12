@@ -11,8 +11,10 @@ from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, DataTable, Input, Label, Static
 
+from music_rig.tui.screen_results import SingleShotMixin
 
-class ReferencePickerModal(ModalScreen[list[str] | None]):
+
+class ReferencePickerModal(SingleShotMixin, ModalScreen[list[str] | None]):
     """Searchable single or multi reference picker.
 
     Returns the selected id list, or None on cancel.
@@ -54,8 +56,8 @@ class ReferencePickerModal(ModalScreen[list[str] | None]):
             yield DataTable(id="picker-table", cursor_type="row")
             yield Static("", id="picker-selected")
             with Horizontal(id="modal-buttons"):
-                yield Button("OK", variant="primary", id="confirm")
-                yield Button("Cancel", id="cancel")
+                yield Button("OK", variant="primary", id="confirm", action="screen.confirm")
+                yield Button("Cancel", id="cancel", action="screen.cancel")
 
     def on_mount(self) -> None:
         table = self.query_one("#picker-table", DataTable)
@@ -97,7 +99,7 @@ class ReferencePickerModal(ModalScreen[list[str] | None]):
             return
         if not self._multi:
             self._selected = {rid}
-            self.dismiss(list(self._selected))
+            self.complete(list(self._selected))
             return
         if rid in self._selected:
             self._selected.discard(rid)
@@ -114,21 +116,16 @@ class ReferencePickerModal(ModalScreen[list[str] | None]):
         else:
             rid = self._cursor_id()
             if rid:
-                self.dismiss([rid])
+                self.complete([rid])
 
     def action_cancel(self) -> None:
-        self.dismiss(None)
+        self.complete(None)
 
-    @on(Button.Pressed, "#confirm")
-    def _ok(self) -> None:
-        self.dismiss(sorted(self._selected) if self._multi else list(self._selected))
-
-    @on(Button.Pressed, "#cancel")
-    def _cancel(self) -> None:
-        self.dismiss(None)
+    def action_confirm(self) -> None:
+        self.complete(sorted(self._selected) if self._multi else list(self._selected))
 
 
-class OrderedListEditorModal(ModalScreen[list[str] | None]):
+class OrderedListEditorModal(SingleShotMixin, ModalScreen[list[str] | None]):
     """Simple ordered list editor: add / remove / move."""
 
     BINDINGS = [
@@ -163,8 +160,8 @@ class OrderedListEditorModal(ModalScreen[list[str] | None]):
             )
             yield DataTable(id="olist-table", cursor_type="row")
             with Horizontal(id="modal-buttons"):
-                yield Button("OK", variant="primary", id="confirm")
-                yield Button("Cancel", id="cancel")
+                yield Button("OK", variant="primary", id="confirm", action="screen.confirm")
+                yield Button("Cancel", id="cancel", action="screen.cancel")
 
     def on_mount(self) -> None:
         table = self.query_one("#olist-table", DataTable)
@@ -247,18 +244,10 @@ class OrderedListEditorModal(ModalScreen[list[str] | None]):
         table.move_cursor(row=row + 1)
 
     def action_confirm(self) -> None:
-        self.dismiss(list(self._items))
+        self.complete(list(self._items))
 
     def action_cancel(self) -> None:
-        self.dismiss(None)
-
-    @on(Button.Pressed, "#confirm")
-    def _ok(self) -> None:
-        self.dismiss(list(self._items))
-
-    @on(Button.Pressed, "#cancel")
-    def _cancel(self) -> None:
-        self.dismiss(None)
+        self.complete(None)
 
 
 def load_ref_choices(domain: str) -> list[tuple[str, str]]:

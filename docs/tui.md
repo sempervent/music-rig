@@ -17,13 +17,46 @@ Stage 13–18 Textual UI for browsing and editing music-rig planning/CURRENT sta
 
 ## Launch
 
+Prefer the project environment (avoids stale global `rig` installs):
+
 ```bash
 uv run rig tui
+# or, with the project venv activated:
+#   source .venv/bin/activate && rig tui
+
 uv run rig tui question Q-008
 uv run rig tui patchbay PB-B
 uv run rig tui todo
-uv run rig tui --debug          # or RIG_DEBUG=1
+uv run rig tui --debug          # or RIG_DEBUG=1 — logs python/textual paths + screen push/pop
 ```
+
+Screens use ``RigHeader`` (not Textual's stock ``Header``) so rapid Questions ↔
+Reconcile navigation cannot hit Textual 8.2.8's ``HeaderTitle`` lifecycle race.
+
+## Modal / screen result ownership
+
+Hard rules for result-bearing ``Screen`` / ``ModalScreen``:
+
+- **Exactly one completion** per push. Prefer one semantic handler (`complete()` /
+  `SingleShotMixin`) shared by keyboard bindings and button `action=` paths.
+- Do **not** mix `Binding("enter") → dismiss` with a focused `Button` that also
+  posts `Button.Pressed → dismiss` for the same physical Enter unless you have
+  proven one action cannot trigger both (prefer `action=` on buttons).
+- **Child screens return intent; requesters navigate.** Example: `AnswerScreen`
+  dismisses with `AnswerResult(next_action=RECONCILE|NONE)`; `QuestionsScreen`
+  reloads, then optionally `open_domain("reconcile", …)`.
+- **Never** `push` a sibling screen from a child and then `dismiss` the child
+  (Textual `dismiss` pops the *top* screen — the sibling — leaving the child
+  with an already-finished result Future → `InvalidStateError` on a later Esc).
+
+| Screen | Completes result | Opens sibling itself? | Notes |
+|---|---|---|---|
+| AnswerScreen | yes (`AnswerResult`) | no | Parent opens Reconcile |
+| ConfirmModal | yes | no | Enter/y/n + button `action=` |
+| SelectModeModal | yes | no | Enter / 1–4 / button `action=` |
+| InputModal | yes | no | Submit / OK / Esc |
+| QuestionsScreen | no (list) | yes (Answer, etc.) | Owns post-answer nav |
+| ReconcileScreen | no (list) | yes (modals) | — |
 
 ## Vim-like modes
 
@@ -59,22 +92,27 @@ Footer / banner shows `-- NORMAL --` / `-- INSERT --` / `-- COMMAND --`.
 
 | Key | Action |
 |---|---|
-| **a** | **Answer** (question text stays visible; may keep OPEN) |
+| **a** | **Answer** → Save Draft / Answer & Resolve |
 | **A** | **Add** question |
-| **r** / **R** | **Resolve** (answer required; status→RESOLVED) |
+| **r** / **R** | **Resolve** draft → FINAL (existing answer or Answer screen) |
 | **V** | Verify (observation / `verification_result` flow) |
 | **C** | Reconcile handoff |
 | d | Defer |
 | o | Reopen |
 | t | Open typed target |
+| f | Cycle ACTIVE / OPEN / RESOLVED / UNRECONCILED / DEFERRED / ALL |
 | Ctrl+r | Refresh |
 
-Answer-only save uses `update_question_fields` and may leave status OPEN.
-Resolve requires a non-empty answer and confirmation. Neither invents
-`verification_result`.
+**Save Draft** keeps status OPEN (`answer_state=DRAFT`). **Answer & Resolve**
+sets FINAL (`RESOLVED` + `resolved_at`); `reconciled_at` stays null. Neither
+invents `verification_result`.
 
-After resolve under filter=OPEN the row disappears; notification explains how to
-view RESOLVED/ALL.
+List labels: `OPEN/UNANSWERED`, `OPEN/DRAFT`, `RESOLVED/UNRECONCILED`,
+`RESOLVED/RECONCILED`. Default filter **ACTIVE** = OPEN + RESOLVED-unreconciled
+(excludes RECONCILED/DEFERRED).
+
+After Answer & Resolve under filter=OPEN the row leaves the OPEN view; notification
+explains reconciliation remains pending.
 
 ### Patchbay editor
 

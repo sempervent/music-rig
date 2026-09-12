@@ -162,13 +162,13 @@ questions:
 - id: Q-007
   question: Which physical unit is PB-A / PB-B / PB-C / PB-D (ART P48 vs Behringer PX3000)?
   area: Patchbay
-  status: OPEN
+  status: RESOLVED
   related_todos:
   - RIG-004
   related_changes: []
-  answer: ''
+  answer: PB-A & PB-B are ART P48, PB-C & PB-D are Behringer PX3000
   notes: ''
-  resolved_at: null
+  resolved_at: '2026-09-12T09:34:18.085029-04:00'
   reconciled_at: null
   reconciliation_note: ''
   target:

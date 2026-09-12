@@ -304,6 +304,20 @@ def run_checks(
                     errors.append(
                         f"{q.id} lists {cid} but {cid} does not list {q.id}"
                     )
+            if q.status == QuestionStatus.RESOLVED:
+                if not q.answer.strip():
+                    errors.append(f"{q.id} RESOLVED requires a non-empty answer")
+                if q.resolved_at is None:
+                    errors.append(f"{q.id} RESOLVED requires resolved_at")
+
+    if wishlist is not None:
+        for item in wishlist.items:
+            if item.status.value == "ACQUIRED" and not (
+                item.inventory_ref and item.inventory_ref.strip()
+            ):
+                errors.append(
+                    f"Wishlist '{item.item}' ACQUIRED requires inventory_ref"
+                )
 
     if changes is not None and questions is not None:
         qmap = questions.question_map()

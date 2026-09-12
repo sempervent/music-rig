@@ -6,9 +6,10 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical
 from textual.screen import Screen
-from textual.widgets import DataTable, Footer, Header, Static
+from textual.widgets import DataTable, Footer, Static
 
 from music_rig.tui.navigation import home_rows
+from music_rig.tui.header import RigHeader
 
 
 class HomeScreen(Screen):
@@ -23,7 +24,7 @@ class HomeScreen(Screen):
     ]
 
     def compose(self) -> ComposeResult:
-        yield Header(show_clock=False)
+        yield RigHeader(show_clock=False)
         with Vertical(id="home-body"):
             yield Static("music-rig — Interactive TUI", id="home-title")
             yield Static(

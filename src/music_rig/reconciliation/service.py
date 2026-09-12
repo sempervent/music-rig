@@ -136,9 +136,28 @@ def question_state(
 ) -> ReconciliationState:
     if question.reconciled_at is not None:
         return ReconciliationState.RECONCILED
+    if question.status == QuestionStatus.OPEN:
+        if question.answer.strip():
+            return ReconciliationState.DRAFT_ANSWER
+        return ReconciliationState.NEEDS_ANSWER
+    if question.status == QuestionStatus.DEFERRED:
+        return ReconciliationState.BLOCKED
     adapter = _adapter_for(question)
     plan = adapter.plan(question, paths=paths or {})
     return plan.state
+
+
+def early_open_lifecycle_state(
+    question: OpenQuestion,
+) -> ReconciliationState | None:
+    """Shared OPEN lifecycle before adapter plan logic. None → continue."""
+    if question.reconciled_at is not None:
+        return ReconciliationState.RECONCILED
+    if question.status == QuestionStatus.OPEN:
+        if question.answer.strip():
+            return ReconciliationState.DRAFT_ANSWER
+        return ReconciliationState.NEEDS_ANSWER
+    return None
 
 
 def build_queue(
@@ -320,6 +339,11 @@ def show_question(
     return {
         "artifact_type": "question",
         "question": q.model_dump(mode="json"),
+        "answer_state": question_service.derive_answer_state(q).value,
+        "question_status": q.status.value,
+        "resolved_at": q.resolved_at.isoformat() if q.resolved_at else None,
+        "reconciled_at": q.reconciled_at.isoformat() if q.reconciled_at else None,
+        "lifecycle_label": question_service.lifecycle_label(q),
         "state": plan.state.value,
         "capability": adapter.capability.value,
         "current": current,
@@ -563,6 +587,7 @@ def finalize_question(
     apply_linked_changes: bool = False,
     confirm_dod: bool = False,
     no_current_change: bool = False,
+    confirm_current_reconciled: bool = False,
     note: str = "",
     snapshot_before: bool = False,
     clock: Clock = default_clock,
@@ -600,7 +625,16 @@ def finalize_question(
     adapter = _adapter_for(q)
     verify = adapter.verify(q, paths=paths)
     note_clean = note.strip()
-    if no_current_change:
+    manual_ack = False
+    if confirm_current_reconciled:
+        if not note_clean:
+            raise StoreError(
+                "--confirm-current-reconciled requires a non-empty --note"
+            )
+        manual_ack = True
+        # Agent-interpreted / manual acknowledgment: CURRENT already updated
+        # via supported CLI. Must NOT invent verification_result / evidence VERIFIED.
+    elif no_current_change:
         if not note_clean:
             raise StoreError("--no-current-change requires a non-empty --note")
     elif verify.status != VerificationStatus.MATCH:
@@ -609,7 +643,8 @@ def finalize_question(
         plan = adapter.plan(q, paths=paths)
         if plan.state != ReconciliationState.CURRENT_MATCHES:
             raise StoreError(
-                f"{q.id} finalize requires verify MATCH or "
+                f"{q.id} finalize requires verify MATCH, "
+                f"--confirm-current-reconciled with --note, or "
                 f"--no-current-change with --note (got {verify.status.value})"
             )
 
@@ -625,11 +660,20 @@ def finalize_question(
     cdoc = load_changes(changes_path)
     tdoc = load_todo(todo_path)
 
+    recon_note = note_clean
+    if manual_ack and "agent-interpreted" not in recon_note.casefold():
+        recon_note = (
+            f"[agent-interpreted / manually reconciled] {recon_note}"
+        ).strip()
+
+    # Preserve verification_result unchanged (never invent)
+    prior_vr = q.verification_result
+
     updated_q = OpenQuestion(
         **{
             **q.model_dump(),
             "reconciled_at": clock(),
-            "reconciliation_note": note_clean,
+            "reconciliation_note": recon_note,
         }
     )
     new_qdoc = OpenQuestionsDocument(
@@ -675,9 +719,13 @@ def finalize_question(
         "reconciled_at": updated_q.reconciled_at.isoformat()
         if updated_q.reconciled_at
         else None,
-        "reconciliation_note": note_clean,
+        "reconciliation_note": recon_note,
         "no_current_change": no_current_change,
+        "confirm_current_reconciled": confirm_current_reconciled,
+        "manual_acknowledgment": manual_ack,
+        "answer": q.answer,
         "verification": verify.status.value,
+        "verification_result_unchanged": True,
         "completed_todos": completed_todos,
         "applied_changes": applied_changes,
         "snapshot": snap_info,
@@ -699,6 +747,12 @@ def finalize_question(
         changes_path=changes_path,
         todo_path=todo_path,
     )
+    # Confirm we did not invent verification_result
+    fresh = question_service.get_question(q.id, questions_path=questions_path)
+    if prior_vr is None and fresh.verification_result is not None:
+        raise StoreError(
+            f"{q.id}: finalize invented verification_result (bug)"
+        )
     try:
         _render_planning_and_patchbay(
             _default_paths(
@@ -752,6 +806,7 @@ def sweep(
     counts = {
         "ready_to_finalize": 0,
         "needs_answer": 0,
+        "draft_answer": 0,
         "needs_target_metadata": 0,
         "needs_agent_action": 0,
         "blocked_by_dod": 0,
@@ -762,8 +817,18 @@ def sweep(
             counts["already_reconciled"] += 1
             continue
         if q.status == QuestionStatus.OPEN:
-            skipped.append({"id": q.id, "reason": "OPEN — sweep never answers"})
-            counts["needs_answer"] += 1
+            if q.answer.strip():
+                skipped.append(
+                    {
+                        "id": q.id,
+                        "reason": "OPEN draft — resolve before reconcile "
+                        f"(uv run rig question resolve {q.id})",
+                    }
+                )
+                counts["draft_answer"] += 1
+            else:
+                skipped.append({"id": q.id, "reason": "OPEN — sweep never answers"})
+                counts["needs_answer"] += 1
             continue
         if q.status != QuestionStatus.RESOLVED:
             continue
@@ -784,6 +849,10 @@ def sweep(
         plan = adapter.plan(q, paths=paths)
         if st == ReconciliationState.NEEDS_ANSWER:
             counts["needs_answer"] += 1
+            skipped.append({"id": q.id, "reason": f"state {st.value}"})
+            continue
+        if st == ReconciliationState.DRAFT_ANSWER:
+            counts["draft_answer"] += 1
             skipped.append({"id": q.id, "reason": f"state {st.value}"})
             continue
         if st == ReconciliationState.NEEDS_AGENT_ACTION:
@@ -869,6 +938,11 @@ def sweep(
         suggested_next.append(
             "uv run rig question answer Q-xxx --answer \"...\" --json"
         )
+    if counts.get("draft_answer"):
+        suggested_next.append("uv run rig question resolve Q-xxx")
+        suggested_next.append(
+            "uv run rig question answer Q-xxx --answer \"...\" --json"
+        )
     if counts["needs_target_metadata"]:
         suggested_next.append(
             "uv run rig question target set Q-xxx --pair <pair> --yes --json"
@@ -879,7 +953,13 @@ def sweep(
             "uv run rig reconcile sweep --write --yes --confirm-dod --json"
         )
     if counts["needs_agent_action"]:
-        suggested_next.append("uv run rig reconcile queue --state NEEDS_AGENT_ACTION --json")
+        suggested_next.append(
+            "uv run rig reconcile queue --state NEEDS_AGENT_ACTION --json"
+        )
+        suggested_next.append(
+            "uv run rig reconcile finalize question Q-xxx "
+            "--confirm-current-reconciled --note \"…\" --yes --json"
+        )
 
     return {
         "dry_run": dry_run,
@@ -910,6 +990,19 @@ def cleanup_reconciliation_issues(
     tdoc = load_todo(todo_path)
     paths = _paths(questions=questions_path, changes=changes_path, todo=todo_path)
     for q in qdoc.questions:
+        if q.status == QuestionStatus.OPEN and q.answer.strip():
+            issues.append(
+                {
+                    "severity": "info",
+                    "code": "question_draft_answer",
+                    "id": q.id,
+                    "detail": "OPEN with non-empty draft answer — resolve when final",
+                    "suggested_commands": [
+                        f"uv run rig question resolve {q.id}",
+                        f"uv run rig question answer {q.id} --answer \"…\" --json",
+                    ],
+                }
+            )
         if q.status == QuestionStatus.RESOLVED and q.reconciled_at is None:
             issues.append(
                 {
@@ -935,6 +1028,27 @@ def cleanup_reconciliation_issues(
                             "suggested_commands": [
                                 f"uv run rig reconcile finalize question {q.id} "
                                 f"--yes --no-current-change --note \"matches\" --json"
+                            ],
+                        }
+                    )
+                if plan.state == ReconciliationState.NEEDS_AGENT_ACTION:
+                    issues.append(
+                        {
+                            "severity": "warning",
+                            "code": "manual_recon_waiting",
+                            "id": q.id,
+                            "detail": (
+                                "Needs agent reconciliation — interpret answer into "
+                                "CURRENT via rig CLI, then finalize with "
+                                "--confirm-current-reconciled"
+                            ),
+                            "suggested_commands": [
+                                f"uv run rig reconcile plan question {q.id} --json",
+                                (
+                                    f"uv run rig reconcile finalize question {q.id} "
+                                    f"--confirm-current-reconciled --note \"…\" "
+                                    f"--yes --json"
+                                ),
                             ],
                         }
                     )
@@ -1015,18 +1129,64 @@ def cleanup_reconciliation_issues(
                         ],
                     }
                 )
+        # RESOLVED invariants (defensive — pydantic should already enforce)
+        if q.status == QuestionStatus.RESOLVED:
+            if not q.answer.strip() or q.resolved_at is None:
+                issues.append(
+                    {
+                        "severity": "error",
+                        "code": "resolved_invariant_broken",
+                        "id": q.id,
+                        "detail": "RESOLVED requires non-empty answer and resolved_at",
+                        "suggested_commands": [
+                            f"uv run rig question answer {q.id} --answer \"…\" --json"
+                        ],
+                    }
+                )
     for tid in tdoc.next_session:
         task = tdoc.task_map().get(tid)
-        if task and task.status == TodoStatus.DONE:
+        if task and task.status.value in {"DONE", "CANCELLED", "DEFERRED"}:
             issues.append(
                 {
                     "severity": "error",
-                    "code": "done_in_next_session",
+                    "code": "terminal_in_next_session",
                     "id": tid,
-                    "detail": "DONE TODO still listed in next_session",
+                    "detail": f"{task.status.value} TODO still listed in next_session",
                     "suggested_commands": [
                         f"uv run rig todo next remove {tid}"
                     ],
                 }
             )
+
+    # Channel source/status contradictions (report only — no auto-fix)
+    try:
+        from music_rig import channel_state
+
+        ch_data = channel_state.load_raw()
+        for err in channel_state.validate_channel_map(ch_data):
+            if "source/status" in err or "UNASSIGNED" in err or "CURRENT" in err:
+                # Parse device/channel from message when possible
+                issues.append(
+                    {
+                        "severity": "error",
+                        "code": "channel_source_status_contradiction",
+                        "id": "channel-map",
+                        "detail": err,
+                        "suggested_commands": [
+                            "uv run rig current channels set-source <device> <ch> "
+                            '"<source>" --yes',
+                            "uv run rig current channels clear-source <device> <ch> --yes",
+                        ],
+                    }
+                )
+    except Exception as exc:
+        issues.append(
+            {
+                "severity": "warning",
+                "code": "channel_scan_failed",
+                "id": "channel-map",
+                "detail": str(exc),
+            }
+        )
+
     return issues

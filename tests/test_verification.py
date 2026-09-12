@@ -378,6 +378,8 @@ def fx16(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
 # Production Questions reconciled in the approved post-Stage-18 answering session.
 _RECONCILED_PROD = frozenset({"Q-001", "Q-002", "Q-003", "Q-004", "Q-006"})
+# Human-answered during Stage 19 TUI work; CURRENT reconciliation still pending.
+_FINAL_UNRECONCILED_PROD = frozenset({"Q-007"})
 
 
 def test_production_questions_have_verification_metadata_answers_untouched():
@@ -395,6 +397,11 @@ def test_production_questions_have_verification_metadata_answers_untouched():
             assert q.answer.strip()
             assert q.resolved_at is not None
             assert q.reconciled_at is not None
+        elif q.id in _FINAL_UNRECONCILED_PROD:
+            assert q.status == QuestionStatus.RESOLVED
+            assert q.answer.strip()
+            assert q.resolved_at is not None
+            assert q.reconciled_at is None
         else:
             assert q.status == QuestionStatus.OPEN
             assert q.answer == ""
@@ -414,6 +421,7 @@ def test_production_questions_have_verification_metadata_answers_untouched():
     q7 = doc.question_map()["Q-007"]
     assert q7.target is not None
     assert q7.target.domain == "inventory.patchbay_mapping"
+    assert "ART P48" in q7.answer and "Behringer PX3000" in q7.answer
     # Approved Q-001 A/B/Y reconciliation baseline
     q1 = doc.question_map()["Q-001"]
     assert "Alesis 2" in q1.answer and "Alesis 1" in q1.answer and "Alesis 3" in q1.answer
@@ -425,7 +433,7 @@ def test_production_readiness_matrix_no_answers():
     for row in rows:
         if row["id"] in {f"Q-{i:03d}" for i in range(1, 21)}:
             assert row["kind"]
-            if row["id"] in _RECONCILED_PROD:
+            if row["id"] in _RECONCILED_PROD | _FINAL_UNRECONCILED_PROD:
                 assert row["answer"]
                 assert row["resolved_at"] is not None
             else:

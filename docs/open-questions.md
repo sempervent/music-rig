@@ -20,7 +20,6 @@ Resolving a question records an answer. It does **not** automatically rewrite CU
 | ID | Area | Question | Related TODOs | Related Changes |
 |---|---|---|---|---|
 | Q-005 | Routing | Should the PYLE-PRO dual DI live near the Privia, near the JOYO output, or near clean instrument taps? | RIG-024 | — |
-| Q-007 | Patchbay | Which physical unit is PB-A / PB-B / PB-C / PB-D (ART P48 vs Behringer PX3000)? | RIG-004 | — |
 | Q-008 | Patchbay | What normalization mode (normal / half-normal / thru) is each populated PB-B pair set to? | RIG-002 | — |
 | Q-009 | Patchbay | What are the rear-panel assignments for PB-A, PB-C, and PB-D? | RIG-005, RIG-040 | — |
 | Q-010 | Patchbay | What (if anything) should feed PB-B upper 9–12 into lower 33–36? | RIG-006 | — |
@@ -50,6 +49,7 @@ Resolving a question records an answer. It does **not** automatically rewrite CU
 | Q-003 | Routing | What exact jack(s) receive CH-1 stereo back into the Alesis? | RIG-009 | — |
 | Q-004 | Routing | Does physical KAOSS monitor/capture match documented Monitor Out → KAOSS → TASCAM 9/10? | RIG-010 | — |
 | Q-006 | Routing | Should LS-2 also remain a bass split/blend tool outside its CURRENT SPACE role? | RIG-025 | — |
+| Q-007 | Patchbay | Which physical unit is PB-A / PB-B / PB-C / PB-D (ART P48 vs Behringer PX3000)? | RIG-004 | — |
 
 ## Answers and notes
 
@@ -112,6 +112,14 @@ Should LS-2 also remain a bass split/blend tool outside its CURRENT SPACE role?
 **Reconciled at:** 2026-09-11T23:49:42.282222-04:00
 
 **Reconciliation note:** Descriptive decision: LS-2 SPACE-only; no CURRENT topology change.
+
+### Q-007 — RESOLVED
+
+Which physical unit is PB-A / PB-B / PB-C / PB-D (ART P48 vs Behringer PX3000)?
+
+**Answer:** PB-A & PB-B are ART P48, PB-C & PB-D are Behringer PX3000
+
+**Resolved at:** 2026-09-12T09:34:18.085029-04:00
 
 ### Q-009 — OPEN
 

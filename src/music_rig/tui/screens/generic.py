@@ -7,11 +7,12 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
-from textual.widgets import DataTable, Footer, Header, Input, Static
+from textual.widgets import DataTable, Footer, Input, Static
 
 from music_rig.store import StoreError
 from music_rig.tui.adapters.base import SimpleAdapter
 from music_rig.tui.dialogs import HelpScreen, InputModal
+from music_rig.tui.header import RigHeader
 
 
 class ListDetailScreen(Screen):
@@ -39,7 +40,7 @@ class ListDetailScreen(Screen):
         self._row_ids: list[str] = []
 
     def compose(self) -> ComposeResult:
-        yield Header(show_clock=False)
+        yield RigHeader(show_clock=False)
         with Vertical(id="screen-body"):
             yield Static(self.adapter.label, id="screen-title")
             with Horizontal(id="split"):

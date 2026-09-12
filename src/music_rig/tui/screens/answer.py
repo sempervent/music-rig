@@ -1,8 +1,11 @@
 """Question answer screen — keeps question text visible while editing the answer.
 
-Save Answer (via update_question_fields) may keep status OPEN.
-Resolve (status → RESOLVED) requires a non-empty answer and confirm.
+Save Draft → OPEN + DRAFT answer_state (resolved_at/reconciled_at null).
+Answer & Resolve → FINAL (RESOLVED + resolved_at); reconciled_at stays null.
 Answering does NOT invent verification_result (Stage 17).
+
+Navigation after success is returned as :class:`AnswerResult.next_action`;
+the requester (QuestionsScreen) performs subsequent screen pushes.
 """
 
 from __future__ import annotations
@@ -12,26 +15,44 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
-from textual.widgets import Button, Footer, Header, Static, TextArea
+from textual.widgets import Button, Footer, Static, TextArea
 
 from music_rig import question_service
 from music_rig.models import OpenQuestion, QuestionStatus
 from music_rig.store import StoreError
 from music_rig.tui.debug import format_error
 from music_rig.tui.dialogs import ConfirmModal, HelpScreen
+from music_rig.tui.header import RigHeader
 from music_rig.tui.modes import EditorMode, ModeController
 from music_rig.tui.save_outcome import SaveOutcome
+from music_rig.tui.screen_results import (
+    AnswerNextAction,
+    AnswerResult,
+    SingleShotMixin,
+)
 from music_rig.tui.widgets import format_target
 
 
 def _answer_context_markdown(q: OpenQuestion) -> str:
+    fields = question_service.question_json_fields(q)
+    try:
+        from music_rig.reconciliation.service import question_state
+
+        recon = question_state(q).value
+    except Exception:
+        recon = "—"
     lines = [
-        f"# {q.id} — {q.status.value}",
+        f"# {q.id} — {fields['lifecycle_label']}",
         "",
         q.question,
         "",
         f"Area: {q.area}",
-        f"Status: {q.status.value}",
+        f"Question status: {fields['question_status']}",
+        f"Answer state: {fields['answer_state']}",
+        f"Draft/final: {'FINAL' if fields['answer_state'] == 'FINAL' else ('DRAFT' if fields['answer_state'] == 'DRAFT' else 'UNANSWERED')}",
+        f"Resolved at: {fields['resolved_at'] or '—'}",
+        f"Reconciled at: {fields['reconciled_at'] or '— (pending)'}",
+        f"Reconciliation state: {recon}",
         f"CURRENT answer: {q.answer.strip() or '—'}",
     ]
     if q.related_todos:
@@ -77,15 +98,16 @@ def _answer_context_markdown(q: OpenQuestion) -> str:
     return "\n".join(lines)
 
 
-class AnswerScreen(Screen[tuple[SaveOutcome, str | None]]):
+class AnswerScreen(SingleShotMixin, Screen[AnswerResult]):
     """Split: question context stays visible; answer input below.
 
-    Returns (outcome, question_id) so the list can refresh / explain filter hiding.
+    Dismisses with :class:`AnswerResult` so the list can refresh and optionally
+    open Reconcile — without this screen mutating the stack itself.
     """
 
     BINDINGS = [
-        Binding("ctrl+s", "save_answer", "Save Answer", priority=True),
-        Binding("ctrl+r", "resolve", "Resolve", priority=True),
+        Binding("ctrl+s", "save_draft", "Save Draft", priority=True),
+        Binding("ctrl+r", "answer_resolve", "Answer & Resolve", priority=True),
         Binding("escape", "cancel", "Cancel", priority=True),
         Binding("i", "enter_insert", "Insert", show=False),
         Binding("question_mark", "help", "Help"),
@@ -99,24 +121,26 @@ class AnswerScreen(Screen[tuple[SaveOutcome, str | None]]):
         self._q: OpenQuestion | None = None
 
     def compose(self) -> ComposeResult:
-        yield Header(show_clock=False)
+        yield RigHeader(show_clock=False)
         with Vertical(id="screen-body"):
             yield Static(
-                f"{'Resolve' if self.resolve_on_save else 'Answer'} {self.question_id}",
+                f"{'Answer & Resolve' if self.resolve_on_save else 'Answer'} {self.question_id}",
                 id="screen-title",
             )
             yield Static(self._modes.banner(), id="mode-banner")
             with VerticalScroll(id="detail-pane"):
                 yield Static("Loading…", id="answer-context")
             yield Static("─" * 40, id="filter-label")
-            yield Static("Answer input (question text stays visible above)", id="dirty-label")
+            yield Static(
+                "Answer input — Save Draft (provisional) or Answer & Resolve (final)",
+                id="dirty-label",
+            )
             yield TextArea(id="answer-input")
             with Horizontal(id="modal-buttons"):
-                if self.resolve_on_save:
-                    yield Button("Resolve", variant="primary", id="btn-resolve")
-                else:
-                    yield Button("Save Answer", variant="primary", id="btn-save")
-                    yield Button("Resolve…", id="btn-resolve")
+                yield Button(
+                    "Answer & Resolve", variant="primary", id="btn-resolve"
+                )
+                yield Button("Save Draft", id="btn-draft")
                 yield Button("Cancel", id="btn-cancel")
         yield Footer()
 
@@ -125,9 +149,11 @@ class AnswerScreen(Screen[tuple[SaveOutcome, str | None]]):
             self._q = question_service.get_question(self.question_id)
         except StoreError as exc:
             self.notify(format_error(exc), severity="error")
-            self.dismiss((SaveOutcome.FAILED, None))
+            self.complete(AnswerResult(SaveOutcome.FAILED, None))
             return
-        self.query_one("#answer-context", Static).update(_answer_context_markdown(self._q))
+        self.query_one("#answer-context", Static).update(
+            _answer_context_markdown(self._q)
+        )
         area = self.query_one("#answer-input", TextArea)
         area.load_text(self._q.answer or "")
         area.focus()
@@ -148,33 +174,42 @@ class AnswerScreen(Screen[tuple[SaveOutcome, str | None]]):
         if self._modes.mode is EditorMode.INSERT:
             self._set_mode(EditorMode.NORMAL)
             return
-        self.dismiss((SaveOutcome.CANCELLED, None))
+        self.complete(AnswerResult(SaveOutcome.CANCELLED, None))
 
     def action_help(self) -> None:
         self.app.push_screen(
             HelpScreen(
                 "Answer screen\n\n"
                 "Question text stays visible above the answer input.\n"
-                "Save Answer  writes answer via update_question_fields (may stay OPEN).\n"
-                "Resolve      requires answer; sets status RESOLVED (not reconciled).\n"
-                "Ctrl+S      Save Answer (or Resolve when opened as Resolve).\n"
-                "Does NOT invent verification_result — use V / verify for observations.\n"
+                "Save Draft         OPEN + draft answer (resolved_at null).\n"
+                "Answer & Resolve   FINAL: RESOLVED + resolved_at "
+                "(reconciled_at still null).\n"
+                "Ctrl+S  Save Draft · Ctrl+R Answer & Resolve\n"
+                "Does NOT invent verification_result — use V / verify "
+                "for observations.\n"
             )
         )
 
     def _answer_text(self) -> str:
         return self.query_one("#answer-input", TextArea).text.strip()
 
-    def action_save_answer(self) -> None:
+    def action_save_draft(self) -> None:
         if self.resolve_on_save:
-            self.action_resolve()
+            self._do_answer_resolve()
             return
-        self._do_save_answer()
+        self._do_save_draft()
+
+    def action_answer_resolve(self) -> None:
+        self._do_answer_resolve()
 
     def action_resolve(self) -> None:
+        """Compat alias for Resolve shortcut from Questions list."""
+        self._do_answer_resolve()
+
+    def _do_answer_resolve(self) -> None:
         answer = self._answer_text()
         if not answer:
-            self.notify("Resolve requires a non-empty answer", severity="error")
+            self.notify("Answer & Resolve requires a non-empty answer", severity="error")
             return
 
         def _confirm(ok: bool | None) -> None:
@@ -187,66 +222,103 @@ class AnswerScreen(Screen[tuple[SaveOutcome, str | None]]):
             except StoreError as exc:
                 self.notify(format_error(exc, prefix="FAILED: "), severity="error")
                 return
-            # Preserve Stage 17: resolve must not invent verification_result
             fresh = question_service.get_question(updated.id)
             assert fresh.answer == answer
+            assert fresh.status == QuestionStatus.RESOLVED
+            assert fresh.reconciled_at is None
+            if fresh.verification_result is not None and (
+                self._q is None or self._q.verification_result is None
+            ):
+                self.notify(
+                    "FAILED: answering invented verification_result (bug)",
+                    severity="error",
+                )
+                return
+
+            def _recon(choice: bool | None) -> None:
+                # True = Reconcile Now → parent opens reconcile after dismiss.
+                next_action = (
+                    AnswerNextAction.RECONCILE
+                    if choice
+                    else AnswerNextAction.NONE
+                )
+                self.complete(
+                    AnswerResult(
+                        SaveOutcome.SUCCESS,
+                        updated.id,
+                        next_action,
+                    )
+                )
+
             self.notify(
-                f"Saved {updated.id}. Resolved. CURRENT reconciliation still required "
-                f"(rig reconcile plan question {updated.id})."
+                f"{updated.id} answered and resolved. "
+                "CURRENT reconciliation is still required "
+                f"(reconciled_at null)."
             )
-            self.dismiss((SaveOutcome.SUCCESS, updated.id))
+            self.app.push_screen(
+                ConfirmModal(
+                    f"{updated.id} reconciled_at still null",
+                    "Answer is FINAL (RESOLVED). CURRENT reconciliation "
+                    "is still required.\n\n"
+                    "Reconcile Now opens the reconcile screen.\n"
+                    "Later leaves reconciliation pending.\n"
+                    "Enter = Reconcile Now · Esc = Later.",
+                    confirm_label="Reconcile Now",
+                ),
+                _recon,
+            )
 
         self.app.push_screen(
             ConfirmModal(
-                f"Resolve {self.question_id}?",
-                "Recording an answer does not automatically rewrite CURRENT.\n"
+                f"Answer & Resolve {self.question_id}?",
+                "Records a FINAL answer (RESOLVED + resolved_at).\n"
                 "Does not invent verification_result.\n"
-                "Reconcile separately if the answer changes physical truth.\n"
+                "Does not rewrite CURRENT — reconcile separately.\n"
                 "Enter confirms · Esc cancels.",
-                confirm_label="Resolve",
+                confirm_label="Answer & Resolve",
             ),
             _confirm,
         )
 
-    def _do_save_answer(self) -> None:
+    def _do_save_draft(self) -> None:
         answer = self._answer_text()
         if not answer:
-            self.notify("Answer cannot be empty", severity="warning")
+            self.notify("Draft answer cannot be empty", severity="warning")
             return
         try:
-            updated = question_service.update_question_fields(
-                self.question_id, answer=answer, render=True
+            result = question_service.draft_question(
+                self.question_id, answer, render=True
+            )
+            updated = result.get("question") or question_service.get_question(
+                self.question_id
             )
         except StoreError as exc:
             self.notify(format_error(exc, prefix="FAILED: "), severity="error")
             return
-        # Must not invent verification_result
         fresh = question_service.get_question(updated.id)
         if fresh.verification_result is not None and (
             self._q is None or self._q.verification_result is None
         ):
-            # Should never happen — guard for tests / regressions
             self.notify(
-                "FAILED: answering invented verification_result (bug)",
+                "FAILED: drafting invented verification_result (bug)",
                 severity="error",
             )
             return
-        status_note = (
-            f"Status remains {updated.status.value}."
-            if updated.status != QuestionStatus.RESOLVED
-            else "Status is RESOLVED."
+        fields = question_service.question_json_fields(fresh)
+        self.notify(
+            f"Saved draft {fresh.id}. Status OPEN / answer_state "
+            f"{fields['answer_state']}. Resolve when final."
         )
-        self.notify(f"Saved {updated.id}. Answer recorded. {status_note}")
-        self.dismiss((SaveOutcome.SUCCESS, updated.id))
+        self.complete(AnswerResult(SaveOutcome.SUCCESS, fresh.id))
 
-    @on(Button.Pressed, "#btn-save")
-    def _btn_save(self) -> None:
-        self._do_save_answer()
+    @on(Button.Pressed, "#btn-draft")
+    def _btn_draft(self) -> None:
+        self._do_save_draft()
 
     @on(Button.Pressed, "#btn-resolve")
     def _btn_resolve(self) -> None:
-        self.action_resolve()
+        self._do_answer_resolve()
 
     @on(Button.Pressed, "#btn-cancel")
     def _btn_cancel(self) -> None:
-        self.dismiss((SaveOutcome.CANCELLED, None))
+        self.complete(AnswerResult(SaveOutcome.CANCELLED, None))

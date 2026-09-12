@@ -8,6 +8,7 @@ from typing import Callable
 
 from music_rig.inbox_service import default_clock
 from music_rig.models import (
+    AnswerState,
     ChangeRecord,
     ChangesDocument,
     OpenQuestion,
@@ -27,6 +28,51 @@ from music_rig.store import (
 from music_rig import todo_service
 
 Clock = Callable[[], datetime]
+
+
+def derive_answer_state(question: OpenQuestion) -> AnswerState:
+    """Derived answer lifecycle (not persisted).
+
+    OPEN + empty answer = UNANSWERED
+    OPEN + non-empty answer = DRAFT
+    RESOLVED + non-empty answer = FINAL
+    """
+    if question.status == QuestionStatus.RESOLVED and question.answer.strip():
+        return AnswerState.FINAL
+    if question.status == QuestionStatus.OPEN and question.answer.strip():
+        return AnswerState.DRAFT
+    return AnswerState.UNANSWERED
+
+
+def lifecycle_label(question: OpenQuestion) -> str:
+    """Human list label combining status + answer/recon state."""
+    ans = derive_answer_state(question)
+    if question.status == QuestionStatus.OPEN:
+        if ans == AnswerState.DRAFT:
+            return "OPEN/DRAFT"
+        return "OPEN/UNANSWERED"
+    if question.status == QuestionStatus.RESOLVED:
+        if question.reconciled_at is not None:
+            return "RESOLVED/RECONCILED"
+        return "RESOLVED/UNRECONCILED"
+    return question.status.value
+
+
+def question_json_fields(question: OpenQuestion) -> dict:
+    """Stable agent-facing fields including derived answer_state."""
+    return {
+        "id": question.id,
+        "question_status": question.status.value,
+        "answer_state": derive_answer_state(question).value,
+        "answer": question.answer,
+        "resolved_at": (
+            question.resolved_at.isoformat() if question.resolved_at else None
+        ),
+        "reconciled_at": (
+            question.reconciled_at.isoformat() if question.reconciled_at else None
+        ),
+        "lifecycle_label": lifecycle_label(question),
+    }
 
 
 def get_question(
@@ -134,7 +180,7 @@ def add_question(
 
 def resolve_question(
     question_id: str,
-    answer: str,
+    answer: str | None = None,
     *,
     related_change: str | None = None,
     verification_note: str | None = None,
@@ -146,14 +192,21 @@ def resolve_question(
     docs_wishlist=None,
     docs_questions=None,
 ) -> OpenQuestion:
-    cleaned = answer.strip()
-    if not cleaned:
-        raise StoreError("Resolved questions require a non-empty answer.")
+    """Promote to FINAL: RESOLVED + non-empty answer + resolved_at; reconciled_at null.
+
+    If ``answer`` is None/blank, uses the existing question answer (draft → resolve).
+    """
     qdoc = load_questions(questions_path)
     key = question_id.strip().upper()
     current = qdoc.question_map().get(key)
     if current is None:
         raise StoreError(f"Question {key} does not exist.")
+
+    cleaned = (answer or "").strip()
+    if not cleaned:
+        cleaned = current.answer.strip()
+    if not cleaned:
+        raise StoreError("Resolved questions require a non-empty answer.")
 
     changes_doc = None
     change_ids = list(current.related_changes)
@@ -212,6 +265,97 @@ def resolve_question(
             write=True,
         )
     return updated
+
+
+def draft_question(
+    question_id: str,
+    answer: str,
+    *,
+    dry_run: bool = False,
+    clock: Clock = default_clock,
+    render: bool = True,
+    questions_path: Path | None = None,
+    docs_todo=None,
+    docs_wishlist=None,
+    docs_questions=None,
+) -> dict:
+    """Save a draft answer: status OPEN, resolved_at/reconciled_at null.
+
+    Does not invent verification_result. Does not reconcile.
+    """
+    _ = clock  # reserved for future audit timestamps
+    cleaned = answer.strip()
+    if not cleaned:
+        raise StoreError("Draft answer cannot be empty.")
+    current = get_question(question_id, questions_path=questions_path)
+    before = question_json_fields(current)
+    if dry_run:
+        return {
+            "dry_run": True,
+            "question_id": current.id,
+            "before": before,
+            "after": {
+                "id": current.id,
+                "question_status": QuestionStatus.OPEN.value,
+                "answer_state": AnswerState.DRAFT.value,
+                "answer": cleaned,
+                "resolved_at": None,
+                "reconciled_at": None,
+            },
+            "answer_state": AnswerState.DRAFT.value,
+            "question_status": QuestionStatus.OPEN.value,
+            "resolved_at": None,
+            "reconciled_at": None,
+            "suggested_next_command": (
+                f"uv run rig question resolve {current.id}"
+            ),
+            "message": (
+                "Draft answer recorded. Question remains OPEN. "
+                "Resolve when the answer is final."
+            ),
+        }
+    qdoc = load_questions(questions_path)
+    key = current.id
+    data = current.model_dump()
+    data.update(
+        {
+            "status": QuestionStatus.OPEN,
+            "answer": cleaned,
+            "resolved_at": None,
+            "reconciled_at": None,
+            "reconciliation_note": "",
+        }
+    )
+    updated = OpenQuestion.model_validate(data)
+    new_qdoc = OpenQuestionsDocument(
+        questions=[updated if q.id == key else q for q in qdoc.questions]
+    )
+    write_documents(questions=new_qdoc, questions_path=questions_path)
+    if render:
+        render_docs(
+            docs_todo=docs_todo,
+            docs_wishlist=docs_wishlist,
+            questions_path=questions_path,
+            docs_questions=docs_questions,
+            write=True,
+        )
+    fields = question_json_fields(updated)
+    return {
+        "dry_run": False,
+        "question_id": updated.id,
+        "before": before,
+        "after": fields,
+        "question": updated,
+        "answer_state": fields["answer_state"],
+        "question_status": fields["question_status"],
+        "resolved_at": None,
+        "reconciled_at": None,
+        "suggested_next_command": f"uv run rig question resolve {updated.id}",
+        "message": (
+            "Draft answer recorded. Question remains OPEN. "
+            "Resolve when the answer is final."
+        ),
+    }
 
 
 def defer_question(
@@ -632,25 +776,21 @@ def answer_question(
     docs_wishlist=None,
     docs_questions=None,
 ) -> dict:
-    """Noninteractive resolve: RESOLVED + answer + resolved_at; reconciled_at stays null."""
+    """FINAL answer: RESOLVED + answer + resolved_at; reconciled_at stays null.
+
+    Does not invent verification_result. Prefer ``draft_question`` for provisional text.
+    """
     cleaned = answer.strip()
     if not cleaned:
         raise StoreError("Resolved questions require a non-empty answer.")
     current = get_question(question_id, questions_path=questions_path)
-    before = {
-        "id": current.id,
-        "status": current.status.value,
-        "answer": current.answer,
-        "resolved_at": current.resolved_at.isoformat() if current.resolved_at else None,
-        "reconciled_at": (
-            current.reconciled_at.isoformat() if current.reconciled_at else None
-        ),
-    }
+    before = question_json_fields(current)
     after_note = (
         verification_note.strip()
         if verification_note is not None
         else current.verification_note
     )
+    suggested = f"uv run rig reconcile plan question {current.id} --json"
     if dry_run:
         return {
             "dry_run": True,
@@ -658,13 +798,19 @@ def answer_question(
             "before": before,
             "after": {
                 "id": current.id,
-                "status": QuestionStatus.RESOLVED.value,
+                "question_status": QuestionStatus.RESOLVED.value,
+                "answer_state": AnswerState.FINAL.value,
                 "answer": cleaned,
                 "resolved_at": "(would set)",
                 "reconciled_at": None,
                 "verification_note": after_note,
             },
-            "next_command": f"uv run rig reconcile plan question {current.id} --json",
+            "answer_state": AnswerState.FINAL.value,
+            "question_status": QuestionStatus.RESOLVED.value,
+            "resolved_at": "(would set)",
+            "reconciled_at": None,
+            "suggested_next_command": suggested,
+            "next_command": suggested,
             "message": "Answer recorded. CURRENT reconciliation still required.",
         }
     updated = resolve_question(
@@ -680,18 +826,20 @@ def answer_question(
         docs_wishlist=docs_wishlist,
         docs_questions=docs_questions,
     )
+    fields = question_json_fields(updated)
     return {
         "dry_run": False,
         "question_id": updated.id,
         "before": before,
-        "after": {
-            "id": updated.id,
-            "status": updated.status.value,
-            "answer": updated.answer,
-            "resolved_at": updated.resolved_at.isoformat() if updated.resolved_at else None,
-            "reconciled_at": None,
-        },
+        "after": fields,
         "question": updated,
+        "answer_state": fields["answer_state"],
+        "question_status": fields["question_status"],
+        "resolved_at": fields["resolved_at"],
+        "reconciled_at": None,
+        "suggested_next_command": (
+            f"uv run rig reconcile plan question {updated.id} --json"
+        ),
         "next_command": f"uv run rig reconcile plan question {updated.id} --json",
         "message": "Answer recorded. CURRENT reconciliation still required.",
     }

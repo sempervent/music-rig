@@ -4320,6 +4320,14 @@ def reconcile_finalize_cmd(
     apply_linked_changes: bool = typer.Option(False, "--apply-linked-changes"),
     confirm_dod: bool = typer.Option(False, "--confirm-dod"),
     no_current_change: bool = typer.Option(False, "--no-current-change"),
+    confirm_current_reconciled: bool = typer.Option(
+        False,
+        "--confirm-current-reconciled",
+        help=(
+            "Acknowledge agent-interpreted CURRENT updates match the final answer "
+            "(requires --note). Does not invent verification_result."
+        ),
+    ),
     note: str = typer.Option("", "--note"),
     snapshot_before: bool = typer.Option(False, "--snapshot-before"),
 ) -> None:
@@ -4335,6 +4343,7 @@ def reconcile_finalize_cmd(
             apply_linked_changes=apply_linked_changes,
             confirm_dod=confirm_dod,
             no_current_change=no_current_change,
+            confirm_current_reconciled=confirm_current_reconciled,
             note=note,
             snapshot_before=snapshot_before,
         )
@@ -5144,6 +5153,7 @@ def question_list_cmd(
         False, "--unreconciled", help="RESOLVED but not yet reconciled"
     ),
     area: Optional[str] = typer.Option(None, "--area"),
+    as_json: bool = typer.Option(False, "--json"),
 ) -> None:
     """List questions. Default: ACTIVE (OPEN + RESOLVED-unreconciled)."""
     try:
@@ -5155,6 +5165,19 @@ def question_list_cmd(
         )
     except StoreError as exc:
         _fail(str(exc))
+    if as_json:
+        payload = [
+            {
+                **question_service.question_json_fields(q),
+                "area": q.area,
+                "question": q.question,
+            }
+            for q in items
+        ]
+        typer.echo(
+            json.dumps(ok_payload("question.list", payload), indent=2, default=str)
+        )
+        return
     if all_items:
         title = "QUESTIONS (all)"
     elif open_only:
@@ -5168,19 +5191,26 @@ def question_list_cmd(
         console.print("(none)")
         return
     for q in items:
-        status = f"{q.status.value}  "
-        recon = ""
-        if q.status.value == "RESOLVED" and q.reconciled_at is None:
-            recon = " [unreconciled]"
-        console.print(f"{q.id}  {status}{q.area:<18} {q.question}{recon}")
+        label = question_service.lifecycle_label(q)
+        console.print(f"{q.id}  {label:<22} {q.area:<18} {q.question}")
 
 
 @question_app.command("show")
-def question_show_cmd(question_id: str) -> None:
+def question_show_cmd(
+    question_id: str,
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
     try:
         q = question_service.get_question(question_id)
     except StoreError as exc:
         _fail(str(exc))
+    fields = question_service.question_json_fields(q)
+    if as_json:
+        payload = {**q.model_dump(mode="json"), **fields}
+        typer.echo(
+            json.dumps(ok_payload("question.show", payload), indent=2, default=str)
+        )
+        return
     console.print(f"[bold]{q.id}[/bold]")
     console.print("")
     console.print("Question:")
@@ -5188,6 +5218,8 @@ def question_show_cmd(question_id: str) -> None:
     console.print("")
     console.print(f"Area: {q.area}")
     console.print(f"Status: {q.status.value}")
+    console.print(f"Answer state: {fields['answer_state']}")
+    console.print(f"Lifecycle: {fields['lifecycle_label']}")
     console.print("")
     console.print("Related TODOs:")
     if q.related_todos:
@@ -5211,6 +5243,9 @@ def question_show_cmd(question_id: str) -> None:
     if q.resolved_at is not None:
         console.print("")
         console.print(f"Resolved at: {q.resolved_at.isoformat()}")
+    if q.reconciled_at is not None:
+        console.print("")
+        console.print(f"Reconciled at: {q.reconciled_at.isoformat()}")
 
 
 @question_app.command("add")
@@ -5244,18 +5279,67 @@ def question_add_cmd(
     console.print(f"Created [bold]{item.id}[/bold]")
 
 
+@question_app.command("draft")
+def question_draft_cmd(
+    question_id: str,
+    answer: str = typer.Option(..., "--answer", help="Non-empty draft answer text"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    no_render: bool = typer.Option(False, "--no-render"),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Save a draft answer: stays OPEN; resolved_at/reconciled_at null."""
+    try:
+        result = question_service.draft_question(
+            question_id,
+            answer,
+            dry_run=dry_run,
+            render=not no_render and not dry_run,
+        )
+    except StoreError as exc:
+        if as_json:
+            typer.echo(
+                json.dumps(err_payload("store_error", str(exc)), indent=2, default=str)
+            )
+            raise typer.Exit(1)
+        _fail(str(exc))
+    out = {k: v for k, v in result.items() if k != "question"}
+    if as_json:
+        typer.echo(json.dumps(ok_payload("draft", out), indent=2, default=str))
+        return
+    console.print(result.get("message") or "Draft recorded.")
+    if dry_run:
+        console.print("[dim]dry-run — no write[/dim]")
+    console.print(f"Next: {result.get('suggested_next_command')}")
+
+
 @question_app.command("resolve")
 def question_resolve_cmd(
     question_id: str,
-    answer: Optional[str] = typer.Option(None, "--answer"),
+    answer: Optional[str] = typer.Option(
+        None, "--answer", help="Optional; defaults to existing draft answer"
+    ),
     change: Optional[str] = typer.Option(None, "--change", help="Related CHG id"),
     no_render: bool = typer.Option(False, "--no-render"),
+    as_json: bool = typer.Option(False, "--json"),
 ) -> None:
-    """Record an answer (interactive). Prefer `rig question answer` for agents."""
+    """Promote to FINAL (RESOLVED + resolved_at). Uses existing answer if omitted."""
     try:
+        q = question_service.get_question(question_id)
         if answer is None:
-            answer = typer.prompt("Answer")
-        if change is None and typer.confirm("Link a related CHG record?", default=False):
+            if q.answer.strip():
+                answer = q.answer
+            elif not as_json:
+                answer = typer.prompt("Answer")
+            else:
+                raise StoreError(
+                    f"{q.id} has no answer — pass --answer or use "
+                    "`rig question answer` / `rig question draft` first"
+                )
+        if (
+            change is None
+            and not as_json
+            and typer.confirm("Link a related CHG record?", default=False)
+        ):
             change = typer.prompt("Related CHG record")
         updated = question_service.resolve_question(
             question_id,
@@ -5264,7 +5348,23 @@ def question_resolve_cmd(
             render=not no_render,
         )
     except StoreError as exc:
+        if as_json:
+            typer.echo(
+                json.dumps(err_payload("store_error", str(exc)), indent=2, default=str)
+            )
+            raise typer.Exit(1)
         _fail(str(exc))
+    fields = question_service.question_json_fields(updated)
+    out = {
+        **fields,
+        "suggested_next_command": (
+            f"uv run rig reconcile plan question {updated.id} --json"
+        ),
+        "message": "Answer recorded. CURRENT reconciliation still required.",
+    }
+    if as_json:
+        typer.echo(json.dumps(ok_payload("resolve", out), indent=2, default=str))
+        return
     console.print(f"{updated.id} resolved.")
     console.print("")
     console.print(
@@ -5282,7 +5382,7 @@ def question_answer_cmd(
     no_render: bool = typer.Option(False, "--no-render"),
     as_json: bool = typer.Option(False, "--json"),
 ) -> None:
-    """Noninteractive resolve: set RESOLVED + answer; reconciled_at stays null."""
+    """FINAL answer: RESOLVED + answer; reconciled_at stays null. Not a draft."""
     try:
         result = question_service.answer_question(
             question_id,
@@ -5298,21 +5398,20 @@ def question_answer_cmd(
             )
             raise typer.Exit(1)
         _fail(str(exc))
-    # Drop non-serializable OpenQuestion if present
     out = {k: v for k, v in result.items() if k != "question"}
     out["reconciled_at"] = None
     if result.get("question") is not None:
         q = result["question"]
-        out["status"] = q.status.value
-        out["answer"] = q.answer
-        out["resolved_at"] = q.resolved_at.isoformat() if q.resolved_at else None
+        out.update(question_service.question_json_fields(q))
     if as_json:
         typer.echo(json.dumps(ok_payload("answer", out), indent=2, default=str))
         return
     console.print(result.get("message") or "Answer recorded.")
     if dry_run:
         console.print("[dim]dry-run — no write[/dim]")
-    console.print(f"Next: {result.get('next_command')}")
+    console.print(
+        f"Next: {result.get('suggested_next_command') or result.get('next_command')}"
+    )
 
 
 @question_target_app.command("show")

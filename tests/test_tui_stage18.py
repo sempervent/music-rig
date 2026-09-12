@@ -67,7 +67,9 @@ async def test_resolve_does_not_invent_verification_result(tui_fx):
         await pilot.press(*list("resolved-only"))
         await pilot.press("ctrl+s")
         await pilot.pause()
-        await pilot.press("enter")
+        await pilot.press("enter")  # confirm Answer & Resolve
+        await pilot.pause()
+        await pilot.press("escape")  # Later (reconcile pending)
         await pilot.pause()
     q = load_questions(tui_fx["questions"]).question_map()["Q-002"]
     assert q.status.value == "RESOLVED"

@@ -88,6 +88,22 @@ def validate_channel_map(data: dict[str, Any]) -> list[str]:
                 errors.append(f"{device} channel {key}: missing status")
             if device == "tascam" and "type" not in meta:
                 errors.append(f"{device} channel {key}: missing type")
+            source = meta.get("source")
+            status = str(meta.get("status") or "")
+            has_source = source not in (None, "")
+            if has_source and status == "UNASSIGNED":
+                errors.append(
+                    f"{device} channel {key}: source/status contradiction — "
+                    f"source={source!r} but status=UNASSIGNED "
+                    f"(repair: uv run rig current channels set-source {device} {key} "
+                    f"{source!r} --yes)"
+                )
+            if not has_source and status == "CURRENT":
+                errors.append(
+                    f"{device} channel {key}: source/status contradiction — "
+                    f"empty source but status=CURRENT "
+                    f"(repair: uv run rig current channels clear-source {device} {key} --yes)"
+                )
     return errors
 
 

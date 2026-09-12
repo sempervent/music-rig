@@ -6,12 +6,13 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
-from textual.widgets import DataTable, Footer, Header, Static
+from textual.widgets import DataTable, Footer, Static
 
 from music_rig import question_service
 from music_rig.reconciliation import service as reconcile_service
 from music_rig.models import ReconciliationState
 from music_rig.store import StoreError
+from music_rig.tui.header import RigHeader
 
 
 class ReconcileScreen(Screen):
@@ -35,7 +36,7 @@ class ReconcileScreen(Screen):
         self._items: list = []
 
     def compose(self) -> ComposeResult:
-        yield Header(show_clock=False)
+        yield RigHeader(show_clock=False)
         yield Static("Reconcile queue", id="screen-title")
         with Horizontal(id="split"):
             yield DataTable(id="list-table")

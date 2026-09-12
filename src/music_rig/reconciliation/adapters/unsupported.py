@@ -63,6 +63,8 @@ class UnsupportedAdapter(ReconciliationAdapter):
     def plan(self, question: OpenQuestion, *, paths: dict[str, Any]) -> Plan:
         if question.reconciled_at is not None:
             state = ReconciliationState.RECONCILED
+        elif question.status == QuestionStatus.OPEN and question.answer.strip():
+            state = ReconciliationState.DRAFT_ANSWER
         elif question.status != QuestionStatus.RESOLVED or not question.answer.strip():
             state = ReconciliationState.NEEDS_ANSWER
         else:
@@ -74,14 +76,30 @@ class UnsupportedAdapter(ReconciliationAdapter):
             else "(none)"
         )
         kind = question.verification.kind if question.verification else ""
-        families = list(_COMMAND_FAMILIES_BY_KIND.get(kind, ["rig inspect", "rig question"]))
-        classification = MANUAL_CLASSIFICATION.get(question.id, "GENUINELY_AGENT_INTERPRETED")
+        families = list(
+            _COMMAND_FAMILIES_BY_KIND.get(
+                kind, ["rig inspect", "rig current", "rig path show"]
+            )
+        )
+        # Prefer CURRENT mutation families for agent-interpreted recon
+        if "rig current" not in " ".join(families):
+            families = ["rig current path", "rig current channels", *families]
+        classification = MANUAL_CLASSIFICATION.get(
+            question.id, "GENUINELY_AGENT_INTERPRETED"
+        )
         missing = None
         if classification in {"NEEDS_SMALL_SERVICE", "GENUINELY_DESCRIPTIVE"}:
             if domain == "(none)" and classification == "NEEDS_SMALL_SERVICE":
-                missing = f"no CURRENT entrypoint for {question.id} / {kind or 'unknown kind'}"
+                missing = (
+                    f"no CURRENT entrypoint for {question.id} / "
+                    f"{kind or 'unknown kind'}"
+                )
         elif classification == "STRUCTURABLE_NOW" and kind == "INVENTORY_LOCATION":
-            families = ["rig current gear set-location", "rig gear show", "rig question target set"]
+            families = [
+                "rig current gear set-location",
+                "rig gear show",
+                "rig question target set",
+            ]
 
         details: dict[str, Any] = {
             "manual_classification": classification,
@@ -92,11 +110,52 @@ class UnsupportedAdapter(ReconciliationAdapter):
                 current_snapshot=None,
                 suggested_command_families=families,
                 postcondition=(
-                    "Answer interpreted into CURRENT via supported rig CLI; "
-                    "or finalize --no-current-change with explicit note"
+                    "Canonical CURRENT updated via supported rig CLI to reflect "
+                    "the final human answer; then finalize with "
+                    "--confirm-current-reconciled (not physical verification)"
                 ),
                 missing_capability=missing,
             )
+            details["requires_agent_interpretation"] = True
+            details["manual_finalize_allowed"] = True
+            details["required_confirmation"] = "--confirm-current-reconciled"
+
+        if state == ReconciliationState.DRAFT_ANSWER:
+            suggested = [
+                f"uv run rig question resolve {question.id}",
+                f"uv run rig question answer {question.id} --answer \"…\" --json",
+            ]
+            blockers: list[Any] = [
+                {
+                    "code": "draft_answer",
+                    "message": (
+                        "OPEN with draft answer — resolve before reconcile"
+                    ),
+                }
+            ]
+        elif state == ReconciliationState.NEEDS_AGENT_ACTION:
+            suggested = [
+                f"uv run rig reconcile plan question {question.id} --json",
+                (
+                    f"uv run rig reconcile finalize question {question.id} "
+                    f"--confirm-current-reconciled --note \"…\" --yes --json"
+                ),
+            ]
+            blockers = [
+                {
+                    "code": "needs_agent_action",
+                    "message": (
+                        f"Needs agent reconciliation (manual interpretation): "
+                        f"{domain}"
+                    ),
+                    "classification": classification,
+                }
+            ]
+        else:
+            suggested = [
+                f"uv run rig reconcile plan question {question.id} --json",
+            ]
+            blockers = []
 
         return Plan(
             artifact_type="question",
@@ -111,22 +170,8 @@ class UnsupportedAdapter(ReconciliationAdapter):
             ]
             if state == ReconciliationState.NEEDS_AGENT_ACTION
             else [],
-            blockers=(
-                [
-                    {
-                        "code": "needs_agent_action",
-                        "message": f"Unsupported/manual domain: {domain}",
-                        "classification": classification,
-                    }
-                ]
-                if state == ReconciliationState.NEEDS_AGENT_ACTION
-                else []
-            ),
-            suggested_commands=[
-                f"uv run rig reconcile plan question {question.id} --json",
-                f"uv run rig reconcile finalize question {question.id} "
-                f"--no-current-change --note \"…\" --yes",
-            ],
+            blockers=blockers,
+            suggested_commands=suggested,
             details=details,
         )
 

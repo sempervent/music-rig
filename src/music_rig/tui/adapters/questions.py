@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from music_rig.models import OpenQuestion
+from music_rig import question_service
+from music_rig.models import OpenQuestion, QuestionStatus
 from music_rig.tui.widgets import format_target
 
 
@@ -11,8 +12,34 @@ def filter_questions(
     status_filter: str,
     search: str = "",
 ) -> list[OpenQuestion]:
+    """Filter questions for the list.
+
+    ACTIVE (default): OPEN unanswered + OPEN draft + RESOLVED unreconciled.
+    Excludes RECONCILED and DEFERRED unless explicitly requested.
+    """
     status_filter = status_filter.upper()
-    if status_filter != "ALL":
+    if status_filter == "ACTIVE":
+        items = [
+            q
+            for q in items
+            if q.status == QuestionStatus.OPEN
+            or (
+                q.status == QuestionStatus.RESOLVED and q.reconciled_at is None
+            )
+        ]
+    elif status_filter == "OPEN":
+        items = [q for q in items if q.status == QuestionStatus.OPEN]
+    elif status_filter == "RESOLVED":
+        items = [q for q in items if q.status == QuestionStatus.RESOLVED]
+    elif status_filter == "DEFERRED":
+        items = [q for q in items if q.status == QuestionStatus.DEFERRED]
+    elif status_filter == "UNRECONCILED":
+        items = [
+            q
+            for q in items
+            if q.status == QuestionStatus.RESOLVED and q.reconciled_at is None
+        ]
+    elif status_filter != "ALL":
         items = [q for q in items if q.status.value == status_filter]
     needle = search.strip().casefold()
     if needle:
@@ -25,6 +52,7 @@ def filter_questions(
                     q.area,
                     q.answer,
                     q.notes,
+                    question_service.lifecycle_label(q),
                     format_target(q.target),
                 ]
             ).casefold()
@@ -37,18 +65,26 @@ def filter_questions(
 def question_detail_markdown(q: OpenQuestion) -> str:
     from music_rig.reconciliation.service import question_state
 
+    fields = question_service.question_json_fields(q)
     try:
         state = question_state(q).value
     except Exception:
         state = "—"
+    human_recon = state
+    if state == "NEEDS_AGENT_ACTION":
+        human_recon = "Needs agent reconciliation"
+    elif state == "DRAFT_ANSWER":
+        human_recon = "DRAFT_ANSWER — resolve before reconcile"
     lines = [
-        f"# {q.id} — {q.status.value}",
+        f"# {q.id} — {fields['lifecycle_label']}",
         "",
         q.question,
         "",
         f"**Area:** {q.area}",
-        f"**Status:** {q.status.value}",
-        f"**Reconciliation state:** {state}",
+        f"**Status:** {fields['question_status']}",
+        f"**Answer state:** {fields['answer_state']}",
+        f"**Lifecycle:** {fields['lifecycle_label']}",
+        f"**Reconciliation state:** {human_recon}",
         "",
         "## Typed target",
         "",
@@ -115,4 +151,5 @@ def question_detail_markdown(q: OpenQuestion) -> str:
     return "\n".join(lines)
 
 
-STATUS_CYCLE = ("OPEN", "RESOLVED", "DEFERRED", "ALL")
+# ACTIVE = work still requiring attention (default)
+STATUS_CYCLE = ("ACTIVE", "OPEN", "RESOLVED", "UNRECONCILED", "DEFERRED", "ALL")
