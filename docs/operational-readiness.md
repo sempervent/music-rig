@@ -10,22 +10,26 @@ Status language for this repository:
 
 **Current goal: PLAYABLE** — not perfectly audited.
 
+Recording is **not** required for PLAYABLE. See [Jam now](jam-now.md) and
+[Capture now](capture-now.md).
+
 Optional detail (exact Thru5 THRU sockets, archival Questions, formal re-smoke)
 must not block jamming.
 
-## Snapshot census (Stage 27 repair)
+## Snapshot census (Stage 28)
 
 | Metric | Value |
 |---|---|
 | Overall class | **PLAYABLE** |
+| Stage 27 jam (HUMAN) | SUCCESS — not captured (capture would have broken flow) |
 | FINAL / reconciled Questions | includes Q-008, Q-014–Q-018, Q-020, Q-017 (UNKNOWN) |
-| OPEN Questions | Q-005, Q-009, Q-010, Q-012, Q-013, Q-019 |
+| OPEN Questions | Q-005, Q-009, Q-010, Q-012, Q-013, Q-019 (non-blocking) |
 | Pending HUMAN actions | **0** |
 | Ableton clock | VERIFIED (RIG-031 DONE) |
 | PB-B represented modes | `normal` (Q-008 reconciled) |
-| Thru5 | Device-level fanout to SL-2 / SR-18 / miniKORG / KAOSS; sockets not tracked |
-| ZeRO templates | UNKNOWN (honest) |
-| Next Session | RIG-046 (reference jam), RIG-038 (PFL template) |
+| Thru5 | Device-level fanout; sockets not tracked |
+| Capture | Optional Scratch (OBS REC) / Multitrack (Arrangement Record) |
+| Next Session | RIG-046 (jam; capture optional), RIG-038 (PFL template) |
 
 ## What is deferred (optional)
 

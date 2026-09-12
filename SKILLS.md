@@ -499,6 +499,20 @@ state changes from that reconciliation are intentional. Report them. Do **not**
 finish by asking whether to preserve them. Git commit/push remains a separate
 concern unless the human also requested repository delivery.
 
+## Creative sessions (PLAY first)
+
+When helping during a jam or creative experiment:
+
+1. Prefer `rig --am-bot session note "…"` / `session discovery` / `capture` / `change`
+   over interrupting the HUMAN to reconcile CURRENT.
+2. Session notes auto-start a session if none is active — no ceremony required.
+3. Never imply that PLAYABLE requires recording.
+4. Never fabricate HUMAN answers, observations, DoD, or VERIFIED CURRENT from an
+   experiment note.
+5. Promotion to CURRENT happens **after** the jam, only if the HUMAN wants to keep it.
+
+See [docs/capture-now.md](docs/capture-now.md) and [docs/stage-28-capture.md](docs/stage-28-capture.md).
+
 ## Things Agents Must Never Do
 
 - Invent answers to OPEN questions or mark UNKNOWN as decided

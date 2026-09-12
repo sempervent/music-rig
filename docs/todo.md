@@ -43,7 +43,7 @@ At most three tasks. Prefer resolving physical uncertainty, reproducibility, and
 
 | ID | Task | Why this session |
 |---|---|---|
-| RIG-046 | Record one complete PFL reference jam through the documented rig | Make music — reference jam is the point of the rig |
+| RIG-046 | Play another PFL jam; optionally practice Scratch or Multitrack capture without breaking flow | Make music — practice optional capture only if it stays fun |
 | RIG-038 | Create/finalize repeatable PFL JAM Ableton template | Turn-on-and-play set supports jamming with less friction |
 
 ## Waiting / External
@@ -87,7 +87,7 @@ At most three tasks. Prefer resolving physical uncertainty, reproducibility, and
 | RIG-043 | Establish rig backup / archive procedure | Studio ops | P1 | READY | — | Procedure covers Ableton template, M4L devices, LC3, ZeRO SL, FCB1010 docs, U6MIDI Pro routes, Stream Deck profiles, KAOSS settings, important samples/PFL assets; docs record backup *location* without dumping binaries into git | Extends RIG-017/018 |
 | RIG-044 | Write one-performer live-looping recovery playbook | Studio ops | P1 | READY | RIG-019 | Playbook covers bad RC-1 loop, wrong clip, runaway delay/feedback, stuck note, KAOSS mistake, wrong scene, mute/solo accidents, pedal noise, full emergency stop; prefer recovery without keyboard/mouse | — |
 | RIG-045 | Finish Stream Deck+ / OBS hands-off performance profiles | Video / ops | P1 | READY | RIG-042 helpful | Profiles (PFL HOME, OBS REC, OBS SCENES, OBS SAFE, ABLETON, FILES, MAC-RIG, SETTINGS) verified or remaining gaps listed; OBS SAFE provides stop-record, mute, camera isolate, replay save where supported, return to known scene; no keyboard/mouse needed for core performance | Do not recreate already-complete pages |
-| RIG-046 | Record one complete PFL reference jam through the documented rig | Integration | P0 | READY | RIG-015 helpful | At least one instrument source; AUX SEND wet path; RC-1 used; JOYO branch used; KAOSS available/used; Ableton records expected paths; OBS/camera if practical; recording reviewed; discrepancies logged | Proves the rig makes music |
+| RIG-046 | Play another PFL jam; optionally practice Scratch or Multitrack capture without breaking flow | Integration | P0 | READY | RIG-015 helpful | Successful jam counts even with zero recording (Stage 27 precedent). Optional stretch — Scratch (OBS REC) or Multitrack (Arrangement Record) start/stop without leaving the musical state; note any remaining friction. Do not treat uncaptured SUCCESS as failure. | Stage 27 HUMAN jam SUCCESS without capture. Capture friction is Stage 28 — PLAY first. See docs/capture-now.md. |
 | RIG-047 | Audit pedal power supplies vs CURRENT pedal load | Pedals / power | P1 | READY | RIG-001 helpful | Per-pedal voltage + current need, supply assignment, isolation, total headroom documented; wishlist power item updated (buy / park / REDUNDANT) | Change one variable at a time if diagnosing noise |
 | RIG-048 | Research stereo line-to-pedal / reamp / isolation options against owned ProRMP + PDC22 | Routing | P2 | READY | RIG-024 helpful | Written comparison of capability gap vs owned gear; shortlist or “no buy — workflow change” decision; no product purchase committed | Wishlist RESEARCH companion |
 

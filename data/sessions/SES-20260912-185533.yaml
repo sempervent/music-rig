@@ -1,0 +1,19 @@
+id: SES-20260912-185533
+started_at: '2026-09-12T18:55:33.488564-04:00'
+ended_at: '2026-09-12T18:55:44.594126-04:00'
+status: COMPLETED
+focus: Stage 27 reference jam (HUMAN-reported SUCCESS)
+events:
+- timestamp: '2026-09-12T18:55:33.739936-04:00'
+  type: NOTE
+  text: 'HUMAN-reported result: SUCCESS. Not recorded through the rig/interface because capture
+    would have broken flow. Capture friction is Stage 28 design input — not a failed jam.'
+  todo_id: null
+  capture_id: null
+  change_id: null
+- timestamp: '2026-09-12T18:55:33.978660-04:00'
+  type: DISCOVERY
+  text: PLAY without CAPTURE is a valid successful outcome.
+  todo_id: null
+  capture_id: null
+  change_id: null

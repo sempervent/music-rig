@@ -29,6 +29,9 @@ Target: ~5 minutes. Baseline session only (not every owned device).
 You are ready when you hear a dry source and the transport is under Ableton
 clock.
 
+Recording is optional. For Scratch / Multitrack without breaking flow, see
+[Capture now](capture-now.md). Uncaptured play still counts as success.
+
 ## Shutdown
 
 1. Stop recording / clips; clear or stop **RC-1** if looping.
