@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fixtures.stage_repos import _clock
+from fixtures.repo_fixtures import _clock
 import json
 from datetime import datetime, timezone
 from pathlib import Path

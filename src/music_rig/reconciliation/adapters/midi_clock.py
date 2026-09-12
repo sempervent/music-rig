@@ -187,19 +187,52 @@ class MidiClockAdapter(ReconciliationAdapter):
                 op(PlanOperationKind.NO_CURRENT_CHANGE, note="observation UNKNOWN")
             )
 
-        cmds = [
-            "uv run rig current midi verify",
-            "uv run rig midi clock",
+        from music_rig.reconciliation.suggestions import (
+            ActionSuggestion,
+            SuggestionKind,
+            render_suggestions,
+            suggest_answer,
+            suggest_finalize,
+            suggest_verify_record,
+        )
+
+        suggestions: list[ActionSuggestion] = [
+            ActionSuggestion(
+                kind=SuggestionKind.VERIFY,
+                intent="current midi verify",
+                description="Inspect MIDI clock / topology evidence",
+                code="midi_verify",
+            ),
+            ActionSuggestion(
+                kind=SuggestionKind.INSPECT,
+                intent="midi clock",
+                description="Show MIDI clock master",
+                code="midi_clock",
+            ),
         ]
         if endpoint:
-            cmds.append(
-                f"uv run rig current midi set-clock-master {endpoint} "
-                f"--question {question.id}"
+            suggestions.append(
+                ActionSuggestion(
+                    kind=SuggestionKind.CLI_HINT,
+                    intent=(
+                        f"current midi set-clock-master {endpoint} "
+                        f"--question {question.id}"
+                    ),
+                    description=f"Set clock master to {endpoint}",
+                    code="set_clock_master",
+                    params={"endpoint": endpoint, "question_id": question.id},
+                )
             )
-            cmds.append(
-                f"uv run rig reconcile apply question {question.id} --dry-run --json"
+            suggestions.append(
+                ActionSuggestion(
+                    kind=SuggestionKind.INSPECT,
+                    intent=f"reconcile apply question {question.id} --dry-run --json",
+                    description="Dry-run apply for clock master",
+                    code="apply_dry_run",
+                    params={"question_id": question.id},
+                )
             )
-        cmds.append(f"uv run rig reconcile finalize question {question.id} --yes")
+        suggestions.append(suggest_finalize(question.id))
 
         blockers: list[Any] = []
         details: dict[str, Any] = {
@@ -214,6 +247,7 @@ class MidiClockAdapter(ReconciliationAdapter):
             ),
         }
         if has_bot_answer(question):
+            ans = [suggest_answer(question.id)]
             blockers.append(
                 {
                     "code": "needs_human_answer",
@@ -222,9 +256,8 @@ class MidiClockAdapter(ReconciliationAdapter):
                         "BOT answer is not human factual authority. "
                         "A human must Answer & Resolve."
                     ),
-                    "suggested_commands": [
-                        f'uv run rig question answer {question.id} --answer "…"'
-                    ],
+                    "suggestions": [s.to_dict() for s in ans],
+                    "suggested_commands": render_suggestions(ans),
                 }
             )
         elif (
@@ -232,6 +265,11 @@ class MidiClockAdapter(ReconciliationAdapter):
             and question.status == QuestionStatus.RESOLVED
             and not has_positive_observation(question)
         ):
+            obs = [
+                suggest_verify_record(
+                    question.id, outcome="confirmed", value=endpoint or "…"
+                )
+            ]
             blockers.append(
                 {
                     "code": "needs_human_observation",
@@ -240,10 +278,8 @@ class MidiClockAdapter(ReconciliationAdapter):
                         "This verification kind requires an explicit physical/software "
                         "test observation (not answer attestation alone)."
                     ),
-                    "suggested_commands": [
-                        f"uv run rig verify record {question.id} "
-                        f"--outcome confirmed --value {endpoint or '…'} --yes --json"
-                    ],
+                    "suggestions": [s.to_dict() for s in obs],
+                    "suggested_commands": render_suggestions(obs),
                 }
             )
         elif state == ReconciliationState.NEEDS_AGENT_ACTION and not endpoint:
@@ -268,7 +304,7 @@ class MidiClockAdapter(ReconciliationAdapter):
             desired=endpoint or (question.answer.strip() or None),
             operations=operations,
             blockers=blockers,
-            suggested_commands=cmds,
+            suggestions=suggestions,
             postconditions=(
                 [f"clock.master == {endpoint} AND status == VERIFIED"]
                 if endpoint and authority

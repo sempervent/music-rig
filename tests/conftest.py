@@ -268,5 +268,5 @@ def tui_fx(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
 
 pytest_plugins = [
-    "fixtures.stage_repos",
+    "fixtures.repo_fixtures",
 ]

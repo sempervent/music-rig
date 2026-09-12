@@ -104,16 +104,55 @@ class AbletonTemplateAdapter(ReconciliationAdapter):
                 op(PlanOperationKind.RECORD_FAILED_VERIFICATION, note=vr.note or "")
             )
 
-        cmds = ["uv run rig ableton targets"]
-        if path_key:
-            cmds.append(f"uv run rig ableton template {path_key}")
-            cmds.append(
-                f"uv run rig current ableton set-template-evidence {path_key} VERIFIED"
+        from music_rig.reconciliation.suggestions import (
+            ActionSuggestion,
+            SuggestionKind,
+            suggest_finalize,
+            suggest_verify_record,
+        )
+
+        suggestions: list[ActionSuggestion] = [
+            ActionSuggestion(
+                kind=SuggestionKind.INSPECT,
+                intent="ableton targets",
+                description="List Ableton template targets",
+                code="ableton_targets",
             )
-        cmds.append(f"uv run rig reconcile apply question {question.id} --dry-run --json")
-        cmds.append(
-            f"uv run rig reconcile finalize question {question.id} "
-            f"--no-current-change --note \"template reviewed\" --yes"
+        ]
+        if path_key:
+            suggestions.append(
+                ActionSuggestion(
+                    kind=SuggestionKind.INSPECT,
+                    intent=f"ableton template {path_key}",
+                    description=f"Show template {path_key}",
+                    code="ableton_template",
+                    params={"path": path_key},
+                )
+            )
+            suggestions.append(
+                ActionSuggestion(
+                    kind=SuggestionKind.CLI_HINT,
+                    intent=(
+                        f"current ableton set-template-evidence {path_key} VERIFIED"
+                    ),
+                    description=f"Set template {path_key} evidence VERIFIED",
+                    code="set_template_evidence",
+                    params={"path": path_key},
+                )
+            )
+        suggestions.append(
+            ActionSuggestion(
+                kind=SuggestionKind.INSPECT,
+                intent=f"reconcile apply question {question.id} --dry-run --json",
+                description="Dry-run apply for template evidence",
+                code="apply_dry_run",
+                params={"question_id": question.id},
+            )
+        )
+        suggestions.append(
+            suggest_finalize(
+                question.id, no_current_change=True, note="template reviewed"
+            )
         )
 
         details: dict[str, Any] = {}
@@ -130,6 +169,9 @@ class AbletonTemplateAdapter(ReconciliationAdapter):
                             "Confirm Live set offline, then "
                             "`rig verify record --outcome confirmed`"
                         ),
+                        "suggestions": [
+                            suggest_verify_record(question.id).to_dict()
+                        ],
                     }
                 )
             details["action_packet"] = build_action_packet(
@@ -157,7 +199,7 @@ class AbletonTemplateAdapter(ReconciliationAdapter):
             desired=question.answer.strip() or None,
             operations=operations,
             blockers=blockers,
-            suggested_commands=cmds,
+            suggestions=suggestions,
             details=details,
             postconditions=(
                 [f"{path_key} evidence == VERIFIED"] if path_key else []

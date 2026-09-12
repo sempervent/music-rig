@@ -40,7 +40,7 @@ from music_rig.reconciliation.context import ReconciliationContext
 from music_rig.reconciliation.operation_registry import allowlisted_kinds, get_spec
 from music_rig.reconciliation.operations import RigOperation
 from music_rig.store import StoreError, ROOT, load_questions
-from fixtures.stage_repos import _provider
+from fixtures.repo_fixtures import _provider
 
 def test_atomic_multi_domain_success(fx21):
     """channels + patchbay + finalize commit in one atomic write."""

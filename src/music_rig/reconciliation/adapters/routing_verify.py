@@ -109,17 +109,55 @@ class RoutingVerifyAdapter(ReconciliationAdapter):
                 )
             )
 
-        cmds = []
+        from music_rig.reconciliation.suggestions import (
+            ActionSuggestion,
+            SuggestionKind,
+            suggest_finalize,
+            suggest_verify_record,
+        )
+
+        suggestions: list[ActionSuggestion] = []
         if path:
-            cmds.append(f"uv run rig path show {path}")
-            cmds.append(f"uv run rig current path verify {path}")
-            cmds.append(
-                f"uv run rig current path set-evidence {path} VERIFIED"
+            suggestions.append(
+                ActionSuggestion(
+                    kind=SuggestionKind.INSPECT,
+                    intent=f"path show {path}",
+                    description=f"Show named path {path}",
+                    code="path_show",
+                    params={"path": path},
+                )
             )
-        cmds.append(f"uv run rig reconcile verify question {question.id}")
-        cmds.append(
-            f"uv run rig reconcile finalize question {question.id} "
-            f"--no-current-change --note \"verified path\" --yes"
+            suggestions.append(
+                ActionSuggestion(
+                    kind=SuggestionKind.VERIFY,
+                    intent=f"current path verify {path}",
+                    description=f"Verify path {path}",
+                    code="path_verify",
+                    params={"path": path},
+                )
+            )
+            suggestions.append(
+                ActionSuggestion(
+                    kind=SuggestionKind.CLI_HINT,
+                    intent=f"current path set-evidence {path} VERIFIED",
+                    description=f"Set path {path} evidence VERIFIED",
+                    code="path_set_evidence",
+                    params={"path": path},
+                )
+            )
+        suggestions.append(
+            ActionSuggestion(
+                kind=SuggestionKind.VERIFY,
+                intent=f"reconcile verify question {question.id}",
+                description=f"Verify reconciliation for {question.id}",
+                code="reconcile_verify",
+                params={"question_id": question.id},
+            )
+        )
+        suggestions.append(
+            suggest_finalize(
+                question.id, no_current_change=True, note="verified path"
+            )
         )
 
         details: dict[str, Any] = {}
@@ -148,6 +186,9 @@ class RoutingVerifyAdapter(ReconciliationAdapter):
                     {
                         "code": "needs_human_observation",
                         "message": "Record confirm/correct via verify record",
+                        "suggestions": [
+                            suggest_verify_record(question.id).to_dict()
+                        ],
                     }
                 )
 
@@ -160,7 +201,7 @@ class RoutingVerifyAdapter(ReconciliationAdapter):
             desired=question.answer.strip() or None,
             operations=operations,
             blockers=blockers,
-            suggested_commands=cmds,
+            suggestions=suggestions,
             details=details,
             postconditions=(
                 [f"path {path} evidence == VERIFIED"] if path else []

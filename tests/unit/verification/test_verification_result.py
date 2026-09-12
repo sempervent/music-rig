@@ -28,7 +28,7 @@ from music_rig.reconciliation.adapters import get_adapter
 from music_rig.reconciliation.adapters.unsupported import MANUAL_CLASSIFICATION
 from music_rig.reconciliation.types import Capability, PlanOperationKind, VerificationStatus
 from music_rig.store import StoreError, load_changes, load_questions
-from fixtures.stage_repos import _clock
+from fixtures.repo_fixtures import _clock
 
 def test_verification_result_model_serialization():
     vr = VerificationResult(

@@ -65,14 +65,20 @@ def reconcile_run(
         }
 
     if dispatch.mode is DispatchMode.HUMAN_ANSWER:
+        from music_rig.reconciliation.suggestions import (
+            render_suggestion,
+            suggest_answer,
+        )
+
         return {
             **base,
             "ok": False,
             "mode": "needs_human",
             "message": (
                 f"{qid} needs a final human answer before reconciliation.\n"
-                f'  uv run rig question answer {qid} --answer "…"'
+                f"  {render_suggestion(suggest_answer(qid))}"
             ),
+            "suggestions": [suggest_answer(qid).to_dict()],
         }
 
     if dispatch.mode is DispatchMode.HUMAN_OBSERVATION:
@@ -88,6 +94,11 @@ def reconcile_run(
         )
 
     if dispatch.mode is DispatchMode.HUMAN_CLARIFICATION:
+        from music_rig.reconciliation.suggestions import (
+            render_suggestion,
+            suggest_answer,
+        )
+
         return {
             **base,
             "ok": False,
@@ -95,9 +106,10 @@ def reconcile_run(
             "message": (
                 f"{qid}: human clarification required — an agent cannot invent "
                 f"the missing fact.\n"
-                f'  uv run rig question answer {qid} --answer "…"'
+                f"  {render_suggestion(suggest_answer(qid))}"
             ),
             "blockers": list(plan.blockers or []),
+            "suggestions": [suggest_answer(qid).to_dict()],
         }
 
     if dispatch.mode is DispatchMode.DETERMINISTIC:
@@ -129,7 +141,19 @@ def reconcile_run(
     if dispatch.mode is DispatchMode.AGENT:
         status = provider_status(root=root)
         if not status.get("configured") and not provider:
+            from music_rig.reconciliation.suggestions import (
+                ActionSuggestion,
+                SuggestionKind,
+                render_suggestion,
+            )
+
             detected = detect_providers(root=root)
+            setup = ActionSuggestion(
+                kind=SuggestionKind.CLI_HINT,
+                intent="agent provider setup",
+                description="Configure agent provider",
+                code="provider_setup",
+            )
             return {
                 **base,
                 "ok": False,
@@ -137,7 +161,8 @@ def reconcile_run(
                 "provider_configured": False,
                 "detected": detected,
                 "message": _missing_provider_message(detected),
-                "setup_hint": "uv run rig agent provider setup",
+                "setup_hint": render_suggestion(setup),
+                "suggestions": [setup.to_dict()],
             }
 
         autonomy = AutonomyLevel.PLAN_ONLY
@@ -260,12 +285,13 @@ def _human_observation_path(
             return out
 
     if apply and yes:
+        from music_rig.reconciliation.suggestions import render_suggestion
+
         out["message"] = (
             message
             + "\n\n--yes does not imply human observation. "
             "Record verification first:\n"
-            f"  uv run rig verify record {qid} --outcome confirmed "
-            f"--value … --yes --json"
+            f"  {render_suggestion(suggest_verify_record(qid))}"
         )
         out["ok"] = False
         return out
@@ -280,6 +306,13 @@ def _format_observation_message(
     desired: Any,
     match_line: str,
 ) -> str:
+    from music_rig.reconciliation.suggestions import (
+        ActionSuggestion,
+        SuggestionKind,
+        render_suggestion,
+        suggest_verify_record,
+    )
+
     current_lines = _format_current(current)
     return "\n".join(
         [
@@ -301,10 +334,10 @@ def _format_observation_message(
             "",
             "Next:",
             "  Verify the fact on the actual rig, then record the observation with:",
-            f"    uv run rig verify record {qid} --outcome confirmed --value … --yes --json",
+            f"    {render_suggestion(suggest_verify_record(qid))}",
             "",
             "  Or use:",
-            "    uv run rig tui verify",
+            f"    {render_suggestion(ActionSuggestion(kind=SuggestionKind.VERIFY, intent='tui verify', code='tui_verify'))}",
         ]
     )
 
@@ -408,7 +441,20 @@ def _deterministic_path(
         out["applied"] = True
         out["message"] = f"Applied deterministic reconciliation for {qid}."
     else:
+        from music_rig.reconciliation.suggestions import (
+            ActionSuggestion,
+            SuggestionKind,
+            render_suggestion,
+        )
+
         basis = (plan.details or {}).get("evidence_basis")
+        run_sug = ActionSuggestion(
+            kind=SuggestionKind.CLI_HINT,
+            intent=f"reconcile run {qid} --apply --yes",
+            description=f"Apply deterministic reconciliation for {qid}",
+            code="reconcile_run_apply",
+            params={"question_id": qid},
+        )
         out["message"] = (
             f"Deterministic apply available for {qid}.\n"
             + (
@@ -416,14 +462,38 @@ def _deterministic_path(
                 if basis
                 else ""
             )
-            + f"Review plan, then: uv run rig reconcile run {qid} --apply --yes"
+            + f"Review plan, then: {render_suggestion(run_sug)}"
         )
     return out
 
 
 def _missing_provider_message(detected: dict[str, Any]) -> str:
+    from music_rig.reconciliation.suggestions import (
+        ActionSuggestion,
+        SuggestionKind,
+        render_suggestion,
+    )
+
     cursor = detected.get("cursor") or {}
     ollama = detected.get("ollama") or {}
+    setup = ActionSuggestion(
+        kind=SuggestionKind.CLI_HINT,
+        intent="agent provider setup",
+        description="Configure agent provider",
+        code="provider_setup",
+    )
+    use_cursor = ActionSuggestion(
+        kind=SuggestionKind.CLI_HINT,
+        intent="agent provider use cursor",
+        description="Use Cursor provider",
+        code="provider_cursor",
+    )
+    use_ollama = ActionSuggestion(
+        kind=SuggestionKind.CLI_HINT,
+        intent="agent provider use ollama --model <model>",
+        description="Use Ollama provider",
+        code="provider_ollama",
+    )
     return "\n".join(
         [
             "Agent reconciliation is required.",
@@ -433,10 +503,10 @@ def _missing_provider_message(detected: dict[str, Any]) -> str:
             f"  Ollama {'✓' if ollama.get('available') else '✗'}",
             "",
             "Configure Provider:",
-            "  uv run rig agent provider setup",
+            f"  {render_suggestion(setup)}",
             "",
             "Or:",
-            "  uv run rig agent provider use cursor",
-            "  uv run rig agent provider use ollama --model <model>",
+            f"  {render_suggestion(use_cursor)}",
+            f"  {render_suggestion(use_ollama)}",
         ]
     )

@@ -49,7 +49,7 @@ Prefer `tests.helpers.cli` over ad-hoc `CliRunner` usage:
 ## Fixtures
 
 Stage-era isolated repos (`fx15`, `fx17`, `fx19`, `fx20`, `fx21`, `iso`, …) live in
-`tests/fixtures/` (notably `stage_repos.py`) so split modules share one definition.
+`tests/fixtures/` (notably `repo_fixtures.py`) so split modules share one definition.
 
 Root `tui_fx` remains in `tests/conftest.py` for TUI mutation isolation.
 
