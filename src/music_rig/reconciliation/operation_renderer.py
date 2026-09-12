@@ -54,11 +54,12 @@ def render_argv(operation: RigOperation, *, prefix: str = "uv run rig") -> list[
         if args.get("yes"):
             parts.append("--yes")
     elif kind == "question.finalize_manual":
+        qid = args.get("question_id") or args.get("artifact_id") or "Q-xxx"
         parts += [
             "reconcile",
             "finalize",
             "question",
-            str(args["question_id"]),
+            str(qid),
             "--confirm-current-reconciled",
             "--note",
             str(args.get("note") or "agent-assisted reconciliation"),

@@ -103,7 +103,9 @@ def test_production_midi_is_conservative_and_valid():
     assert midi_state.validate_midi_doc(midi_state.load_raw()) == []
     assert len(doc.devices) == 12
     assert len(doc.endpoints) == 2
-    assert doc.connections == []
+    assert len(doc.connections) == 2
+    assert {c.source for c in doc.connections} == {"behringer-fcb1010", "cme-u6midi-pro"}
+    assert all(c.status == MidiEvidenceStatus.VERIFIED for c in doc.connections)
     assert len(doc.channels) == 4
     assert all(item.status == MidiEvidenceStatus.INTENDED for item in doc.channels)
     assert doc.clock.master is not None
@@ -114,6 +116,7 @@ def test_production_midi_is_conservative_and_valid():
     questions = load_questions().question_map()
     assert questions["Q-014"].target.domain == "midi.clock_master"
     assert questions["Q-015"].target.domain == "midi.verify"
+    assert questions["Q-015"].reconciled_at is not None
     assert questions["Q-016"].target.domain == "controls.verify"
     assert questions["Q-016"].target.gear == "behringer-fcb1010"
     assert questions["Q-017"].target.domain == "controls.verify"

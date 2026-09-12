@@ -220,13 +220,17 @@ questions:
 - id: Q-011
   question: Do the physical DIRTY and SPACE boards match docs/pedal-chains.md?
   area: Pedals / power
-  status: OPEN
+  status: RESOLVED
   related_todos:
   - RIG-001
   related_changes: []
-  answer: ''
+  answer: Current docs are correct
+  answer_actor: HUMAN
   notes: ''
-  reconciliation_note: ''
+  resolved_at: '2026-09-12T15:40:19.683447-04:00'
+  reconciled_at: '2026-09-12T15:52:33.750454-04:00'
+  reconciliation_note: 'HUMAN BOARD_COMPARE via TUI: Current docs are correct; DIRTY/SPACE
+    match docs/pedal-chains.md. No CURRENT mutation required.'
   verification:
     kind: BOARD_COMPARE
     prompt: Walk DIRTY and SPACE boards against docs/pedal-chains.md. YES = match; NO = note
@@ -302,13 +306,17 @@ questions:
 - id: Q-015
   question: What is the verified physical MIDI topology using U6MIDI Pro + Thru5 WC?
   area: MIDI
-  status: OPEN
+  status: RESOLVED
   related_todos:
   - RIG-037
   related_changes: []
-  answer: ''
+  answer: U6MIDI Pro sends to Thru5C WC on 1 and inputs from FCB1010
+  answer_actor: HUMAN
   notes: ''
-  reconciliation_note: ''
+  resolved_at: '2026-09-12T15:43:29.143252-04:00'
+  reconciled_at: '2026-09-12T15:52:43.157376-04:00'
+  reconciliation_note: 'agent-interpreted HUMAN MIDI topology into CURRENT links: FCB1010→U6MIDI
+    IN1; U6MIDI OUT1→Thru5 WC IN1. Downstream fan-out still open.'
   target:
     domain: midi.verify
   verification:
@@ -321,13 +329,18 @@ questions:
 - id: Q-016
   question: What exact FCB1010 switch map is assigned in banks 00/01/02?
   area: MIDI
-  status: OPEN
+  status: RESOLVED
   related_todos:
   - RIG-035
   related_changes: []
-  answer: ''
+  answer: Currently bank 00 just allows selection of tracks 1-10 (arming) and their respective
+    audio group control
+  answer_actor: HUMAN
   notes: ''
-  reconciliation_note: ''
+  resolved_at: '2026-09-12T15:46:02.759002-04:00'
+  reconciled_at: '2026-09-12T15:52:43.587639-04:00'
+  reconciliation_note: agent-interpreted HUMAN bank-00 FCB map into controllers.yaml notes.
+    Banks 01/02 unobserved; RIG-035 left READY; no verify-record invented.
   target:
     domain: controls.verify
     gear: behringer-fcb1010
@@ -361,14 +374,18 @@ questions:
 - id: Q-018
   question: What are the exact active tracks in the current PFL jam Ableton set?
   area: Performance / video
-  status: OPEN
+  status: RESOLVED
   related_todos:
   - RIG-034
   - RIG-038
   related_changes: []
-  answer: ''
+  answer: Active tracks are 1 Zoned Kit, 2 miniKORG, 3 KAOSS, 6 MIXER, 7 mix, 8 clean (guitars)
+  answer_actor: HUMAN
   notes: ''
-  reconciliation_note: ''
+  resolved_at: '2026-09-12T15:38:51.163957-04:00'
+  reconciled_at: '2026-09-12T15:52:44.052835-04:00'
+  reconciliation_note: agent-interpreted HUMAN PFL jam track list into ableton.yaml template
+    notes/active flags. Evidence left INTENDED; no verify-record invented.
   target:
     domain: ableton.template
     path: pfl-jam
@@ -399,13 +416,18 @@ questions:
 - id: Q-020
   question: What is the default one-player loop-building order (RC-1 vs KAOSS vs future RC-600)?
   area: Performance / video
-  status: OPEN
+  status: RESOLVED
   related_todos:
   - RIG-038
   related_changes: []
-  answer: ''
+  answer: Default loop order is currently RC-1 -> KAOSS with RC-1 -> KAOSS | RC-600 or instrument
+    -> RC-6000 via Alesis Mixer
+  answer_actor: HUMAN
   notes: Also related to Wishlist playbook IDEA; jam template work tracked under RIG-038.
-  reconciliation_note: ''
+  resolved_at: '2026-09-12T15:45:10.100517-04:00'
+  reconciled_at: '2026-09-12T15:52:44.524705-04:00'
+  reconciliation_note: 'HUMAN workflow: RC-1 → KAOSS default; RC-600 variants via mixer when
+    available. Documented in docs/known-good-ops.md.'
   verification:
     kind: WORKFLOW
     prompt: Decide the default one-player loop order from how you actually jam (RC-1 / KAOSS

@@ -31,4 +31,6 @@ The design goal is not purity. It is controllable chaos: clean captures availabl
 | [Open questions](open-questions.md) | Unresolved facts |
 | [Reconciliation](reconciliation.md) | Question ↔ CURRENT engine architecture |
 | [Testing](testing.md) | Suite layout, markers, coverage gate |
+| [Operational readiness](operational-readiness.md) | Stage 24 playability burn-down / human check batches |
+| [Known-good ops](known-good-ops.md) | Startup, shutdown, smoke test, reference jam |
 | [Inventory](inventory.md) | What is owned |

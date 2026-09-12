@@ -21,15 +21,15 @@ when it is explicitly represented in `connections`.
 
 | Gear ref | Role | Notes |
 |---|---|---|
-| cme-u6midi-pro | usb-midi-router | 3 in / 3 out; route / merge / filter / remap — OWNED |
-| cme-midi-thru5-wc | midi-thru | Hardware thru distribution — OWNED; not a programmable remapper |
+| cme-u6midi-pro | usb-midi-router | 3 in / 3 out; route / merge / filter / remap — OWNED. Q-015: receives FCB1010 on MIDI IN 1; sends to Thru5 WC on MIDI OUT 1. |
+| cme-midi-thru5-wc | midi-thru | Hardware thru distribution — OWNED; not a programmable remapper. Q-015: fed from U6MIDI Pro OUT 1 into Thru5 WC IN 1; other thru ports not fully traced. |
 | tascam-us-16x08 | audio-interface-midi | May participate in MIDI paths; exact CURRENT use UNKNOWN |
 | korg-minikorg | synth | — |
 | kaoss-replay | sampler-effects | — |
 | boss-sl-2 | pedal | — |
 | casio-privia | instrument | — |
 | korg-padkontrol | controller | — |
-| behringer-fcb1010 | foot-controller | USB Uno recognition unresolved (RIG-022); switch maps out of Stage 8 scope |
+| behringer-fcb1010 | foot-controller | USB Uno recognition unresolved (RIG-022); bank-00 map partially attested (Q-016) |
 | novation-remote-zero-sl | controller | — |
 | launchpad-x | controller | — |
 | novation-launch-control-3 | controller | — |
@@ -38,7 +38,8 @@ when it is explicitly represented in `connections`.
 
 | ID | Source / port | Destination / port | Transport | Evidence | Notes |
 |---|---|---|---|---|---|
-| — | UNKNOWN | UNKNOWN | — | UNKNOWN | No verified physical links |
+| midi-link-001 | behringer-fcb1010 / MIDI OUT | cme-u6midi-pro / MIDI IN 1 | DIN | VERIFIED | — |
+| midi-link-002 | cme-u6midi-pro / MIDI OUT 1 | cme-midi-thru5-wc / MIDI IN 1 | DIN | VERIFIED | — |
 <!-- rig:midi-topology:end -->
 
 ## Evidence rules

@@ -33,6 +33,8 @@ nav:
   - Reamp and DI: reamp-and-di.md
   - Troubleshooting: troubleshooting.md
   - Open Questions: open-questions.md
+  - Operational readiness: operational-readiness.md
+  - Known-good ops: known-good-ops.md
   - Interactive TUI: tui.md
   - Reconciliation: reconciliation.md
   - Testing: testing.md

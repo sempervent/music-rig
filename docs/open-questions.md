@@ -23,15 +23,10 @@ Resolving a question records an answer. It does **not** automatically rewrite CU
 | Q-008 | Patchbay | What normalization mode (normal / half-normal / thru) is each populated PB-B pair set to? | RIG-002 | — |
 | Q-009 | Patchbay | What are the rear-panel assignments for PB-A, PB-C, and PB-D? | RIG-005, RIG-040 | — |
 | Q-010 | Patchbay | What (if anything) should feed PB-B upper 9–12 into lower 33–36? | RIG-006 | — |
-| Q-011 | Pedals / power | Do the physical DIRTY and SPACE boards match docs/pedal-chains.md? | RIG-001 | — |
 | Q-012 | Pedals / power | Where are Flamma Mod and PH-2 right now (disconnected, stored, elsewhere)? | RIG-011 | — |
 | Q-013 | Pedals / power | What is each CURRENT pedal’s voltage, current draw, and power-supply assignment? | RIG-047 | — |
-| Q-015 | MIDI | What is the verified physical MIDI topology using U6MIDI Pro + Thru5 WC? | RIG-037 | — |
-| Q-016 | MIDI | What exact FCB1010 switch map is assigned in banks 00/01/02? | RIG-035 | — |
 | Q-017 | MIDI | Which ReMOTE ZeRO SL templates are actually loaded on the device? | RIG-036 | — |
-| Q-018 | Performance / video | What are the exact active tracks in the current PFL jam Ableton set? | RIG-034, RIG-038 | — |
 | Q-019 | Performance / video | What OBS camera angles are already covered by owned webcams? | RIG-042 | — |
-| Q-020 | Performance / video | What is the default one-player loop-building order (RC-1 vs KAOSS vs future RC-600)? | RIG-038 | — |
 
 ## Deferred
 
@@ -49,7 +44,12 @@ Resolving a question records an answer. It does **not** automatically rewrite CU
 | Q-004 | Routing | Does physical KAOSS monitor/capture match documented Monitor Out → KAOSS → TASCAM 9/10? | RIG-010 | — |
 | Q-006 | Routing | Should LS-2 also remain a bass split/blend tool outside its CURRENT SPACE role? | RIG-025 | — |
 | Q-007 | Patchbay | Which physical unit is PB-A / PB-B / PB-C / PB-D (ART P48 vs Behringer PX3000)? | RIG-004 | — |
+| Q-011 | Pedals / power | Do the physical DIRTY and SPACE boards match docs/pedal-chains.md? | RIG-001 | — |
 | Q-014 | MIDI | Is Ableton definitely the master clock in practice, or do KAOSS/SL-2 sometimes lead? | RIG-031 | — |
+| Q-015 | MIDI | What is the verified physical MIDI topology using U6MIDI Pro + Thru5 WC? | RIG-037 | — |
+| Q-016 | MIDI | What exact FCB1010 switch map is assigned in banks 00/01/02? | RIG-035 | — |
+| Q-018 | Performance / video | What are the exact active tracks in the current PFL jam Ableton set? | RIG-034, RIG-038 | — |
+| Q-020 | Performance / video | What is the default one-player loop-building order (RC-1 vs KAOSS vs future RC-600)? | RIG-038 | — |
 
 ## Answers and notes
 
@@ -131,6 +131,18 @@ What are the rear-panel assignments for PB-A, PB-C, and PB-D?
 
 **Notes:** Assignments remain UNKNOWN until inspected.
 
+### Q-011 — RESOLVED
+
+Do the physical DIRTY and SPACE boards match docs/pedal-chains.md?
+
+**Answer:** Current docs are correct
+
+**Resolved at:** 2026-09-12T15:40:19.683447-04:00
+
+**Reconciled at:** 2026-09-12T15:52:33.750454-04:00
+
+**Reconciliation note:** HUMAN BOARD_COMPARE via TUI: Current docs are correct; DIRTY/SPACE match docs/pedal-chains.md. No CURRENT mutation required.
+
 ### Q-014 — RESOLVED
 
 Is Ableton definitely the master clock in practice, or do KAOSS/SL-2 sometimes lead?
@@ -143,11 +155,55 @@ Is Ableton definitely the master clock in practice, or do KAOSS/SL-2 sometimes l
 
 **Reconciliation note:** HUMAN answer: Ableton is master clock; evidence VERIFIED via HUMAN_ANSWER. Linked RIG-031 left open (HUMAN DoD).
 
-### Q-020 — OPEN
+### Q-015 — RESOLVED
+
+What is the verified physical MIDI topology using U6MIDI Pro + Thru5 WC?
+
+**Answer:** U6MIDI Pro sends to Thru5C WC on 1 and inputs from FCB1010
+
+**Resolved at:** 2026-09-12T15:43:29.143252-04:00
+
+**Reconciled at:** 2026-09-12T15:52:43.157376-04:00
+
+**Reconciliation note:** agent-interpreted HUMAN MIDI topology into CURRENT links: FCB1010→U6MIDI IN1; U6MIDI OUT1→Thru5 WC IN1. Downstream fan-out still open.
+
+### Q-016 — RESOLVED
+
+What exact FCB1010 switch map is assigned in banks 00/01/02?
+
+**Answer:** Currently bank 00 just allows selection of tracks 1-10 (arming) and their respective audio group control
+
+**Resolved at:** 2026-09-12T15:46:02.759002-04:00
+
+**Reconciled at:** 2026-09-12T15:52:43.587639-04:00
+
+**Reconciliation note:** agent-interpreted HUMAN bank-00 FCB map into controllers.yaml notes. Banks 01/02 unobserved; RIG-035 left READY; no verify-record invented.
+
+### Q-018 — RESOLVED
+
+What are the exact active tracks in the current PFL jam Ableton set?
+
+**Answer:** Active tracks are 1 Zoned Kit, 2 miniKORG, 3 KAOSS, 6 MIXER, 7 mix, 8 clean (guitars)
+
+**Resolved at:** 2026-09-12T15:38:51.163957-04:00
+
+**Reconciled at:** 2026-09-12T15:52:44.052835-04:00
+
+**Reconciliation note:** agent-interpreted HUMAN PFL jam track list into ableton.yaml template notes/active flags. Evidence left INTENDED; no verify-record invented.
+
+### Q-020 — RESOLVED
 
 What is the default one-player loop-building order (RC-1 vs KAOSS vs future RC-600)?
 
+**Answer:** Default loop order is currently RC-1 -> KAOSS with RC-1 -> KAOSS | RC-600 or instrument -> RC-6000 via Alesis Mixer
+
 **Notes:** Also related to Wishlist playbook IDEA; jam template work tracked under RIG-038.
+
+**Resolved at:** 2026-09-12T15:45:10.100517-04:00
+
+**Reconciled at:** 2026-09-12T15:52:44.524705-04:00
+
+**Reconciliation note:** HUMAN workflow: RC-1 → KAOSS default; RC-600 variants via mixer when available. Documented in docs/known-good-ops.md.
 
 ## ID allocation
 

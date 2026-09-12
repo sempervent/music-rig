@@ -21,7 +21,7 @@ and controls are left explicit instead of inventing assignments.
 
 ## behringer-fcb1010
 
-Channel 16 and bank roles are design direction (RIG-035). Exact switch map is OPEN (Q-016). EXP A/B CC numbers are documented intent; Ableton targets UNKNOWN.
+Channel 16 INTENDED. Q-016 HUMAN (bank 00): switches select/arm tracks 1–10 and their respective audio group control. Banks 01/02 still unobserved. EXP A/B CC numbers are documented intent; Ableton targets UNKNOWN.
 
 | Context | Kind | Control | Type | Availability | Message | Target | Evidence | Notes |
 |---|---|---|---|---|---|---|---|---|

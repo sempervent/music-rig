@@ -1,41 +1,44 @@
 # Durable Ableton Live targets for controller mapping.
 # Not a full Live Set dump — only stable references needed by mappings.
-# Exact active PFL jam tracks remain incompletely verified (Q-018 / RIG-038).
+# Q-018 HUMAN (PFL jam Live set active tracks):
+#   1 Zoned Kit, 2 miniKORG, 3 KAOSS, 6 MIXER, 7 mix, 8 clean (guitars)
 # Evidence: VERIFIED | INTENDED | UNKNOWN
 
 tracks:
   - id: drums
     name: Drums
     evidence: INTENDED
-    notes: padKONTROL / Launchpad X MIDI ch10 — from docs/ableton-track-map.md
+    notes: >-
+      Live PFL jam track 1 named "Zoned Kit" (Q-018 HUMAN).
+      padKONTROL / Launchpad X MIDI ch10 direction.
   - id: minikorg
     name: miniKORG
     evidence: INTENDED
-    notes: TASCAM 3/4
+    notes: TASCAM 3/4; Live track 2 (Q-018)
   - id: mixer
     name: MIXER
     evidence: INTENDED
-    notes: Alesis main out → TASCAM 1/2
+    notes: Alesis main out → TASCAM 1/2; Live track 6 (Q-018)
   - id: kaoss
     name: KAOSS
     evidence: INTENDED
-    notes: TASCAM OUT 3/4 → KAOSS Replay → TASCAM IN 15/16
+    notes: TASCAM OUT 3/4 → KAOSS Replay → TASCAM IN 15/16; Live track 3 (Q-018)
   - id: acoustic-clean
     name: ACOUSTIC CLEAN
     evidence: INTENDED
-    notes: TASCAM 5
+    notes: TASCAM 5; may sit under Live "clean (guitars)" group track 8 (Q-018)
   - id: bass-clean
     name: BASS CLEAN
     evidence: INTENDED
-    notes: TASCAM 6
+    notes: TASCAM 6; may sit under Live "clean (guitars)" group track 8 (Q-018)
   - id: guitar-clean
     name: GUITAR CLEAN
     evidence: INTENDED
-    notes: TASCAM 7
+    notes: TASCAM 7; Live track 8 "clean (guitars)" (Q-018)
   - id: sr18
     name: SR-18
     evidence: INTENDED
-    notes: TASCAM 11/12
+    notes: TASCAM 11/12; not listed among Q-018 active Live tracks
   - id: kaoss-privia
     name: KAOSS - Privia
     evidence: INTENDED
@@ -90,8 +93,10 @@ templates:
     evidence: INTENDED
     related_todos: [RIG-038, RIG-046]
     notes: >-
-      Structural expectations for a turn-on-and-play jam set.
-      Exact live-set contents remain open (Q-018 / RIG-038).
+      Q-018 HUMAN Live active tracks: 1 Zoned Kit (=drums registry), 2 miniKORG,
+      3 KAOSS, 6 MIXER, 7 mix (no separate registry id yet), 8 clean (guitars).
+      acoustic-clean/bass-clean/sr18 marked inactive in template pending clearer
+      Live grouping. Evidence remains INTENDED (bot did not invent verify-record).
     tracks:
       - track_ref: drums
         role: midi-source
@@ -101,29 +106,29 @@ templates:
         role: audio-source
         active: true
         record_ready: unknown
-      - track_ref: mixer
-        role: clean-bus
-        active: true
-        record_ready: unknown
       - track_ref: kaoss
         role: wet-source
         active: true
         record_ready: unknown
-      - track_ref: acoustic-clean
-        role: clean-source
-        active: true
-        record_ready: unknown
-      - track_ref: bass-clean
-        role: clean-source
+      - track_ref: mixer
+        role: clean-bus
         active: true
         record_ready: unknown
       - track_ref: guitar-clean
         role: clean-source
         active: true
         record_ready: unknown
+      - track_ref: acoustic-clean
+        role: clean-source
+        active: false
+        record_ready: unknown
+      - track_ref: bass-clean
+        role: clean-source
+        active: false
+        record_ready: unknown
       - track_ref: sr18
         role: audio-source
-        active: true
+        active: false
         record_ready: unknown
     sends:
       - send_ref: send-c

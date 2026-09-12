@@ -7,14 +7,14 @@
 
 | ID | Label | Evidence | Notes |
 |---|---|---|---|
-| drums | Drums | INTENDED | padKONTROL / Launchpad X MIDI ch10 — from docs/ableton-track-map.md |
-| minikorg | miniKORG | INTENDED | TASCAM 3/4 |
-| mixer | MIXER | INTENDED | Alesis main out → TASCAM 1/2 |
-| kaoss | KAOSS | INTENDED | TASCAM OUT 3/4 → KAOSS Replay → TASCAM IN 15/16 |
-| acoustic-clean | ACOUSTIC CLEAN | INTENDED | TASCAM 5 |
-| bass-clean | BASS CLEAN | INTENDED | TASCAM 6 |
-| guitar-clean | GUITAR CLEAN | INTENDED | TASCAM 7 |
-| sr18 | SR-18 | INTENDED | TASCAM 11/12 |
+| drums | Drums | INTENDED | Live PFL jam track 1 named "Zoned Kit" (Q-018 HUMAN). padKONTROL / Launchpad X MIDI ch10 direction. |
+| minikorg | miniKORG | INTENDED | TASCAM 3/4; Live track 2 (Q-018) |
+| mixer | MIXER | INTENDED | Alesis main out → TASCAM 1/2; Live track 6 (Q-018) |
+| kaoss | KAOSS | INTENDED | TASCAM OUT 3/4 → KAOSS Replay → TASCAM IN 15/16; Live track 3 (Q-018) |
+| acoustic-clean | ACOUSTIC CLEAN | INTENDED | TASCAM 5; may sit under Live "clean (guitars)" group track 8 (Q-018) |
+| bass-clean | BASS CLEAN | INTENDED | TASCAM 6; may sit under Live "clean (guitars)" group track 8 (Q-018) |
+| guitar-clean | GUITAR CLEAN | INTENDED | TASCAM 7; Live track 8 "clean (guitars)" (Q-018) |
+| sr18 | SR-18 | INTENDED | TASCAM 11/12; not listed among Q-018 active Live tracks |
 | kaoss-privia | KAOSS - Privia | INTENDED | — |
 | kaoss-kazoo | KAOSS - Kazoo | INTENDED | — |
 | kaoss-bass | KAOSS - Bass | INTENDED | — |
@@ -42,7 +42,7 @@
 
 | ID | Label | Tracks | Sends | Requirements | Evidence | Notes |
 |---|---|---:|---:|---|---|---|
-| pfl-jam | PFL JAM | 8 | 2 | hands-off-core, pfl-jam-record-ready | INTENDED | Structural expectations for a turn-on-and-play jam set. Exact live-set contents remain open (Q-018 / RIG-038). |
+| pfl-jam | PFL JAM | 8 | 2 | hands-off-core, pfl-jam-record-ready | INTENDED | Q-018 HUMAN Live active tracks: 1 Zoned Kit (=drums registry), 2 miniKORG, 3 KAOSS, 6 MIXER, 7 mix (no separate registry id yet), 8 clean (guitars). acoustic-clean/bass-clean/sr18 marked inactive in template pending clearer Live grouping. Evidence remains INTENDED (bot did not invent verify-record). |
 
 ### PFL JAM tracks
 
@@ -50,12 +50,12 @@
 |---|---|---|---|
 | drums | midi-source | true | unknown |
 | minikorg | audio-source | true | unknown |
-| mixer | clean-bus | true | unknown |
 | kaoss | wet-source | true | unknown |
-| acoustic-clean | clean-source | true | unknown |
-| bass-clean | clean-source | true | unknown |
+| mixer | clean-bus | true | unknown |
 | guitar-clean | clean-source | true | unknown |
-| sr18 | audio-source | true | unknown |
+| acoustic-clean | clean-source | false | unknown |
+| bass-clean | clean-source | false | unknown |
+| sr18 | audio-source | false | unknown |
 
 | Send | Role | Notes |
 |---|---|---|

@@ -51,6 +51,14 @@ def test_render_finalize_and_resolve_and_inspect():
     )
     assert "finalize" in render_cli(fin) and "--confirm-current-reconciled" in render_cli(fin)
 
+    # Agent proposals may use artifact_id instead of question_id.
+    fin2 = RigOperation(
+        namespace="question",
+        action="finalize_manual",
+        args={"artifact_id": "Q-020", "note": "workflow documented"},
+    )
+    assert "Q-020" in render_argv(fin2)
+
     res = RigOperation(namespace="question", action="resolve", args={"question_id": "Q-1"})
     assert render_argv(res)[-2:] == ["resolve", "Q-1"]
 
