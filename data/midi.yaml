@@ -1,8 +1,9 @@
 # Canonical CURRENT MIDI topology (not audio routing).
 # Evidence statuses: VERIFIED | INTENDED | UNKNOWN
 # Do not treat INTENDED design as VERIFIED CURRENT fact.
-# Physical cable topology remains UNKNOWN until RIG-037 / Q-015.
-# Controller switch/knob maps are out of scope for this document (Stage 9+).
+# Q-015 HUMAN: FCB1010 → U6MIDI Pro IN 1; U6MIDI Pro OUT 1 → Thru5 WC IN 1.
+# Downstream Thru5 fan-out and other ports remain incompletely traced.
+# Controller switch/knob maps are out of scope for this document (see controllers.yaml).
 
 endpoints:
 - id: ableton
@@ -14,10 +15,14 @@ endpoints:
 devices:
 - gear_ref: cme-u6midi-pro
   role: usb-midi-router
-  notes: 3 in / 3 out; route / merge / filter / remap — OWNED
+  notes: >-
+    3 in / 3 out; route / merge / filter / remap — OWNED.
+    Q-015: receives FCB1010 on MIDI IN 1; sends to Thru5 WC on MIDI OUT 1.
 - gear_ref: cme-midi-thru5-wc
   role: midi-thru
-  notes: Hardware thru distribution — OWNED; not a programmable remapper
+  notes: >-
+    Hardware thru distribution — OWNED; not a programmable remapper.
+    Q-015: fed from U6MIDI Pro OUT 1 into Thru5 WC IN 1; other thru ports not fully traced.
 - gear_ref: tascam-us-16x08
   role: audio-interface-midi
   notes: May participate in MIDI paths; exact CURRENT use UNKNOWN
@@ -33,14 +38,30 @@ devices:
   role: controller
 - gear_ref: behringer-fcb1010
   role: foot-controller
-  notes: USB Uno recognition unresolved (RIG-022); switch maps out of Stage 8 scope
+  notes: USB Uno recognition unresolved (RIG-022); bank-00 map partially attested (Q-016)
 - gear_ref: novation-remote-zero-sl
   role: controller
 - gear_ref: launchpad-x
   role: controller
 - gear_ref: novation-launch-control-3
   role: controller
-connections: []
+connections:
+- id: midi-link-001
+  source: behringer-fcb1010
+  source_port: MIDI OUT
+  destination: cme-u6midi-pro
+  destination_port: MIDI IN 1
+  transport: DIN
+  status: VERIFIED
+  notes: ''
+- id: midi-link-002
+  source: cme-u6midi-pro
+  source_port: MIDI OUT 1
+  destination: cme-midi-thru5-wc
+  destination_port: MIDI IN 1
+  transport: DIN
+  status: VERIFIED
+  notes: ''
 channels:
 - gear_ref: casio-privia
   channel: 1
@@ -82,8 +103,8 @@ clock:
 ableton_ports: []
 routes: []
 unknowns:
-- Physical USB + DIN topology (U6MIDI Pro + Thru5 WC roles) — Q-015 / RIG-037
-- Whether Ableton is master clock in practice — Q-014 / RIG-031
+- Downstream Thru5 WC fan-out ports beyond IN 1 / remaining U6MIDI ports — RIG-037
 - Ableton Preferences Track / Sync / Remote per port — RIG-037
 - Exact U6MIDI Pro programmed routes/filters — RIG-037
 - Feedback-prevention path / All Notes Off path — RIG-037
+- FCB1010 banks 01/02 switch maps — Q-016 partial (bank 00 only)

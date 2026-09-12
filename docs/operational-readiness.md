@@ -125,12 +125,20 @@ UNKNOWN is a valid answer.
 
 **Why:** Smoke test needs one reliable foot action; recovery should not depend on a mouse.
 
-## Deferred to next batch (still high value)
+## First HUMAN batch — received and reconciled
 
-- **Q-008** — PB-B normalization modes (RIG-002). Multi-pair; set `target.pair` per answer or batch carefully.
-- **Q-017** — ZeRO SL loaded templates (observation).
-- Remaining P2/P3 Questions after playability path is stable.
+| ID | HUMAN answer (summary) | Reconciliation |
+|---|---|---|
+| Q-018 | Active tracks: 1 Zoned Kit, 2 miniKORG, 3 KAOSS, 6 MIXER, 7 mix, 8 clean (guitars) | CURRENT ableton template notes/active flags; finalized |
+| Q-011 | Current docs are correct | No CURRENT mutation; finalized |
+| Q-015 | U6MIDI Pro sends to Thru5 WC on 1; inputs from FCB1010 | CURRENT midi links; finalized |
+| Q-020 | Default RC-1 → KAOSS (+ RC-600 variants) | Documented in known-good-ops; finalized |
+| Q-016 | Bank 00 arms tracks 1–10 / group control | controllers.yaml notes; finalized (01/02 still open) |
 
-## Not done yet (paused)
+See [Known-good ops](known-good-ops.md) for startup / smoke / reference jam.
 
-Startup / shutdown checklist, physical smoke PASS, and reference jam recipe wait until this batch returns. Existing recovery text in `docs/live-recovery.md` stays INTENDED until controllers/mappings are observed.
+## Deferred next HUMAN batch
+
+- **Q-008** — PB-B normalization modes (RIG-002)
+- **Q-017** — ZeRO SL loaded templates (observation)
+- Physical smoke-test PASS and reference-jam PASS checkboxes in known-good-ops

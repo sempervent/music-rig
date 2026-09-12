@@ -174,7 +174,11 @@ def test_q016_q017_targets_and_reconcile_commands():
     questions = load_questions().question_map()
     assert questions["Q-016"].target.gear == "behringer-fcb1010"
     assert questions["Q-017"].target.gear == "novation-remote-zero-sl"
-    assert "rig current controls verify behringer-fcb1010" in format_reconcile_question("Q-016")
+    # Q-016 HUMAN bank-00 answer reconciled; banks 01/02 still incomplete in CURRENT.
+    assert questions["Q-016"].reconciled_at is not None
+    assert "bank 00" in (questions["Q-016"].answer or "").casefold()
+    # Q-017 remains OPEN — reconcile text still points at controls verify.
+    assert questions["Q-017"].status.value == "OPEN"
     assert "rig current controls verify novation-remote-zero-sl" in format_reconcile_question(
         "Q-017"
     )

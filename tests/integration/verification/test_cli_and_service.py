@@ -378,7 +378,22 @@ def fx16(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
 
 # Production Questions reconciled in approved answering/reconciliation sessions.
-_RECONCILED_PROD = frozenset({"Q-001", "Q-002", "Q-003", "Q-004", "Q-006", "Q-007", "Q-014"})
+_RECONCILED_PROD = frozenset(
+    {
+        "Q-001",
+        "Q-002",
+        "Q-003",
+        "Q-004",
+        "Q-006",
+        "Q-007",
+        "Q-011",
+        "Q-014",
+        "Q-015",
+        "Q-016",
+        "Q-018",
+        "Q-020",
+    }
+)
 # Reserved for FINAL answers still awaiting CURRENT reconciliation.
 _FINAL_UNRECONCILED_PROD = frozenset()
 
