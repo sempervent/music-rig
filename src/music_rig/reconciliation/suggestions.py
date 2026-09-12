@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shlex
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
@@ -100,7 +101,16 @@ def render_suggestion(
     if intent.startswith("rig "):
         return f"{prefix} {intent[4:]}"
     params = suggestion.params or {}
-    extra = " ".join(f"--{k.replace('_', '-')} {v}" for k, v in sorted(params.items()))
+    extra_parts: list[str] = []
+    for key, value in sorted(params.items()):
+        flag = f"--{str(key).replace('_', '-')}"
+        if isinstance(value, bool):
+            if value:
+                extra_parts.append(flag)
+            continue
+        extra_parts.append(flag)
+        extra_parts.append(shlex.quote(str(value)))
+    extra = " ".join(extra_parts)
     body = intent if not extra else f"{intent} {extra}".strip()
     return f"{prefix} {body}".strip()
 

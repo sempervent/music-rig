@@ -19,6 +19,7 @@ CapId = Annotated[str, Field(pattern=r"^CAP-\d{3}$")]
 ChgId = Annotated[str, Field(pattern=r"^CHG-\d{3}$")]
 SesId = Annotated[str, Field(pattern=r"^SES-\d{8}-\d{6}$")]
 QuestionId = Annotated[str, Field(pattern=r"^Q-\d{3}$")]
+HarId = Annotated[str, Field(pattern=r"^HAR-\d{3}$")]
 
 TERMINAL_FOR_NEXT = frozenset({"DONE", "CANCELLED", "DEFERRED"})
 
@@ -1444,6 +1445,83 @@ class OpenQuestionsDocument(BaseModel):
         numbers = [int(q.id.split("-")[1]) for q in self.questions]
         nxt = (max(numbers) + 1) if numbers else 1
         return f"Q-{nxt:03d}"
+
+
+class HumanActionType(StrEnum):
+    """Pending HUMAN-authority actions prepared by BOT (or HUMAN tools)."""
+
+    QUESTION_ANSWER = "QUESTION_ANSWER"
+    VERIFICATION_RESULT = "VERIFICATION_RESULT"
+    TODO_DOD_CONFIRMATION = "TODO_DOD_CONFIRMATION"
+    HUMAN_CLARIFICATION = "HUMAN_CLARIFICATION"
+
+
+class HumanActionStatus(StrEnum):
+    PENDING = "PENDING"
+    ACCEPTED = "ACCEPTED"
+    REJECTED = "REJECTED"
+    SUPERSEDED = "SUPERSEDED"
+
+
+class HumanActionRequest(BaseModel):
+    """Proposal waiting for HUMAN acceptance — not canonical factual truth."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: HarId
+    action_type: HumanActionType
+    artifact_id: str = Field(min_length=1)
+    prompt: str = Field(min_length=1)
+    proposed_value: str = Field(min_length=1)
+    explanation: str = Field(min_length=1)
+    source_actor: AnswerActor = AnswerActor.BOT
+    created_at: datetime
+    related_ids: list[str] = Field(default_factory=list)
+    consequences: str = ""
+    status: HumanActionStatus = HumanActionStatus.PENDING
+    # Preserve original proposal if HUMAN edits before accept.
+    proposed_value_original: str = ""
+    accepted_value: str | None = None
+    accepted_by: AnswerActor | None = None
+    accepted_at: datetime | None = None
+    rejected_at: datetime | None = None
+    superseded_reason: str = ""
+    # VERIFICATION_RESULT payload
+    verification_outcome: str | None = None
+    verification_note: str | None = None
+
+    @model_validator(mode="after")
+    def _defaults(self) -> HumanActionRequest:
+        if not self.proposed_value_original.strip():
+            object.__setattr__(self, "proposed_value_original", self.proposed_value)
+        if self.action_type is HumanActionType.VERIFICATION_RESULT:
+            if not (self.verification_outcome or "").strip():
+                raise ValueError(f"{self.id} VERIFICATION_RESULT requires verification_outcome")
+        return self
+
+
+class HumanActionsDocument(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[HumanActionRequest] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _unique_ids(self) -> HumanActionsDocument:
+        ids = [item.id for item in self.items]
+        if len(ids) != len(set(ids)):
+            raise ValueError("human action HAR IDs must be unique")
+        return self
+
+    def item_map(self) -> dict[str, HumanActionRequest]:
+        return {item.id: item for item in self.items}
+
+    def next_id(self) -> str:
+        numbers = [int(item.id.split("-")[1]) for item in self.items]
+        nxt = (max(numbers) + 1) if numbers else 1
+        return f"HAR-{nxt:03d}"
+
+    def pending(self) -> list[HumanActionRequest]:
+        return [i for i in self.items if i.status is HumanActionStatus.PENDING]
 
 
 class PathTreeNode(BaseModel):

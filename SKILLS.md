@@ -28,6 +28,18 @@ If not, correct the command before execution.
 Bots cannot finalize HUMAN answers or create HUMAN observation evidence.
 Use `question draft` for suggestions; humans Answer & Resolve / verify in TUI/CLI without `--am-bot`.
 
+When a HUMAN-only step is required, **prepare a pending human action** instead of
+printing a bare command pile:
+
+```bash
+uv run rig --am-bot human prepare QUESTION_ANSWER Q-xxx \
+  --value "…" --prompt "…" --why "…"
+# then tell the human:
+uv run rig human review
+```
+
+Never accept pending actions as BOT (`rig --am-bot human accept` must fail).
+
 Operating guide for agentic coding agents working in this repository.
 
 ## Opening rule (CLI-first)

@@ -11,6 +11,7 @@ from music_rig.tui.navigation import normalize_route
 from music_rig.tui.screens.editable import EditableListScreen
 from music_rig.tui.screens.generic import ListDetailScreen
 from music_rig.tui.screens.home import HomeScreen
+from music_rig.tui.screens.human_actions import HumanActionsScreen
 from music_rig.tui.screens.patchbays import PatchbayEditorScreen, PatchbayListScreen
 from music_rig.tui.screens.questions import QuestionsScreen
 from music_rig.tui.screens.reconcile import ReconcileScreen
@@ -155,6 +156,9 @@ class RigApp(App[None]):
             return
         if key == "verify":
             self.push_screen(VerifyScreen(initial_id=object_id))
+            return
+        if key == "human":
+            self.push_screen(HumanActionsScreen(initial_id=object_id))
             return
         if key == "reconcile":
             self.push_screen(ReconcileScreen(initial_id=object_id))
