@@ -1193,10 +1193,24 @@ class LocalPathsConfig(BaseModel):
     controller_mappings_export: str | None = None
 
 
+class AgentLocalConfig(BaseModel):
+    """Machine-local agent provider settings (never committed secrets)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str | None = None
+    argv: list[str] = Field(default_factory=list)
+    timeout_seconds: int = Field(default=120, ge=1, le=600)
+    env_forward: list[str] = Field(default_factory=list)
+    max_context_rounds: int = Field(default=5, ge=1, le=10)
+    max_stdout_bytes: int = Field(default=1_000_000, ge=1024, le=5_000_000)
+
+
 class LocalConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     paths: LocalPathsConfig = Field(default_factory=LocalPathsConfig)
+    agent: AgentLocalConfig = Field(default_factory=AgentLocalConfig)
 
 
 class MidiTransport(str, Enum):

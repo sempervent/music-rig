@@ -9,3 +9,14 @@ paths:
   stream_deck_export: null
   kaoss_backup: null
   controller_mappings_export: null
+
+# Optional agent provider (stdio command). Not required for packet/validate/apply.
+# agent:
+#   provider: command
+#   argv:
+#     - /path/to/agent-wrapper
+#   timeout_seconds: 120
+#   env_forward:
+#     - MY_API_KEY_NAME_ONLY
+#   max_context_rounds: 5
+#   max_stdout_bytes: 1000000

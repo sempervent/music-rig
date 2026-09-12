@@ -913,8 +913,21 @@ def sweep(
         )
     if counts.get("draft_answer"):
         suggested_next.append("uv run rig question resolve Q-xxx")
+    agent_candidates = sorted(
+        {
+            f.artifact_id
+            for f in findings
+            if f.check_id == "question_convergence"
+            and f.status is FindingStatus.BLOCKED
+            and (
+                f.state == ReconciliationState.NEEDS_AGENT_ACTION.value
+                or "agent" in f.summary.lower()
+            )
+        }
+    )
     if counts["needs_agent_action"]:
         suggested_next.append("uv run rig agent packet Q-xxx --json")
+        suggested_next.append("uv run rig agent reconcile Q-xxx")
         suggested_next.append(
             "uv run rig reconcile queue --state NEEDS_AGENT_ACTION --json"
         )
@@ -935,6 +948,7 @@ def sweep(
         "results": results,
         "skipped": skipped,
         "counts": counts,
+        "agent_candidates": agent_candidates,
         "checks": group_findings(findings),
         "plan": [op.to_dict() for op in plan_ops],
         "suggested_next_commands": suggested_next,

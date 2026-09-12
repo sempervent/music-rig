@@ -4403,7 +4403,9 @@ def reconcile_sweep_cmd(
 def agent_capabilities_cmd(
     as_json: bool = typer.Option(False, "--json"),
 ) -> None:
-    """Show allowlisted agent operations and no-provider workflow."""
+    """Show allowlisted agent operations and provider workflow."""
+    from rich.table import Table
+
     from music_rig import agent as agent_mod
 
     result = agent_mod.capabilities()
@@ -4412,12 +4414,73 @@ def agent_capabilities_cmd(
         return
     console.print("[bold]AGENT CAPABILITIES[/bold]")
     console.print(f"Provider configured: {result['provider_configured']}")
-    console.print("Allowlisted operations:")
-    for kind in result["allowlisted_operations"]:
-        console.print(f"  - {kind}")
+    table = Table(title="Operations")
+    table.add_column("Operation")
+    table.add_column("Domain")
+    table.add_column("R/W")
+    table.add_column("Autonomous Safe")
+    table.add_column("Requires Verification")
+    table.add_column("Transaction Support")
+    for row in result.get("operations") or []:
+        domains = ", ".join(row.get("domain") or [])
+        table.add_row(
+            str(row.get("operation")),
+            domains,
+            str(row.get("read_write")),
+            "yes" if row.get("autonomous_safe") else "no",
+            "yes" if row.get("requires_verification") else "no",
+            "yes" if row.get("transaction_support") else "no",
+        )
+    console.print(table)
     console.print("Workflow:")
     for step in result["workflow"]:
         console.print(f"  {step}")
+
+
+provider_app = typer.Typer(help="Agent provider configuration and handshake.")
+agent_app.add_typer(provider_app, name="provider")
+
+
+@provider_app.command("status")
+def agent_provider_status_cmd(
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    from music_rig.agent.provider import provider_status
+
+    result = provider_status()
+    if as_json:
+        console.print_json(data=ok_payload("agent.provider.status", result))
+        return
+    console.print("[bold]AGENT PROVIDER STATUS[/bold]")
+    console.print(f"Configured: {result['configured']}")
+    console.print(f"Provider type: {result['provider_type']}")
+    console.print(f"Executable: {result['executable']}")
+    console.print(f"Timeout: {result['timeout_seconds']}s")
+    console.print(
+        "Forwarded env names: "
+        + (", ".join(result["forwarded_environment_variable_names"]) or "(none)")
+    )
+
+
+@provider_app.command("test")
+def agent_provider_test_cmd(
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    from music_rig.agent.errors import AgentError
+    from music_rig.agent.provider import provider_test
+
+    try:
+        result = provider_test()
+    except AgentError as exc:
+        if as_json:
+            console.print_json(data=err_payload(exc.code, str(exc)))
+            raise typer.Exit(1)
+        _fail(str(exc))
+    if as_json:
+        console.print_json(data=ok_payload("agent.provider.test", result))
+        return
+    console.print("[bold]AGENT PROVIDER TEST[/bold]")
+    console.print_json(data=result)
 
 
 @agent_app.command("packet")
@@ -4477,7 +4540,7 @@ def agent_apply_cmd(
     snapshot_before: bool = typer.Option(False, "--snapshot-before"),
     as_json: bool = typer.Option(False, "--json"),
 ) -> None:
-    """Dry-run or apply a validated proposal via domain services (no subprocess)."""
+    """Dry-run or apply a validated proposal via atomic transaction."""
     from music_rig import agent as agent_mod
 
     try:
@@ -4507,41 +4570,85 @@ def agent_apply_cmd(
 def agent_reconcile_cmd(
     question_id: str,
     as_json: bool = typer.Option(False, "--json"),
+    dry_run: bool = typer.Option(True, "--dry-run/--write"),
+    apply: bool = typer.Option(False, "--apply"),
+    yes: bool = typer.Option(False, "--yes"),
+    autonomy: str = typer.Option("PLAN_ONLY", "--autonomy"),
 ) -> None:
-    """Preview-first agent reconcile (no provider configured in Stage 20)."""
-    from music_rig import agent as agent_mod
+    """Plan-first autonomous reconcile (provider optional; default writes nothing)."""
+    from music_rig.agent.orchestrate import AutonomyLevel, autonomous_reconcile
+    from music_rig.agent.provider import provider_status
 
     try:
-        packet = agent_mod.build_agent_packet(question_id)
+        level = AutonomyLevel(autonomy.upper())
+    except ValueError:
+        _fail(f"unknown autonomy level {autonomy!r}")
+
+    # Without provider, fall back to packet preview
+    status = provider_status()
+    if not status.get("configured"):
+        from music_rig import agent as agent_mod
+
+        try:
+            packet = agent_mod.build_agent_packet(question_id)
+        except StoreError as exc:
+            if as_json:
+                console.print_json(data=err_payload("store_error", str(exc)))
+                raise typer.Exit(1)
+            _fail(str(exc))
+        result = {
+            "artifact_id": question_id.upper(),
+            "provider_configured": False,
+            "packet_hash": packet.get("packet_hash"),
+            "final_human_answer": packet.get("final_human_answer"),
+            "reconciliation_state": packet.get("reconciliation_state"),
+            "autonomy": level.value,
+            "message": (
+                "No agent provider configured.\n"
+                f"Use:\n  uv run rig agent packet {question_id.upper()} --json\n"
+                "  uv run rig agent validate proposal.json\n"
+                "  uv run rig agent apply proposal.json --dry-run"
+            ),
+            "next_commands": [
+                f"uv run rig agent packet {question_id.upper()} --json",
+                "uv run rig agent validate proposal.json",
+                "uv run rig agent apply proposal.json --dry-run",
+            ],
+        }
+        if as_json:
+            console.print_json(data=ok_payload("agent.reconcile", result))
+            return
+        console.print("[bold]AGENT RECONCILIATION[/bold]")
+        console.print(result["message"])
+        return
+
+    if apply and yes and level is AutonomyLevel.PLAN_ONLY:
+        level = AutonomyLevel.APPLY_SAFE
+
+    try:
+        result = autonomous_reconcile(
+            question_id,
+            autonomy=level,
+            apply=apply,
+            yes=yes,
+            dry_run=False if (apply and yes) else dry_run,
+        )
     except StoreError as exc:
         if as_json:
             console.print_json(data=err_payload("store_error", str(exc)))
             raise typer.Exit(1)
         _fail(str(exc))
-    result = {
-        "artifact_id": question_id.upper(),
-        "provider_configured": False,
-        "packet_hash": packet.get("packet_hash"),
-        "final_human_answer": packet.get("final_human_answer"),
-        "reconciliation_state": packet.get("reconciliation_state"),
-        "message": (
-            "No agent provider configured.\n"
-            f"Packet available via: uv run rig agent packet {question_id.upper()} --json\n"
-            "Validate an external proposal with: uv run rig agent validate proposal.json\n"
-            "Apply with: uv run rig agent apply proposal.json --dry-run"
-        ),
-        "next_commands": [
-            f"uv run rig agent packet {question_id.upper()} --json",
-            "uv run rig agent validate proposal.json",
-            "uv run rig agent apply proposal.json --dry-run",
-        ],
-    }
+
     if as_json:
         console.print_json(data=ok_payload("agent.reconcile", result))
-        return
-    console.print("[bold]AGENT RECONCILIATION[/bold]")
-    console.print(f"Artifact: {result['artifact_id']}")
-    console.print(f"Answer: {result['final_human_answer']!r}")
+        raise typer.Exit(0 if result.get("ok") else 1)
+    console.print("[bold]AGENT RECONCILIATION PLAN[/bold]")
+    if result.get("plan_review"):
+        console.print(result["plan_review"])
+    else:
+        console.print_json(data=result)
+    if not result.get("ok"):
+        raise typer.Exit(1)
     console.print(result["message"])
 
 
