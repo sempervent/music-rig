@@ -121,6 +121,10 @@ Which physical unit is PB-A / PB-B / PB-C / PB-D (ART P48 vs Behringer PX3000)?
 
 **Resolved at:** 2026-09-12T09:34:18.085029-04:00
 
+**Reconciled at:** 2026-09-12T10:14:10.222320-04:00
+
+**Reconciliation note:** [agent-interpreted / manually reconciled] Updated CURRENT hardware_model from final Q-007 answer: PB-A/B=ART P48, PB-C/D=Behringer PX3000 (model-level; unique unit IDs still unknown)
+
 ### Q-009 — OPEN
 
 What are the rear-panel assignments for PB-A, PB-C, and PB-D?

@@ -18,10 +18,10 @@ Owned hardware (model → bay letter mapping may still be UNKNOWN in structured 
 
 | Named bay | Hardware model | Status |
 |---|---|---|
-| PB-A | UNKNOWN | UNDOCUMENTED |
-| PB-B | UNKNOWN | PARTIALLY DOCUMENTED |
-| PB-C | UNKNOWN | UNDOCUMENTED |
-| PB-D | UNKNOWN | UNDOCUMENTED |
+| PB-A | ART P48 | UNDOCUMENTED |
+| PB-B | ART P48 | PARTIALLY DOCUMENTED |
+| PB-C | Behringer PX3000 | UNDOCUMENTED |
+| PB-D | Behringer PX3000 | UNDOCUMENTED |
 
 ## Represented jack pairs
 

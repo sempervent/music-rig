@@ -24,6 +24,7 @@ class ReconcileScreen(Screen):
         Binding("a", "apply", "Apply"),
         Binding("v", "verify", "Verify"),
         Binding("f", "finalize", "Finalize"),
+        Binding("g", "agent_packet", "Agent"),
         Binding("o", "open_target", "Open Target"),
         Binding("e", "edit_target", "Edit Target"),
         Binding("l", "open_related", "Related"),
@@ -222,6 +223,40 @@ class ReconcileScreen(Screen):
             ),
             _done,
         )
+
+    def action_agent_packet(self) -> None:
+        """Show agent packet summary — no embedded chat; CLI remains canonical."""
+        from music_rig.tui.dialogs import HelpScreen
+
+        item = self._selected()
+        if item is None or item.artifact_type != "question":
+            self.notify("Select a question for agent packet", severity="warning")
+            return
+        try:
+            from music_rig.agent import build_agent_packet, capabilities
+
+            packet = build_agent_packet(item.artifact_id)
+            caps = capabilities()
+        except Exception as exc:  # noqa: BLE001
+            self.notify(f"Agent packet failed: {exc}", severity="error")
+            return
+        provider = (
+            "Provider configured."
+            if caps.get("provider_configured")
+            else "Agent provider not configured.\nPacket can be exported through CLI."
+        )
+        body = (
+            f"AGENT PACKET {packet['artifact']['id']}\n\n"
+            f"State: {packet.get('reconciliation_state')}\n"
+            f"Capability: {packet.get('capability')}\n"
+            f"Answer: {packet.get('final_human_answer') or '—'}\n\n"
+            f"{provider}\n\n"
+            f"CLI:\n"
+            f"  uv run rig agent packet {item.artifact_id} --json\n"
+            f"  uv run rig agent validate proposal.json\n"
+            f"  uv run rig agent apply proposal.json --dry-run\n"
+        )
+        self.app.push_screen(HelpScreen(body))
 
     def action_open_target(self) -> None:
         item = self._selected()

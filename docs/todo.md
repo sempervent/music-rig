@@ -62,7 +62,6 @@ At most three tasks. Prefer resolving physical uncertainty, reproducibility, and
 |---|---|---|---|---|---|---|---|
 | RIG-001 | Physically verify DIRTY chain order and SPACE topology (SY-1 SEND PH-3→TR-2; LS-2 loops; A+B MIX↔BYPASS) | Pedals | P0 | READY | — | `docs/pedal-chains.md` matches the physical board; any mismatch updated in pedal docs, diagrams, and inventory active lists | Do not invent fixes; document what is actually wired |
 | RIG-002 | Inspect and record normal / half-normal / thru for every populated PB-B pair | Patchbay | P0 | READY | — | Every populated pair in `data/patchbays.yaml` and `docs/patchbays.md` has `mode` set to normal, half-normal, or thru | Upper 9–12 / lower 33–36 included if physically checkable |
-| RIG-004 | Map ART P48 / Behringer PX3000 units to PB-A/B/C/D letters | Patchbay | P1 | READY | — | `data/patchbays.yaml` and `docs/patchbays.md` list hardware_model per bay | Visual/serial inspection at rack |
 | RIG-005 | Decide roles for PB-A, PB-C, PB-D (remain open vs assigned roles) | Patchbay | P1 | READY | RIG-004 helpful | Each bay has a documented role or explicit “leave undocumented/open for now” decision in `docs/patchbays.md` | Decision, not speculative wiring |
 | RIG-006 | Identify intended sources for PB-B lower 33–36 (or confirm intentionally unused) | Patchbay | P1 | READY | — | Upper 9–12 plan or “intentionally unassigned” recorded in patchbay docs/YAML | Do not invent sources |
 | RIG-007 | Verify `assets/pedal-flow.jpeg` against CURRENT topology; update, archive, or remove | Docs | P2 | READY | RIG-001 | Image matches CURRENT or is moved/labeled HISTORICAL/removed with a note in docs | Untracked asset; treat carefully |
@@ -100,6 +99,7 @@ At most three tasks. Prefer resolving physical uncertainty, reproducibility, and
 | ID | Task | Completed | Notes |
 |---|---|---|---|
 | RIG-003 | Trace and document non-clean A/B/Y destinations for acoustic, bass, electric | — | Resolves open-questions routing fact |
+| RIG-004 | Map ART P48 / Behringer PX3000 units to PB-A/B/C/D letters | — | Visual/serial inspection at rack |
 | RIG-008 | Determine acoustic instrument Alesis mixer assignment if any | — | Open question fact |
 | RIG-009 | Verify physical CH-1 stereo return jack(s) into Alesis | — | Stereo return vs specific line channel |
 | RIG-010 | Physically verify KAOSS Replay monitor/capture path vs docs | — | Separate from AUX SEND |

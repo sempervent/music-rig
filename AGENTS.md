@@ -213,6 +213,9 @@ uv run rig check
   child screens return navigation intent (`AnswerResult`); the requester owns
   subsequent `push_screen` / `open_domain`. Never push a sibling then dismiss
   the child underneath it. See [docs/tui.md](docs/tui.md).
+- Agent reconciliation: `uv run rig agent packet|validate|apply` — agents propose
+  allowlisted `RigOperation`s; the rig validates and dispatches. No YAML edits,
+  no shell, no invented VERIFIED evidence. See root `SKILLS.md`.
 - Agent guide: root `SKILLS.md` (CLI-first; do not automate TUI). Discovery:
   `uv run rig inspect …`.
 - Do not implement OBS/Ableton/MIDI/Stream Deck/macOS automation from the TUI;

@@ -120,6 +120,14 @@ reconcile_app = typer.Typer(
     invoke_without_command=True,
     no_args_is_help=False,
 )
+agent_app = typer.Typer(
+    help=(
+        "Agent-assisted reconciliation: packet → proposal → validate → apply. "
+        "Agents propose allowlisted RigOperations; the rig validates and dispatches. "
+        "No YAML edits, no shell, no invented VERIFIED evidence."
+    ),
+    no_args_is_help=True,
+)
 verify_app = typer.Typer(
     help=(
         "Guided human verification for OPEN questions. "
@@ -197,6 +205,7 @@ app.add_typer(changes_app, name="changes")
 app.add_typer(question_app, name="question")
 question_app.add_typer(question_target_app, name="target")
 app.add_typer(reconcile_app, name="reconcile")
+app.add_typer(agent_app, name="agent")
 app.add_typer(verify_app, name="verify")
 app.add_typer(path_app, name="path")
 app.add_typer(gear_app, name="gear")
@@ -4369,7 +4378,7 @@ def reconcile_sweep_cmd(
     confirm_dod: bool = typer.Option(False, "--confirm-dod"),
     as_json: bool = typer.Option(False, "--json"),
 ) -> None:
-    """Finalize CURRENT_MATCHES / READY_TO_FINALIZE only. Never answers OPEN."""
+    """Aggregate independent reconciliation checks; finalize READY matches only."""
     try:
         # Default dry-run=True; --write clears dry_run
         result = reconcile_service.sweep(
@@ -4388,6 +4397,152 @@ def reconcile_sweep_cmd(
             )
             return
         _fail(str(exc))
+
+
+@agent_app.command("capabilities")
+def agent_capabilities_cmd(
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Show allowlisted agent operations and no-provider workflow."""
+    from music_rig import agent as agent_mod
+
+    result = agent_mod.capabilities()
+    if as_json:
+        console.print_json(data=ok_payload("agent.capabilities", result))
+        return
+    console.print("[bold]AGENT CAPABILITIES[/bold]")
+    console.print(f"Provider configured: {result['provider_configured']}")
+    console.print("Allowlisted operations:")
+    for kind in result["allowlisted_operations"]:
+        console.print(f"  - {kind}")
+    console.print("Workflow:")
+    for step in result["workflow"]:
+        console.print(f"  {step}")
+
+
+@agent_app.command("packet")
+def agent_packet_cmd(
+    question_id: str,
+    as_json: bool = typer.Option(True, "--json/--human"),
+) -> None:
+    """Build a structured agent work packet (no LLM)."""
+    from music_rig import agent as agent_mod
+
+    try:
+        packet = agent_mod.build_agent_packet(question_id)
+    except StoreError as exc:
+        if as_json:
+            console.print_json(data=err_payload("store_error", str(exc)))
+            raise typer.Exit(1)
+        _fail(str(exc))
+    if as_json:
+        console.print_json(data=ok_payload("agent.packet", packet))
+        return
+    console.print(f"[bold]AGENT PACKET[/bold] {packet['artifact']['id']}")
+    console.print(packet.get("final_human_answer") or "(no answer)")
+    console.print_json(data=packet)
+
+
+@agent_app.command("validate")
+def agent_validate_cmd(
+    proposal_path: Path,
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Validate an external agent proposal JSON file."""
+    from music_rig import agent as agent_mod
+
+    try:
+        proposal = agent_mod.load_proposal(proposal_path)
+        result = agent_mod.validate_proposal(proposal)
+    except (StoreError, OSError, json.JSONDecodeError, ValueError) as exc:
+        if as_json:
+            console.print_json(data=err_payload("validation_error", str(exc)))
+            raise typer.Exit(1)
+        _fail(str(exc))
+    payload = ok_payload("agent.validate", result)
+    if as_json:
+        console.print_json(data=payload)
+        raise typer.Exit(0 if result.get("ok") else 1)
+    console.print("[bold]AGENT VALIDATE[/bold]")
+    console.print_json(data=result)
+    if not result.get("ok"):
+        raise typer.Exit(1)
+
+
+@agent_app.command("apply")
+def agent_apply_cmd(
+    proposal_path: Path,
+    dry_run: bool = typer.Option(True, "--dry-run/--write"),
+    yes: bool = typer.Option(False, "--yes"),
+    snapshot_before: bool = typer.Option(False, "--snapshot-before"),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Dry-run or apply a validated proposal via domain services (no subprocess)."""
+    from music_rig import agent as agent_mod
+
+    try:
+        proposal = agent_mod.load_proposal(proposal_path)
+        result = agent_mod.apply_proposal(
+            proposal,
+            dry_run=dry_run,
+            yes=yes,
+            snapshot_before=snapshot_before,
+        )
+    except (StoreError, OSError, json.JSONDecodeError, ValueError) as exc:
+        if as_json:
+            console.print_json(data=err_payload("apply_error", str(exc)))
+            raise typer.Exit(1)
+        _fail(str(exc))
+    payload = ok_payload("agent.apply", result)
+    if as_json:
+        console.print_json(data=payload)
+        raise typer.Exit(0 if result.get("ok") else 1)
+    console.print("[bold]AGENT APPLY[/bold]")
+    console.print_json(data=result)
+    if not result.get("ok"):
+        raise typer.Exit(1)
+
+
+@agent_app.command("reconcile")
+def agent_reconcile_cmd(
+    question_id: str,
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Preview-first agent reconcile (no provider configured in Stage 20)."""
+    from music_rig import agent as agent_mod
+
+    try:
+        packet = agent_mod.build_agent_packet(question_id)
+    except StoreError as exc:
+        if as_json:
+            console.print_json(data=err_payload("store_error", str(exc)))
+            raise typer.Exit(1)
+        _fail(str(exc))
+    result = {
+        "artifact_id": question_id.upper(),
+        "provider_configured": False,
+        "packet_hash": packet.get("packet_hash"),
+        "final_human_answer": packet.get("final_human_answer"),
+        "reconciliation_state": packet.get("reconciliation_state"),
+        "message": (
+            "No agent provider configured.\n"
+            f"Packet available via: uv run rig agent packet {question_id.upper()} --json\n"
+            "Validate an external proposal with: uv run rig agent validate proposal.json\n"
+            "Apply with: uv run rig agent apply proposal.json --dry-run"
+        ),
+        "next_commands": [
+            f"uv run rig agent packet {question_id.upper()} --json",
+            "uv run rig agent validate proposal.json",
+            "uv run rig agent apply proposal.json --dry-run",
+        ],
+    }
+    if as_json:
+        console.print_json(data=ok_payload("agent.reconcile", result))
+        return
+    console.print("[bold]AGENT RECONCILIATION[/bold]")
+    console.print(f"Artifact: {result['artifact_id']}")
+    console.print(f"Answer: {result['final_human_answer']!r}")
+    console.print(result["message"])
 
 
 @reconcile_app.command("change")

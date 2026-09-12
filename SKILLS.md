@@ -330,6 +330,33 @@ The TUI is a **human editor** over the same services as the CLI. Agents should p
   navigate (never push a sibling then dismiss the child). See `docs/tui.md`.
 - `rig tui --debug` / `RIG_DEBUG=1` for pipeline diagnostics only.
 
+## Agent-Assisted Reconciliation
+
+The agent does **not** mutate YAML. The agent proposes **RigOperations**.
+The rig validates and dispatches those operations through domain services.
+
+```bash
+uv run rig reconcile queue --json
+uv run rig agent packet Q-xxx --json
+# external agent reasons over packet JSON → writes proposal.json
+uv run rig agent validate proposal.json
+uv run rig agent apply proposal.json --dry-run
+uv run rig agent apply proposal.json --yes
+# optional preview when no provider is configured:
+uv run rig agent reconcile Q-xxx
+uv run rig agent capabilities --json
+```
+
+Policy:
+
+- Do not invent human observations or reinterpret ambiguous answers.
+- If packet context is insufficient, request more structured inspection —
+  do not guess.
+- Do not set `evidence=VERIFIED` without a Stage 17 `verification_result`.
+- Model-level answers must not invent unique inventory unit IDs.
+- Sweep inspects via independent checks, freezes a plan, then applies —
+  it never answers OPEN questions.
+
 ## Live Rig Data Changes During Development
 
 When the human provides real rig facts while you are working on a feature branch:

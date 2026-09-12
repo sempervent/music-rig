@@ -169,8 +169,10 @@ questions:
   answer: PB-A & PB-B are ART P48, PB-C & PB-D are Behringer PX3000
   notes: ''
   resolved_at: '2026-09-12T09:34:18.085029-04:00'
-  reconciled_at: null
-  reconciliation_note: ''
+  reconciled_at: '2026-09-12T10:14:10.222320-04:00'
+  reconciliation_note: '[agent-interpreted / manually reconciled] Updated CURRENT hardware_model
+    from final Q-007 answer: PB-A/B=ART P48, PB-C/D=Behringer PX3000 (model-level; unique
+    unit IDs still unknown)'
   target:
     domain: inventory.patchbay_mapping
     bay: null

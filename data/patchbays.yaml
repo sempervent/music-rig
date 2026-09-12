@@ -4,28 +4,26 @@
 
 schema_notes:
   jack_fields:
-    - row: upper | lower
-    - connection: free-text device/port label, or null if unassigned/undocumented
-    - device: optional structured device name
-    - port: optional structured port name
-    - direction: optional (source | destination | bidirectional | unknown)
-    - paired_with: paired jack number on the other row
-    - mode: normal | half-normal | thru | unknown
-    - status: documented | unassigned | undocumented
-    - notes: free text
-
+  - row: upper | lower
+  - connection: free-text device/port label, or null if unassigned/undocumented
+  - device: optional structured device name
+  - port: optional structured port name
+  - direction: optional (source | destination | bidirectional | unknown)
+  - paired_with: paired jack number on the other row
+  - mode: normal | half-normal | thru | unknown
+  - status: documented | unassigned | undocumented
+  - notes: free text
 patchbays:
   PB-A:
-    hardware_model: unknown
+    hardware_model: ART P48
     status: undocumented
     jacks: {}
-
   PB-B:
-    hardware_model: unknown
+    hardware_model: ART P48
     status: partially_documented
     numbering:
-      upper: "1-24"
-      lower: "25-48"
+      upper: 1-24
+      lower: 25-48
     jacks:
       1:
         row: upper
@@ -199,13 +197,11 @@ patchbays:
         mode: unknown
         status: documented
         notes: Upper jack 12 is unassigned; no documented source for this destination.
-
   PB-C:
-    hardware_model: unknown
+    hardware_model: Behringer PX3000
     status: undocumented
     jacks: {}
-
   PB-D:
-    hardware_model: unknown
+    hardware_model: Behringer PX3000
     status: undocumented
     jacks: {}
