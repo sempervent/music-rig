@@ -12,6 +12,7 @@ Use the repository itself as the source of remembered state, not chat memory or 
 1. Inspect the existing repository documentation before answering questions, proposing changes, or modifying files.
 2. Treat the source-of-truth hierarchy below as authoritative for CURRENT physical state.
 3. Cross-check routing, inventory, diagrams, and YAML data before stating that a connection, device role, or channel assignment is current.
+4. **CLI-first for agents:** use `uv run rig …` (especially `rig reconcile`) for ordinary mutations — do not teach direct YAML edits. See [SKILLS.md](SKILLS.md).
 
 ## Source-of-truth hierarchy
 
@@ -52,6 +53,8 @@ uv run rig now
 uv run rig now --play
 uv run rig doctor
 uv run rig reconcile
+uv run rig reconcile queue --json
+uv run rig reconcile plan question Q-008 --json
 
 # Questions
 uv run rig question list
@@ -63,6 +66,7 @@ uv run rig question todo Q-008
 uv run rig tui
 uv run rig tui question Q-008
 uv run rig tui patchbay PB-B
+uv run rig tui reconcile
 
 # Inspection (agents)
 uv run rig inspect domains
@@ -179,20 +183,23 @@ uv run rig check
 - No CLI mutation command commits or pushes Git.
 - Prefer the CLI/service layer for planning mutations when practical.
 
-### Interactive TUI (Stage 13)
+### Interactive TUI (Stage 13+)
 
 - `uv run rig tui` is a Textual presentation layer over the same services as the CLI.
 - TUI widgets must not parse CLI output and must not write YAML directly.
 - Editable domains use FieldSpecs (`tui/fields.py`) + adapters under
   `tui/editable_domains/`; apply via Ctrl+S review → service commit.
 - Questions: **`r` = Resolve**, **`Ctrl+r` = Refresh**. Confirm Enter confirms.
+  After resolve, CURRENT reconciliation is still required (`rig reconcile …`).
+- Reconcile screen (`rig tui reconcile`): queue + plan/apply/verify/finalize via
+  `music_rig.reconciliation.service` (same as CLI).
 - Patchbays: mode, upper/lower connections, hardware_model; staged apply + optional snapshot.
 - Also editable: TODO, wishlist, inbox, changes, gear, channels, routing, MIDI,
   controllers, Ableton metadata, performance evidence, backup plan fields.
-- Snapshots / doctor / status / reconcile / automation remain non-mutating views.
+- Snapshots / doctor / status / automation remain non-mutating views.
 - Staged editors use source SHA-256 concurrency checks (no blind overwrite).
-- Resolving a question still does **not** rewrite CURRENT.
-- Agent guide: root `SKILLS.md`. Discovery: `uv run rig inspect …`.
+- Resolving a question still does **not** rewrite CURRENT or set `reconciled_at`.
+- Agent guide: root `SKILLS.md` (CLI-first). Discovery: `uv run rig inspect …`.
 - Do not implement OBS/Ableton/MIDI/Stream Deck/macOS automation from the TUI;
   those families remain `NOT_IMPLEMENTED`.
 

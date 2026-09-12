@@ -109,6 +109,8 @@ def _with_resolved_question(
         answer=answer.strip(),
         notes=current.notes,
         resolved_at=clock(),
+        reconciled_at=None,
+        reconciliation_note="",
         target=current.target,
     )
     return OpenQuestionsDocument(

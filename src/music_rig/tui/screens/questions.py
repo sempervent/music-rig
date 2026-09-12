@@ -234,13 +234,14 @@ class QuestionsScreen(Screen):
                     return
                 filter_was_open = self._filter == "OPEN"
                 self.reload(select_id=updated.id)
+                self.notify(
+                    f"{updated.id} resolved. CURRENT reconciliation still required "
+                    f"(rig reconcile plan question {updated.id})."
+                )
                 if filter_was_open:
                     self.notify(
-                        f"{updated.id} resolved. Hidden because filter=OPEN. "
-                        "Press f for RESOLVED/ALL."
+                        "Hidden because filter=OPEN. Press f for RESOLVED/ALL."
                     )
-                else:
-                    self.notify(f"{updated.id} -> RESOLVED")
 
             self.app.push_screen(
                 ConfirmModal(

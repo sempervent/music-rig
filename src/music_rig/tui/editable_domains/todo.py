@@ -95,21 +95,51 @@ class TodoEditableAdapter(BaseEditableAdapter):
 
     def detail_markdown(self, record_id: str) -> str:
         r = self.get_record(record_id)
-        return "\n".join(
-            [
-                f"# {r['id']}",
-                "",
-                r["task"],
-                "",
-                f"Area: {r['area']}",
-                f"Priority: {r['priority']}",
-                f"Status: {r['status']}",
-                f"Next Session: {'yes' if r['in_next_session'] else 'no'}",
-                f"DoD: {r['definition_of_done']}",
-                f"Notes: {r['notes'] or '—'}",
-                f"Depends: {', '.join(r['depends_on']) or '—'}",
-            ]
-        )
+        lines = [
+            f"# {r['id']}",
+            "",
+            r["task"],
+            "",
+            f"Area: {r['area']}",
+            f"Priority: {r['priority']}",
+            f"Status: {r['status']}",
+            f"Next Session: {'yes' if r['in_next_session'] else 'no'}",
+            f"DoD: {r['definition_of_done']}",
+            f"Notes: {r['notes'] or '—'}",
+            f"Depends: {', '.join(r['depends_on']) or '—'}",
+            "",
+            "## Linked reconciliation",
+            "",
+        ]
+        try:
+            from music_rig.reconciliation.service import question_state
+            from music_rig.store import load_changes, load_questions
+
+            qdoc = load_questions()
+            cdoc = load_changes()
+            linked = False
+            for q in qdoc.questions:
+                if record_id not in q.related_todos:
+                    continue
+                linked = True
+                st = question_state(q)
+                rec = (
+                    q.reconciled_at.isoformat()
+                    if q.reconciled_at is not None
+                    else "—"
+                )
+                lines.append(
+                    f"- {q.id}: recon_state={st.value} reconciled_at={rec}"
+                )
+                for cid in q.related_changes:
+                    chg = cdoc.item_map().get(cid)
+                    chg_st = chg.status.value if chg else "?"
+                    lines.append(f"  - change {cid}: {chg_st}")
+            if not linked:
+                lines.append("_no linked questions_")
+        except Exception as exc:
+            lines.append(f"_unavailable: {exc}_")
+        return "\n".join(lines)
 
     def semantic_actions(self) -> list[tuple[str, str, str]]:
         return [

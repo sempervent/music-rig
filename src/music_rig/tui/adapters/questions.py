@@ -35,6 +35,12 @@ def filter_questions(
 
 
 def question_detail_markdown(q: OpenQuestion) -> str:
+    from music_rig.reconciliation.service import question_state
+
+    try:
+        state = question_state(q).value
+    except Exception:
+        state = "—"
     lines = [
         f"# {q.id} — {q.status.value}",
         "",
@@ -42,6 +48,7 @@ def question_detail_markdown(q: OpenQuestion) -> str:
         "",
         f"**Area:** {q.area}",
         f"**Status:** {q.status.value}",
+        f"**Reconciliation state:** {state}",
         "",
         "## Typed target",
         "",
@@ -60,6 +67,19 @@ def question_detail_markdown(q: OpenQuestion) -> str:
     ]
     if q.resolved_at is not None:
         lines.extend(["", f"**Resolved at:** {q.resolved_at.isoformat()}"])
+    if q.reconciled_at is not None:
+        lines.extend(["", f"**Reconciled at:** {q.reconciled_at.isoformat()}"])
+    if q.reconciliation_note.strip():
+        lines.extend(["", f"**Reconciliation note:** {q.reconciliation_note.strip()}"])
+    # CURRENT target value
+    if q.target is not None:
+        try:
+            from music_rig.reconciliation.adapters import get_adapter
+
+            current = get_adapter(q.target.domain).read_current(q, paths={})
+            lines.extend(["", "## CURRENT at target", "", f"```\n{current}\n```"])
+        except Exception as exc:
+            lines.extend(["", "## CURRENT at target", "", f"_unavailable: {exc}_"])
     return "\n".join(lines)
 
 

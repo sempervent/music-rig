@@ -158,6 +158,8 @@ uv run rig question todo Q-008
 
 # What still needs reconciliation?
 uv run rig reconcile
+uv run rig reconcile queue --json
+uv run rig reconcile plan question Q-008 --json
 uv run rig reconcile change CHG-001
 uv run rig reconcile question Q-008
 

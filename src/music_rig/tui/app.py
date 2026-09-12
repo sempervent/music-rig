@@ -13,6 +13,7 @@ from music_rig.tui.screens.generic import ListDetailScreen
 from music_rig.tui.screens.home import HomeScreen
 from music_rig.tui.screens.patchbays import PatchbayEditorScreen, PatchbayListScreen
 from music_rig.tui.screens.questions import QuestionsScreen
+from music_rig.tui.screens.reconcile import ReconcileScreen
 
 
 APP_CSS = """
@@ -120,6 +121,9 @@ class RigApp(App[None]):
             return
         if key == "question":
             self.push_screen(QuestionsScreen(initial_id=object_id))
+            return
+        if key == "reconcile":
+            self.push_screen(ReconcileScreen(initial_id=object_id))
             return
         if key == "patchbay":
             if object_id:

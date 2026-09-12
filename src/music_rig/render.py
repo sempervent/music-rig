@@ -333,6 +333,12 @@ def render_questions_section(doc: OpenQuestionsDocument) -> str:
             if q.resolved_at is not None:
                 lines.append(f"**Resolved at:** {q.resolved_at.isoformat()}")
                 lines.append("")
+            if q.reconciled_at is not None:
+                lines.append(f"**Reconciled at:** {q.reconciled_at.isoformat()}")
+                lines.append("")
+            if q.reconciliation_note.strip():
+                lines.append(f"**Reconciliation note:** {q.reconciliation_note.strip()}")
+                lines.append("")
 
     lines.append("## ID allocation")
     lines.append("")

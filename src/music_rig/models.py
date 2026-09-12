@@ -346,6 +346,16 @@ class QuestionStatus(str, Enum):
     DEFERRED = "DEFERRED"
 
 
+class ReconciliationState(str, Enum):
+    NEEDS_ANSWER = "NEEDS_ANSWER"
+    READY_TO_APPLY = "READY_TO_APPLY"
+    NEEDS_AGENT_ACTION = "NEEDS_AGENT_ACTION"
+    CURRENT_MATCHES = "CURRENT_MATCHES"
+    READY_TO_FINALIZE = "READY_TO_FINALIZE"
+    RECONCILED = "RECONCILED"
+    BLOCKED = "BLOCKED"
+
+
 class QuestionTarget(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -466,6 +476,8 @@ class OpenQuestion(BaseModel):
     answer: str = ""
     notes: str = ""
     resolved_at: datetime | None = None
+    reconciled_at: datetime | None = None
+    reconciliation_note: str = ""
     target: QuestionTarget | None = None
 
     @field_validator("related_todos", "related_changes")
@@ -484,6 +496,17 @@ class OpenQuestion(BaseModel):
                 raise ValueError(f"{self.id} RESOLVED requires resolved_at")
         if self.status == QuestionStatus.OPEN and self.resolved_at is not None:
             raise ValueError(f"{self.id} OPEN must not have resolved_at")
+        if self.status == QuestionStatus.OPEN and self.reconciled_at is not None:
+            raise ValueError(f"{self.id} OPEN must not have reconciled_at")
+        if self.reconciled_at is not None:
+            if self.status != QuestionStatus.RESOLVED:
+                raise ValueError(
+                    f"{self.id} reconciled_at requires status RESOLVED"
+                )
+            if not self.answer.strip():
+                raise ValueError(
+                    f"{self.id} reconciled_at requires a non-empty answer"
+                )
         return self
 
 
