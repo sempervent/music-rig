@@ -116,7 +116,7 @@ def test_repo_todo_no_next_status():
     doc = load_todo()
     assert all(t.status != "NEXT" for t in doc.tasks)  # type: ignore[comparison-overlap]
     assert {t.id for t in doc.tasks if t.id in doc.next_session} == set(doc.next_session)
-    assert doc.next_session == ["RIG-001", "RIG-002", "RIG-003"]
+    assert doc.next_session == ["RIG-001", "RIG-002"]
     assert all(doc.task_map()[i].status == TodoStatus.READY for i in doc.next_session)
     assert len(doc.tasks) == 44
     assert load_wishlist() and len(load_wishlist().items) == 16

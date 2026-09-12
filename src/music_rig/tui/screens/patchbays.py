@@ -1,4 +1,8 @@
-"""Editable Patchbay list + bay editor. Mutations via propose_* + commit_patchbay."""
+"""Editable Patchbay list + bay editor. Mutations via propose_* + commit_patchbay.
+
+MODE is staged with e / Space; persisted only on :w / Ctrl+S / s Apply.
+m = hardware model (not mode). Space cycles UNKNOWN→NORMAL→HALF-NORMAL→THRU→UNKNOWN.
+"""
 
 from __future__ import annotations
 
@@ -15,15 +19,21 @@ from music_rig.patchbay_state import list_pairs, load_raw
 from music_rig.store import StoreError
 from music_rig import store as store_mod
 from music_rig.tui.adapters import patchbays as pb
+from music_rig.tui.debug import format_error
 from music_rig.tui.dialogs import (
     ApplyPatchbayModal,
+    CommandLineModal,
     DiscardModal,
     HelpScreen,
     InputModal,
     SelectModeModal,
 )
+from music_rig.tui.modes import VIM_HELP_COMMON, EditorMode, ModeController, parse_command
+from music_rig.tui.save_outcome import SaveOutcome
 from music_rig.tui.widgets import mode_cell
 from music_rig.tui.working import ConcurrentModificationError, WorkingDocument
+
+MODE_CYCLE = ("unknown", "normal", "half-normal", "thru")
 
 
 class PatchbayListScreen(Screen):
@@ -47,7 +57,7 @@ class PatchbayListScreen(Screen):
         with Vertical(id="screen-body"):
             yield Static("Patchbays", id="screen-title")
             yield Static(
-                "Edit mode, connections, hardware_model · Ctrl+S apply · staged bulk edits",
+                "Edit mode, connections, hardware_model · Ctrl+S / :w apply · staged bulk edits",
                 id="home-subtitle",
             )
             yield DataTable(id="list-table", cursor_type="row")
@@ -110,15 +120,23 @@ class PatchbayEditorScreen(Screen):
     BINDINGS = [
         Binding("j", "cursor_down", "Down", show=False),
         Binding("k", "cursor_up", "Up", show=False),
+        Binding("g", "go_top_pending", "gg", show=False),
+        Binding("G", "go_bottom", "Bottom", show=False),
         Binding("e", "edit_mode", "Edit mode"),
+        Binding("i", "edit_mode", "Insert/mode", show=False),
+        Binding("space", "cycle_mode", "Cycle mode", show=False),
         Binding("c", "edit_connections", "Connections"),
         Binding("m", "edit_model", "Model"),
         Binding("n", "next_unknown", "Next UNKNOWN"),
-        Binding("ctrl+s", "apply", "Apply"),
+        Binding("N", "prev_unknown", "Prev UNKNOWN", show=False),
+        Binding("ctrl+s", "apply", "Apply", priority=True),
         Binding("s", "apply", "Apply", show=False),
+        Binding("colon", "command_mode", ":", show=False),
+        Binding("u", "undo_staged", "Undo", show=False),
+        Binding("U", "redo_staged", "Redo", show=False),
         Binding("o", "open_question", "Question"),
         Binding("ctrl+r", "refresh", "Refresh"),
-        Binding("escape", "back", "Back"),
+        Binding("escape", "escape", "Esc", show=False, priority=True),
         Binding("q", "back", "Back"),
         Binding("question_mark", "help", "Help"),
     ]
@@ -136,12 +154,16 @@ class PatchbayEditorScreen(Screen):
         self._path = path or store_mod.PATCHBAYS_PATH
         self._working: WorkingDocument | None = None
         self._pair_keys: list[str] = []
+        self._modes = ModeController()
+        self._last_outcome: SaveOutcome | None = None
+        self._quit_after_apply = False
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
         with Vertical(id="screen-body"):
             yield Static(f"Patchbay {self.bay_id}", id="screen-title")
             yield Static("", id="dirty-label")
+            yield Static(self._modes.banner(), id="mode-banner")
             with Horizontal(id="split"):
                 yield DataTable(id="list-table", cursor_type="row")
                 with VerticalScroll(id="detail-pane"):
@@ -153,7 +175,15 @@ class PatchbayEditorScreen(Screen):
         table.add_columns("PAIR", "UPPER", "LOWER", "MODE")
         self._working = pb.open_working(self.bay_id, path=self._path)
         table.focus()
+        self._set_mode(EditorMode.NORMAL)
         self._reload_table(select_pair=self._initial_pair)
+
+    def _set_mode(self, mode: EditorMode) -> None:
+        self._modes.set_mode(mode)
+        try:
+            self.query_one("#mode-banner", Static).update(self._modes.banner())
+        except Exception:
+            pass
 
     def _pairs(self):
         assert self._working is not None
@@ -170,7 +200,8 @@ class PatchbayEditorScreen(Screen):
         if model_base is not None and model_now != model_base:
             model_note = f"{model_base} -> {model_now} *"
         self.query_one("#dirty-label", Static).update(
-            f"Model: {model_note}  ·  {dirty.label() or 'clean'}  ·  Ctrl+S apply"
+            f"Model: {model_note}  ·  {dirty.label() or 'clean'}  ·  "
+            "Space/e stage MODE · Ctrl+S / :w apply · m = hardware model"
         )
         for pair in self._pairs():
             key = pb.pair_key(pair)
@@ -215,6 +246,17 @@ class PatchbayEditorScreen(Screen):
                 return pair
         return None
 
+    def _stage_mode(self, pair, mode: str) -> None:
+        assert self._working is not None
+        key = pb.pair_key(pair)
+        baseline = str(pair.get("mode") or "unknown").lower()
+        mut_key = f"mode:{key}"
+        if mode == baseline:
+            self._working.unstage(mut_key)
+        else:
+            self._working.stage(mut_key, mode)
+        self._reload_table(select_pair=key)
+
     def _update_detail(self) -> None:
         assert self._working is not None
         detail = self.query_one("#detail", Static)
@@ -224,9 +266,11 @@ class PatchbayEditorScreen(Screen):
             return
         key = pb.pair_key(pair)
         effective, baseline = pb.staged_mode_for(self._working, self.bay_id, pair)
-        mode_line = effective
+        mode_line = effective.upper() if effective == "unknown" else effective
         if baseline is not None:
-            mode_line = f"{baseline} -> {effective} *"
+            from_disp = baseline.upper() if baseline == "unknown" else baseline
+            to_disp = effective.upper() if effective == "unknown" else effective
+            mode_line = f"{from_disp} → {to_disp} *"
         upper, _ = pb.staged_connection(self._working, pair, "upper")
         lower, _ = pb.staged_connection(self._working, pair, "lower")
         lines = [
@@ -237,7 +281,7 @@ class PatchbayEditorScreen(Screen):
             f"Mode: {mode_line}",
             f"Status: {pair.get('status') or '—'}",
             "",
-            "e mode · c connections · m model · Ctrl+S apply",
+            "e/Space stage MODE · m hardware model · Ctrl+S / :w apply",
             "",
             "## Related OPEN questions",
         ]
@@ -256,6 +300,18 @@ class PatchbayEditorScreen(Screen):
         self.query_one("#list-table", DataTable).action_cursor_up()
         self._update_detail()
 
+    def action_go_top_pending(self) -> None:
+        self._modes.handle_g(lambda: self._go_row(0))
+
+    def action_go_bottom(self) -> None:
+        if self._pair_keys:
+            self._go_row(len(self._pair_keys) - 1)
+
+    def _go_row(self, idx: int) -> None:
+        table = self.query_one("#list-table", DataTable)
+        table.move_cursor(row=idx)
+        self._update_detail()
+
     @on(DataTable.RowHighlighted)
     def _on_highlight(self) -> None:
         self._update_detail()
@@ -271,15 +327,22 @@ class PatchbayEditorScreen(Screen):
         def _done(mode: str | None) -> None:
             if mode is None:
                 return
-            baseline = str(pair.get("mode") or "unknown").lower()
-            mut_key = f"mode:{key}"
-            if mode == baseline:
-                self._working.unstage(mut_key)
-            else:
-                self._working.stage(mut_key, mode)
-            self._reload_table(select_pair=key)
+            self._stage_mode(pair, mode)
 
         self.app.push_screen(SelectModeModal(key, effective), _done)
+
+    def action_cycle_mode(self) -> None:
+        assert self._working is not None
+        pair = self._selected_pair()
+        if pair is None:
+            return
+        effective, _ = pb.staged_mode_for(self._working, self.bay_id, pair)
+        try:
+            idx = MODE_CYCLE.index(effective)
+        except ValueError:
+            idx = 0
+        nxt = MODE_CYCLE[(idx + 1) % len(MODE_CYCLE)]
+        self._stage_mode(pair, nxt)
 
     def action_edit_connections(self) -> None:
         assert self._working is not None
@@ -335,19 +398,25 @@ class PatchbayEditorScreen(Screen):
             self._reload_table(select_pair=self._selected_pair_key())
 
         self.app.push_screen(
-            InputModal("Hardware model", default=model_now),
+            InputModal("Hardware model (m ≠ mode)", default=model_now),
             _done,
         )
 
     def action_next_unknown(self) -> None:
+        self._jump_unknown(+1)
+
+    def action_prev_unknown(self) -> None:
+        self._jump_unknown(-1)
+
+    def _jump_unknown(self, direction: int) -> None:
         assert self._working is not None
         table = self.query_one("#list-table", DataTable)
-        start = (table.cursor_row or 0) + 1
+        start = (table.cursor_row or 0) + direction
         n = len(self._pair_keys)
         if n == 0:
             return
         for offset in range(n):
-            idx = (start + offset) % n
+            idx = (start + offset * direction) % n
             key = self._pair_keys[idx]
             pair = next(p for p in self._pairs() if pb.pair_key(p) == key)
             effective, _ = pb.staged_mode_for(self._working, self.bay_id, pair)
@@ -366,15 +435,101 @@ class PatchbayEditorScreen(Screen):
             return
         self.app.open_domain("question", related[0].id)  # type: ignore[attr-defined]
 
+    def action_undo_staged(self) -> None:
+        assert self._working is not None
+        if not self._working.undo():
+            self.notify("Nothing to undo")
+            return
+        self._reload_table(select_pair=self._selected_pair_key())
+        self.notify("Undo")
+
+    def action_redo_staged(self) -> None:
+        assert self._working is not None
+        if not self._working.redo():
+            self.notify("Nothing to redo")
+            return
+        self._reload_table(select_pair=self._selected_pair_key())
+        self.notify("Redo")
+
+    def action_command_mode(self) -> None:
+        self._set_mode(EditorMode.COMMAND)
+
+        def _done(raw: str | None) -> None:
+            self._set_mode(EditorMode.NORMAL)
+            if raw is None:
+                self._last_outcome = SaveOutcome.CANCELLED
+                return
+            cmd, _ = parse_command(raw)
+            if cmd == "write":
+                self.action_apply()
+            elif cmd == "wq":
+                self._quit_after_apply = True
+                self.action_apply()
+            elif cmd == "quit":
+                assert self._working is not None
+                if self._working.is_dirty:
+                    self.notify(
+                        "Unsaved changes — use :q! to discard or :w to apply",
+                        severity="warning",
+                    )
+                    self._last_outcome = SaveOutcome.CANCELLED
+                    return
+                self.app.pop_screen()
+            elif cmd == "quit!":
+                assert self._working is not None
+                self._working.discard()
+                self.app.pop_screen()
+            else:
+                self.notify(f"Unknown command :{cmd}", severity="warning")
+
+        self.app.push_screen(CommandLineModal(), _done)
+
+    def action_escape(self) -> None:
+        self._modes.clear_pending()
+        if self._modes.mode is not EditorMode.NORMAL:
+            self._set_mode(EditorMode.NORMAL)
+            return
+        self.action_back()
+
+    def _success_message(self) -> str:
+        assert self._working is not None
+        # Build from last applied mutations — after apply working is discarded;
+        # caller should pass summary before discard. Fallback:
+        return f"Updated {self.bay_id}."
+
     def action_apply(self) -> None:
         assert self._working is not None
         if not self._working.is_dirty:
             self.notify("No staged changes", severity="information")
+            self._last_outcome = SaveOutcome.CANCELLED
             return
+        # Capture human-readable summary before apply discards mutations
+        parts: list[str] = []
+        for key, value in sorted(self._working.mutations.items()):
+            if key.startswith("mode:"):
+                pair = key.removeprefix("mode:")
+                # find baseline
+                before = "unknown"
+                for p in self._pairs():
+                    if pb.pair_key(p) == pair:
+                        before = str(p.get("mode") or "unknown")
+                        break
+                parts.append(
+                    f"pair {pair} mode: {before.upper()} → {str(value).upper()}"
+                )
+            elif key == "model":
+                bay = (self._working.baseline.get("patchbays") or {}).get(self.bay_id) or {}
+                before = str(bay.get("hardware_model") or "unknown")
+                parts.append(f"hardware_model: {before} → {value}")
+            elif key.startswith("upper:") or key.startswith("lower:"):
+                parts.append(f"{key}: → {value!r}")
         summary = pb.change_summary(self._working, self.bay_id)
+        detail_msg = "; ".join(parts) if parts else summary
 
         def _done(result: tuple[bool, bool] | None) -> None:
             if result is None:
+                self._last_outcome = SaveOutcome.CANCELLED
+                self.notify("Save cancelled", severity="information")
                 return
             _ok, create_snap = result
             try:
@@ -385,16 +540,31 @@ class PatchbayEditorScreen(Screen):
                     patchbays_path=self._path,
                 )
             except ConcurrentModificationError as exc:
-                self.notify(str(exc), severity="error")
+                self._last_outcome = SaveOutcome.CONCURRENT_MODIFICATION
+                self.notify(
+                    format_error(exc, prefix="CONCURRENT_MODIFICATION: "),
+                    severity="error",
+                )
+                # retain edits
                 self._reload_table(select_pair=self._selected_pair_key())
                 return
             except StoreError as exc:
-                self.notify(str(exc), severity="error")
+                self._last_outcome = SaveOutcome.FAILED
+                self.notify(format_error(exc, prefix="FAILED: "), severity="error")
                 return
-            self.notify(preview.message or "Applied")
-            # Reload baseline from disk
+            except Exception as exc:
+                self._last_outcome = SaveOutcome.FAILED
+                self.notify(format_error(exc, prefix="FAILED: "), severity="error")
+                return
+            self._last_outcome = SaveOutcome.SUCCESS
+            msg = f"Updated {self.bay_id} {detail_msg}"
+            if preview.message:
+                msg = f"{msg} ({preview.message})"
+            self.notify(msg)
             self._working = pb.open_working(self.bay_id, path=self._path)
             self._reload_table(select_pair=self._selected_pair_key())
+            if self._quit_after_apply:
+                self.app.pop_screen()
 
         self.app.push_screen(ApplyPatchbayModal(summary), _done)
 
@@ -435,14 +605,16 @@ class PatchbayEditorScreen(Screen):
         self.app.push_screen(
             HelpScreen(
                 f"Patchbay {self.bay_id}\n\n"
-                "e       edit mode for selected pair\n"
-                "c       edit upper/lower connections\n"
-                "m       edit hardware_model\n"
-                "n       jump to next UNKNOWN mode\n"
-                "Ctrl+S  apply staged changes (optional snapshot)\n"
-                "o       open related OPEN question\n"
-                "Ctrl+r  reload (discard if dirty)\n"
-                "Esc/q   back (discard prompt if dirty)\n\n"
+                "e / i / Space  stage MODE (not persisted until Apply)\n"
+                "c              edit upper/lower connections\n"
+                "m              edit hardware_model (m ≠ mode)\n"
+                "n / N          next / prev UNKNOWN mode\n"
+                "Ctrl+S / s / :w  apply staged changes\n"
+                "u / U          undo / redo staged\n"
+                "o              open related OPEN question (shows Q-xxx: text)\n"
+                "Ctrl+r         reload\n"
+                ":q / :q!       quit / discard quit\n\n"
+                f"{VIM_HELP_COMMON}\n"
                 "Enter does not apply. Bulk stage then Apply."
             )
         )

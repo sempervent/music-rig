@@ -8,9 +8,11 @@ routes:
     to: TASCAM 1/2
   kaoss_capture:
     status: CURRENT
-    from: Alesis Monitor Out
+    from: TASCAM 3/4
     through: KAOSS Replay
-    to: TASCAM 9/10
+    to: TASCAM 15/16
+    notes: Corrected from Q-004 (was Alesis Monitor Out → TASCAM 9/10). TASCAM 3/4
+      inputs remain miniKORG capture; KAOSS feed label is TASCAM 3/4 per human answer.
   aux_send_loop:
     status: CURRENT
     from: Alesis AUX SEND
@@ -20,9 +22,9 @@ routes:
     - JOYO A/B/Bypass
     - DIRTY (Send A) or SPACE (Send B)
     - BOSS CH-1 stereo out
-    to: Alesis stereo return or line return
+    to: Alesis Return 1 and 2
     notes: RC-1 ahead of wah/JOYO so captured phrases can be manipulated by downstream pedals.
-      JOYO path is mono until CH-1.
+      JOYO path is mono until CH-1. Return jacks confirmed Q-003.
   miniKORG_direct:
     status: CURRENT
     from: miniKORG stereo out
@@ -35,7 +37,7 @@ routes:
     - BOSS acoustic preamp
     - A/B/Y clean leg
     to: TASCAM 5
-    other_aby_leg: UNKNOWN
+    other_aby_leg: Alesis 2
   bass_clean:
     status: CURRENT
     from: Bass
@@ -43,7 +45,7 @@ routes:
     - BBox preamp
     - A/B/Y clean leg
     to: TASCAM 6
-    other_aby_leg: UNKNOWN
+    other_aby_leg: Alesis 1
   electric_guitar_clean:
     status: CURRENT
     from: Electric guitar
@@ -51,7 +53,7 @@ routes:
     - Flamma preamp
     - A/B/Y clean leg
     to: TASCAM 7
-    other_aby_leg: UNKNOWN
+    other_aby_leg: Alesis 3
   sr18_direct:
     status: CURRENT
     from: Alesis SR-18 MAIN L/R
@@ -89,19 +91,19 @@ named_paths:
           signal: stereo
           gear_ref: boss-ch-1
           kind: device
-        - id: alesis-return
-          label: Alesis return / line return
-          kind: endpoint
+        - id: alesis-return-1-2
+          label: Alesis Return 1 and 2
+        position: before
       joyo-a:
         label: 'A = DIRTY (see: rig path show dirty)'
+        nodes: []
         attach: joyo
         position: before
-        nodes: []
       joyo-b:
         label: 'B = SPACE (see: rig path show space)'
+        nodes: []
         attach: joyo
         position: before
-        nodes: []
   dirty:
     label: JOYO DIRTY — Send A
     status: CURRENT
@@ -207,17 +209,15 @@ named_paths:
       main:
         label: Main path
         nodes:
-        - id: alesis-monitor
-          label: Alesis Monitor Out
-          kind: endpoint
+        - id: tascam-3-4
+          label: TASCAM 3/4
         - id: kaoss-replay
           label: KAOSS Replay
           gear_ref: kaoss-replay
           kind: device
-        - id: tascam-9-10
-          label: TASCAM 9/10
-          gear_ref: tascam-us-16x08
-          kind: device
+        - id: tascam-15-16
+          label: TASCAM 15/16
+        position: before
   clean_mixer:
     label: Clean mixer capture
     status: CURRENT
@@ -256,14 +256,14 @@ named_paths:
           label: TASCAM 5
           gear_ref: tascam-us-16x08
           kind: device
+        position: before
       aby-other:
         label: other A/B/Y leg
+        nodes:
+        - id: alesis-2
+          label: Alesis 2
         attach: boss-acoustic-preamp
         position: after
-        nodes:
-        - id: aby-other-unknown
-          label: 'other A/B/Y leg: UNKNOWN'
-          kind: endpoint
   bass:
     label: Bass clean capture
     status: CURRENT
@@ -287,14 +287,14 @@ named_paths:
           label: TASCAM 6
           gear_ref: tascam-us-16x08
           kind: device
+        position: before
       aby-other:
         label: other A/B/Y leg
+        nodes:
+        - id: alesis-1
+          label: Alesis 1
         attach: bbox-preamp
         position: after
-        nodes:
-        - id: aby-other-unknown
-          label: 'other A/B/Y leg: UNKNOWN'
-          kind: endpoint
   electric:
     label: Electric guitar clean capture
     status: CURRENT
@@ -318,14 +318,14 @@ named_paths:
           label: TASCAM 7
           gear_ref: tascam-us-16x08
           kind: device
+        position: before
       aby-other:
         label: other A/B/Y leg
+        nodes:
+        - id: alesis-3
+          label: Alesis 3
         attach: flamma-preamp
         position: after
-        nodes:
-        - id: aby-other-unknown
-          label: 'other A/B/Y leg: UNKNOWN'
-          kind: endpoint
   minikorg:
     label: miniKORG direct capture
     status: CURRENT

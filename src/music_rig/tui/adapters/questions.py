@@ -57,14 +57,46 @@ def question_detail_markdown(q: OpenQuestion) -> str:
         "## Answer",
         "",
         q.answer.strip() or "_—_",
-        "",
-        "## Notes",
-        "",
-        q.notes.strip() or "_—_",
-        "",
-        f"**Related TODOs:** {', '.join(q.related_todos) or '—'}",
-        f"**Related Changes:** {', '.join(q.related_changes) or '—'}",
     ]
+    if q.related_todos:
+        lines.extend(["", f"**Related TODOs:** {', '.join(q.related_todos)}"])
+    else:
+        lines.extend(["", "**Related TODOs:** —"])
+    lines.append(f"**Related Changes:** {', '.join(q.related_changes) or '—'}")
+    v = q.verification
+    if v is not None:
+        lines.extend(
+            [
+                "",
+                "## Verification",
+                "",
+                f"Prompt: {v.prompt or '—'}",
+                f"Kind: {v.kind.value if hasattr(v.kind, 'value') else v.kind}",
+                f"Choices: {', '.join(v.choices) if v.choices else '—'}",
+            ]
+        )
+    vr = q.verification_result
+    if vr is not None:
+        outcome = vr.outcome.value if hasattr(vr.outcome, "value") else vr.outcome
+        lines.extend(
+            [
+                "",
+                "## verification_result",
+                "",
+                f"Outcome: {outcome}",
+                f"Observed: {vr.observed_value or '—'}",
+            ]
+        )
+    else:
+        lines.extend(["", "## verification_result", "", "_none_ (answer ≠ observation)"])
+    lines.extend(
+        [
+            "",
+            "## Notes",
+            "",
+            q.notes.strip() or "_—_",
+        ]
+    )
     if q.resolved_at is not None:
         lines.extend(["", f"**Resolved at:** {q.resolved_at.isoformat()}"])
     if q.reconciled_at is not None:

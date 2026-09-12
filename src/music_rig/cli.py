@@ -5546,6 +5546,11 @@ def tui_cmd(
         None,
         help="Optional object id (Q-008, PB-B, …).",
     ),
+    debug: bool = typer.Option(
+        False,
+        "--debug",
+        help="Pipeline diagnostics / stack traces (also RIG_DEBUG=1).",
+    ),
 ) -> None:
     """Interactive Textual TUI (presentation only; mutations via shared services)."""
     from music_rig.tui import run_tui
@@ -5558,7 +5563,7 @@ def tui_cmd(
             "routing, midi, controls, ableton, performance, snapshot, backup, session, "
             "doctor, status, reconcile, automation"
         )
-    run_tui(route=domain, object_id=object_id)
+    run_tui(route=domain, object_id=object_id, debug=debug)
 
 
 @inspect_app.command("domains")

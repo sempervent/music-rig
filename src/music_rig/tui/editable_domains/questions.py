@@ -210,5 +210,5 @@ class QuestionsEditableAdapter(BaseEditableAdapter):
         working.refresh_source_hash()
         return ApplyResult(
             record_id=updated.id,
-            message=f"{updated.id} saved",
+            message=f"Saved {updated.id}.",
         )

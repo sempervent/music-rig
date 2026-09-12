@@ -14,213 +14,6 @@ from music_rig.tui.app import RigApp
 from music_rig.tui.working import ConcurrentModificationError, WorkingDocument, sha256_file
 
 
-def _write_docs(tmp_path: Path) -> dict[str, Path]:
-    paths = {}
-    for name, start, end in [
-        ("todo.md", "<!-- rig:todo:start -->", "<!-- rig:todo:end -->"),
-        ("wishlist.md", "<!-- rig:wishlist:start -->", "<!-- rig:wishlist:end -->"),
-        ("open-questions.md", "<!-- rig:questions:start -->", "<!-- rig:questions:end -->"),
-        ("patchbays.md", "<!-- rig:patchbays:start -->", "<!-- rig:patchbays:end -->"),
-    ]:
-        path = tmp_path / name
-        path.write_text(f"x\n{start}\n{end}\n", encoding="utf-8")
-        paths[name] = path
-    return paths
-
-
-@pytest.fixture
-def tui_fx(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    """Isolated YAML store for mutation tests — never touches production data."""
-    questions = tmp_path / "open-questions.yaml"
-    todo = tmp_path / "todo.yaml"
-    wish = tmp_path / "wishlist.yaml"
-    inbox = tmp_path / "inbox.yaml"
-    changes = tmp_path / "changes.yaml"
-    patchbays = tmp_path / "patchbays.yaml"
-    inventory = tmp_path / "inventory.yaml"
-    sessions = tmp_path / "sessions"
-    sessions.mkdir()
-    docs = _write_docs(tmp_path)
-
-    todo.write_text(
-        yaml.safe_dump(
-            {
-                "next_session": [],
-                "tasks": [
-                    {
-                        "id": "RIG-001",
-                        "task": "Fixture task",
-                        "area": "Docs",
-                        "priority": "P1",
-                        "status": "READY",
-                        "depends_on": [],
-                        "definition_of_done": "done",
-                        "notes": "",
-                    }
-                ],
-            }
-        ),
-        encoding="utf-8",
-    )
-    wish.write_text("items: []\n", encoding="utf-8")
-    inbox.write_text("items: []\n", encoding="utf-8")
-    changes.write_text("items: []\n", encoding="utf-8")
-    inventory.write_text(
-        yaml.safe_dump(
-            {
-                "items": [
-                    {
-                        "id": "test-gear",
-                        "name": "Test Gear",
-                        "category": "utility",
-                        "ownership_status": "OWNED",
-                        "condition": "WORKING",
-                    }
-                ]
-            }
-        ),
-        encoding="utf-8",
-    )
-    questions.write_text(
-        yaml.safe_dump(
-            {
-                "questions": [
-                    {
-                        "id": "Q-001",
-                        "question": "What mode is PB-B 1/25?",
-                        "area": "Patchbay",
-                        "status": "OPEN",
-                        "related_todos": ["RIG-001"],
-                        "related_changes": [],
-                        "answer": "",
-                        "notes": "",
-                        "resolved_at": None,
-                        "target": {
-                            "domain": "patchbay.mode",
-                            "bay": "PB-B",
-                            "pair": "1/25",
-                        },
-                        "verification": {
-                            "kind": "PATCHBAY_MODE",
-                            "prompt": "Inspect switch",
-                            "answer_type": "ENUM",
-                            "choices": ["normal", "half-normal", "thru", "UNKNOWN"],
-                            "ref_domain": None,
-                        },
-                        "verification_note": "",
-                    },
-                    {
-                        "id": "Q-002",
-                        "question": "Unrelated MIDI clock?",
-                        "area": "MIDI",
-                        "status": "OPEN",
-                        "related_todos": [],
-                        "related_changes": [],
-                        "answer": "",
-                        "notes": "",
-                        "resolved_at": None,
-                    },
-                ]
-            }
-        ),
-        encoding="utf-8",
-    )
-    patchbays.write_text(
-        "# test patchbays\n"
-        + yaml.safe_dump(
-            {
-                "schema_notes": {},
-                "patchbays": {
-                    "PB-A": {
-                        "hardware_model": "unknown",
-                        "status": "undocumented",
-                        "jacks": {},
-                    },
-                    "PB-B": {
-                        "hardware_model": "unknown",
-                        "status": "partially_documented",
-                        "jacks": {
-                            1: {
-                                "row": "upper",
-                                "connection": "miniKORG L",
-                                "paired_with": 25,
-                                "mode": "unknown",
-                                "status": "documented",
-                            },
-                            25: {
-                                "row": "lower",
-                                "connection": "TASCAM 3",
-                                "paired_with": 1,
-                                "mode": "unknown",
-                                "status": "documented",
-                            },
-                            2: {
-                                "row": "upper",
-                                "connection": "miniKORG R",
-                                "paired_with": 26,
-                                "mode": "unknown",
-                                "status": "documented",
-                            },
-                            26: {
-                                "row": "lower",
-                                "connection": "TASCAM 4",
-                                "paired_with": 2,
-                                "mode": "unknown",
-                                "status": "documented",
-                            },
-                        },
-                    },
-                    "PB-C": {
-                        "hardware_model": "unknown",
-                        "status": "undocumented",
-                        "jacks": {},
-                    },
-                    "PB-D": {
-                        "hardware_model": "unknown",
-                        "status": "undocumented",
-                        "jacks": {},
-                    },
-                },
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    from music_rig import current_service, patchbay_state, question_service, todo_service
-    from music_rig import render as render_mod
-
-    def _noop_render(**kwargs):
-        return False, []
-
-    monkeypatch.setattr(render_mod, "render_docs", _noop_render)
-    monkeypatch.setattr(question_service, "render_docs", _noop_render)
-    monkeypatch.setattr(current_service, "render_docs", _noop_render)
-    monkeypatch.setattr(todo_service, "render_docs", _noop_render)
-
-    monkeypatch.setattr(store, "QUESTIONS_PATH", questions)
-    monkeypatch.setattr(store, "TODO_PATH", todo)
-    monkeypatch.setattr(store, "WISHLIST_PATH", wish)
-    monkeypatch.setattr(store, "INBOX_PATH", inbox)
-    monkeypatch.setattr(store, "CHANGES_PATH", changes)
-    monkeypatch.setattr(store, "PATCHBAYS_PATH", patchbays)
-    monkeypatch.setattr(store, "INVENTORY_PATH", inventory)
-    monkeypatch.setattr(store, "SESSIONS_DIR", sessions)
-    monkeypatch.setattr(store, "DOCS_TODO_PATH", docs["todo.md"])
-    monkeypatch.setattr(store, "DOCS_WISHLIST_PATH", docs["wishlist.md"])
-    monkeypatch.setattr(store, "DOCS_QUESTIONS_PATH", docs["open-questions.md"])
-    monkeypatch.setattr(store, "DOCS_PATCHBAYS_PATH", docs["patchbays.md"])
-    monkeypatch.setattr(patchbay_state, "PATCHBAYS_PATH", patchbays)
-    monkeypatch.setattr(current_service, "PATCHBAYS_PATH", patchbays)
-
-    return {
-        "questions": questions,
-        "todo": todo,
-        "patchbays": patchbays,
-        "inventory": inventory,
-        "tmp_path": tmp_path,
-    }
-
-
 # ---------------------------------------------------------------------------
 # Home / navigation
 # ---------------------------------------------------------------------------
@@ -305,10 +98,16 @@ async def test_question_resolve_writes_tmp_only(tui_fx):
         await pilot.pause()
         await pilot.press("r")
         await pilot.pause()
+        from music_rig.tui.screens.answer import AnswerScreen
+
+        assert isinstance(app.screen, AnswerScreen)
+        # Question text must stay visible
+        ctx = str(app.screen.query_one("#answer-context").content)
+        assert "Unrelated MIDI clock?" in ctx
         await pilot.press(*list("clock is unknown"))
-        await pilot.press("enter")
+        await pilot.press("ctrl+s")
         await pilot.pause()
-        # confirm modal — Enter confirms (not Cancel via Tab)
+        # confirm modal — Enter confirms
         await pilot.press("enter")
         await pilot.pause()
     doc = load_questions(tui_fx["questions"])
@@ -316,7 +115,6 @@ async def test_question_resolve_writes_tmp_only(tui_fx):
     assert q.status.value == "RESOLVED"
     assert "clock is unknown" in q.answer
     assert q.resolved_at is not None
-    # production path unchanged (monkeypatched)
     assert tui_fx["questions"].read_text(encoding="utf-8") != before
 
 
@@ -332,15 +130,13 @@ async def test_question_resolve_human_path_lowercase_r(tui_fx):
     async with app.run_test(size=(120, 40)) as pilot:
         await pilot.pause()
         app.notify = _capture  # type: ignore[method-assign]
-        # Human presses lowercase r — must Resolve, not Refresh
         await pilot.press("r")
         await pilot.pause()
-        # Still on Questions screen with answer modal (not a silent refresh)
-        from music_rig.tui.dialogs import InputModal
+        from music_rig.tui.screens.answer import AnswerScreen
 
-        assert isinstance(app.screen, InputModal)
+        assert isinstance(app.screen, AnswerScreen)
         await pilot.press(*list("half-normal verified"))
-        await pilot.press("enter")
+        await pilot.press("ctrl+s")
         await pilot.pause()
         from music_rig.tui.dialogs import ConfirmModal
 
@@ -353,8 +149,8 @@ async def test_question_resolve_human_path_lowercase_r(tui_fx):
     assert q.answer == "half-normal verified"
     assert q.resolved_at is not None
     joined = " ".join(notifications)
-    assert "Q-002 resolved" in joined or "Hidden because filter=OPEN" in joined
-    assert "filter=OPEN" in joined
+    assert "Q-002" in joined
+    assert "filter=OPEN" in joined or "Hidden because filter=OPEN" in joined
 
 
 @pytest.mark.asyncio
@@ -366,7 +162,7 @@ async def test_question_resolve_reopen_under_resolved_filter(tui_fx):
         await pilot.press("r")
         await pilot.pause()
         await pilot.press(*list("answered in test"))
-        await pilot.press("enter")
+        await pilot.press("ctrl+s")
         await pilot.pause()
         await pilot.press("enter")
         await pilot.pause()
@@ -401,6 +197,9 @@ async def test_question_cancel_resolve_no_write(tui_fx):
         await pilot.pause()
         await pilot.press("r")
         await pilot.pause()
+        # Esc from INSERT → NORMAL; second Esc cancels
+        await pilot.press("escape")
+        await pilot.pause()
         await pilot.press("escape")
         await pilot.pause()
     assert tui_fx["questions"].read_text(encoding="utf-8") == before
@@ -415,14 +214,20 @@ async def test_question_cancel_confirm_writes_nothing(tui_fx):
         await pilot.press("r")
         await pilot.pause()
         await pilot.press(*list("should not save"))
-        await pilot.press("enter")
+        await pilot.press("ctrl+s")
         await pilot.pause()
         await pilot.press("escape")  # cancel confirm
+        await pilot.pause()
+        # leave answer screen without saving
+        await pilot.press("escape")
+        await pilot.pause()
+        await pilot.press("escape")
         await pilot.pause()
     assert tui_fx["questions"].read_text(encoding="utf-8") == before
     q = load_questions(tui_fx["questions"]).question_map()["Q-002"]
     assert q.status.value == "OPEN"
     assert q.answer == ""
+
 
 @pytest.mark.asyncio
 async def test_question_defer_reopen_add(tui_fx):
@@ -441,7 +246,6 @@ async def test_question_defer_reopen_add(tui_fx):
         await pilot.press("f")  # RESOLVED
         await pilot.press("f")  # DEFERRED
         await pilot.pause()
-        # select Q-002 if present
         await pilot.press("o")
         await pilot.pause()
         await pilot.press("y")
@@ -451,13 +255,11 @@ async def test_question_defer_reopen_add(tui_fx):
     app = RigApp(route="question")
     async with app.run_test(size=(120, 40)) as pilot:
         await pilot.pause()
-        await pilot.press("a")
+        await pilot.press("A")  # Add (Stage 18: a = Answer)
         await pilot.pause()
+        # AddQuestionModal: question field focused; area defaults to Docs
         await pilot.press(*list("New fact?"))
-        await pilot.press("enter")
-        await pilot.pause()
-        await pilot.press(*list("Docs"))
-        await pilot.press("enter")
+        await pilot.click("#confirm")
         await pilot.pause()
     ids = [q.id for q in load_questions(tui_fx["questions"]).questions]
     assert "Q-003" in ids
@@ -815,7 +617,7 @@ async def test_manual_acceptance_fixture_yaml(tui_fx, monkeypatch):
         await pilot.press("r")
         await pilot.pause()
         await pilot.press(*list("fixture answer"))
-        await pilot.press("enter")
+        await pilot.press("ctrl+s")
         await pilot.pause()
         await pilot.press("enter")
         await pilot.pause()

@@ -1,7 +1,6 @@
 next_session:
 - RIG-001
 - RIG-002
-- RIG-003
 tasks:
 - id: RIG-001
   task: Physically verify DIRTY chain order and SPACE topology (SY-1 SEND PH-3→TR-2; LS-2
@@ -32,7 +31,7 @@ tasks:
   task: Trace and document non-clean A/B/Y destinations for acoustic, bass, electric
   area: Routing
   priority: P0
-  status: READY
+  status: DONE
   depends_on: []
   depends_hint: null
   definition_of_done: Each instrument’s other splitter leg is recorded in `docs/current-routing.md`
@@ -93,7 +92,7 @@ tasks:
   task: Determine acoustic instrument Alesis mixer assignment if any
   area: Routing
   priority: P1
-  status: READY
+  status: DONE
   depends_on:
   - RIG-003
   depends_hint: helpful
@@ -105,7 +104,7 @@ tasks:
   task: Verify physical CH-1 stereo return jack(s) into Alesis
   area: Routing
   priority: P1
-  status: READY
+  status: DONE
   depends_on: []
   depends_hint: null
   definition_of_done: Exact return path recorded in `docs/current-routing.md` and `docs/alesis-mixer-map.md`
@@ -116,7 +115,7 @@ tasks:
   task: Physically verify KAOSS Replay monitor/capture path vs docs
   area: Routing
   priority: P1
-  status: READY
+  status: DONE
   depends_on: []
   depends_hint: null
   definition_of_done: Monitor Out → KAOSS → TASCAM 9/10 confirmed or docs corrected
@@ -302,7 +301,7 @@ tasks:
   task: Decide whether LS-2 has any bass split/blend role outside SPACE
   area: Pedals
   priority: P2
-  status: DEFERRED
+  status: DONE
   depends_on:
   - RIG-001
   depends_hint: null

@@ -17,14 +17,14 @@ Edit with `uv run rig current channels set-source …` (or clear-source).
 | 6 | BASS_CLEAN | Bass after BBox preamp | clean_mono | CURRENT |
 | 7 | GUITAR_CLEAN | Electric after Flamma preamp | clean_mono | CURRENT |
 | 8 | UNASSIGNED | — | unassigned | UNASSIGNED |
-| 9 | KAOSS_L | KAOSS Replay L | wet_stereo | CURRENT |
-| 10 | KAOSS_R | KAOSS Replay R | wet_stereo | CURRENT |
+| 9 | UNASSIGNED | — | unassigned | UNASSIGNED |
+| 10 | UNASSIGNED | — | unassigned | UNASSIGNED |
 | 11 | SR18_L | Alesis SR-18 MAIN L | rhythm | CURRENT |
 | 12 | SR18_R | Alesis SR-18 MAIN R | rhythm | CURRENT |
 | 13 | UNASSIGNED | — | unassigned | UNASSIGNED |
 | 14 | UNASSIGNED | — | unassigned | UNASSIGNED |
-| 15 | UNASSIGNED | — | unassigned | UNASSIGNED |
-| 16 | UNASSIGNED | — | unassigned | UNASSIGNED |
+| 15 | KAOSS_L | KAOSS Replay L | wet_stereo | CURRENT |
+| 16 | KAOSS_R | KAOSS Replay R | wet_stereo | CURRENT |
 <!-- rig:tascam:end -->
 
 ## Notes

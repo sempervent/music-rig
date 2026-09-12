@@ -296,6 +296,7 @@ def test_channel_mutations(current_fx):
         "tascam", 8, "Example Source", path=current_fx["channels"]
     )
     assert preview.changed
+    assert preview.after["status"] == "CURRENT"
     before = current_fx["channels"].read_text(encoding="utf-8")
     current_service.commit_channel(
         data, preview, dry_run=True, render=False, channel_map_path=current_fx["channels"]
@@ -304,19 +305,42 @@ def test_channel_mutations(current_fx):
     current_service.commit_channel(
         data, preview, render=False, channel_map_path=current_fx["channels"]
     )
-    src = channel_state.load_raw(current_fx["channels"])["tascam"][8]["source"]
-    assert src == "Example Source"
+    row = channel_state.load_raw(current_fx["channels"])["tascam"][8]
+    assert row["source"] == "Example Source"
+    assert row["status"] == "CURRENT"
     clear_p, clear_d = channel_state.clear_source(
         "tascam", 8, path=current_fx["channels"]
     )
+    assert clear_p.after["status"] == "UNASSIGNED"
     current_service.commit_channel(
         clear_d, clear_p, render=False, channel_map_path=current_fx["channels"]
     )
-    assert channel_state.load_raw(current_fx["channels"])["tascam"][8]["source"] is None
+    cleared = channel_state.load_raw(current_fx["channels"])["tascam"][8]
+    assert cleared["source"] is None
+    assert cleared["status"] == "UNASSIGNED"
     with pytest.raises(StoreError):
         channel_state.propose_set_source(
             "tascam", 99, "x", path=current_fx["channels"]
         )
+
+
+def test_channel_set_source_promotes_unassigned_to_current(current_fx):
+    """Regression: assigning a source must set status CURRENT (not leave UNASSIGNED)."""
+    raw = channel_state.load_raw(current_fx["channels"])
+    assert raw["alesis"][3]["status"] == "UNASSIGNED"
+    assert raw["alesis"][3]["source"] is None
+    preview, data = channel_state.propose_set_source(
+        "alesis", 3, "Electric", path=current_fx["channels"]
+    )
+    assert preview.before["status"] == "UNASSIGNED"
+    assert preview.after["source"] == "Electric"
+    assert preview.after["status"] == "CURRENT"
+    current_service.commit_channel(
+        data, preview, render=False, channel_map_path=current_fx["channels"]
+    )
+    row = channel_state.load_raw(current_fx["channels"])["alesis"][3]
+    assert row["source"] == "Electric"
+    assert row["status"] == "CURRENT"
 
 
 def test_evidence_links_and_idempotent_no_reconcile(current_fx):

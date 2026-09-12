@@ -161,29 +161,38 @@ def propose_set_source(
         cleaned = source.strip()
         new_source = cleaned if cleaned else None
 
+    before_status = meta.get("status")
     before = {
         "device": device_key,
         "channel": str(key),
         "source": before_source,
+        "status": before_status,
     }
     meta["source"] = new_source
+    # Assigned sources are CURRENT; cleared sources become UNASSIGNED.
+    if new_source is None:
+        meta["status"] = "UNASSIGNED"
+    else:
+        meta["status"] = "CURRENT"
     after = {
         "device": device_key,
         "channel": str(key),
         "source": new_source,
+        "status": meta.get("status"),
     }
 
     errors = validate_channel_map(doc)
     if errors:
         raise StoreError("Channel map validation failed: " + "; ".join(errors))
 
-    changed = before_source != new_source
+    changed = before_source != new_source or before_status != meta.get("status")
     rel = "data/channel-map.yaml"
     label = f"{device_key} {key}"
     if changed:
         message = (
             f"Set {label} source "
             f"{before_source!r} -> {new_source!r}"
+            f" (status {before_status!r} -> {meta.get('status')!r})"
         )
     else:
         message = f"No change: {label} source is already {new_source!r}"

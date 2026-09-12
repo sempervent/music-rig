@@ -10,21 +10,51 @@ from textual.screen import Screen
 from textual.widgets import DataTable, Footer, Header, Static
 
 from music_rig.store import StoreError
-from music_rig.tui.dialogs import ConfirmModal, HelpScreen, InputModal
+from music_rig.tui.debug import format_error
+from music_rig.tui.dialogs import CommandLineModal, ConfirmModal, HelpScreen, InputModal
 from music_rig.tui.editable import BaseEditableAdapter
 from music_rig.tui.forms import RecordEditScreen
+from music_rig.tui.modes import VIM_HELP_COMMON, EditorMode, ModeController, parse_command
+
+
+_ADD_MODALS = {
+    "question": "music_rig.tui.screens.create.AddQuestionModal",
+    "todo": "music_rig.tui.screens.create.AddTodoModal",
+    "wish": "music_rig.tui.screens.create.AddWishModal",
+    "inbox": "music_rig.tui.screens.create.AddInboxModal",
+    "changes": "music_rig.tui.screens.create.AddChangeModal",
+    "gear": "music_rig.tui.screens.create.AddGearModal",
+}
+
+
+def _load_add_modal(domain_id: str):
+    path = _ADD_MODALS.get(domain_id)
+    if not path:
+        return None
+    module_path, cls_name = path.rsplit(".", 1)
+    import importlib
+
+    mod = importlib.import_module(module_path)
+    return getattr(mod, cls_name)
 
 
 class EditableListScreen(Screen):
     BINDINGS = [
         Binding("j", "cursor_down", "Down", show=False),
         Binding("k", "cursor_up", "Up", show=False),
+        Binding("g", "go_top_pending", "gg", show=False),
+        Binding("G", "go_bottom", "Bottom", show=False),
         Binding("enter", "inspect", "Inspect", show=False),
         Binding("e", "edit", "Edit"),
+        Binding("i", "edit", "Insert/Edit", show=False),
+        Binding("A", "add", "Add"),
         Binding("f", "cycle_filter", "Filter"),
         Binding("slash", "search", "Search"),
+        Binding("n", "search_next", "Next", show=False),
+        Binding("N", "search_prev", "Prev", show=False),
+        Binding("colon", "command_mode", ":", show=False),
         Binding("ctrl+r", "refresh", "Refresh"),
-        Binding("escape", "back", "Back"),
+        Binding("escape", "escape", "Esc", show=False, priority=True),
         Binding("q", "back", "Back"),
         Binding("question_mark", "help", "Help"),
     ]
@@ -42,12 +72,16 @@ class EditableListScreen(Screen):
         self._row_ids: list[str] = []
         cycle = adapter.filter_cycle()
         self._filter = cycle[0] if cycle else None
+        self._modes = ModeController()
+        self._search_hits: list[int] = []
+        self._search_idx = -1
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
         with Vertical(id="screen-body"):
             yield Static(f"{self.adapter.label} ✎", id="screen-title")
             yield Static("", id="filter-label")
+            yield Static(self._modes.banner(), id="mode-banner")
             with Horizontal(id="split"):
                 yield DataTable(id="list-table", cursor_type="row")
                 with VerticalScroll(id="detail-pane"):
@@ -58,7 +92,15 @@ class EditableListScreen(Screen):
         table = self.query_one("#list-table", DataTable)
         table.add_columns(*self.adapter.columns())
         table.focus()
+        self._set_mode(EditorMode.NORMAL)
         self.reload(select_id=self._initial_id)
+
+    def _set_mode(self, mode: EditorMode) -> None:
+        self._modes.set_mode(mode)
+        try:
+            self.query_one("#mode-banner", Static).update(self._modes.banner())
+        except Exception:
+            pass
 
     def on_key(self, event) -> None:
         for action_id, key, _label in self.adapter.semantic_actions():
@@ -75,10 +117,11 @@ class EditableListScreen(Screen):
             table.add_row(*row["cells"])
             self._row_ids.append(row["id"])
         filt = self._filter or "ALL"
+        add_hint = " · A Add" if self.adapter.id in _ADD_MODALS else ""
         self.query_one("#filter-label", Static).update(
             f"Filter: {filt}  ·  {len(self._row_ids)} shown"
             + (f"  ·  search: {self._search!r}" if self._search else "")
-            + "  ·  e edit · Ctrl+S in form"
+            + f"  ·  e/i edit · Ctrl+S in form{add_hint}"
         )
         if select_id and select_id in self._row_ids:
             table.move_cursor(row=self._row_ids.index(select_id))
@@ -110,6 +153,18 @@ class EditableListScreen(Screen):
         self.query_one("#list-table", DataTable).action_cursor_up()
         self._update_detail()
 
+    def action_go_top_pending(self) -> None:
+        self._modes.handle_g(lambda: self._go_row(0))
+
+    def action_go_bottom(self) -> None:
+        if self._row_ids:
+            self._go_row(len(self._row_ids) - 1)
+
+    def _go_row(self, idx: int) -> None:
+        table = self.query_one("#list-table", DataTable)
+        table.move_cursor(row=idx)
+        self._update_detail()
+
     def action_inspect(self) -> None:
         self._update_detail()
 
@@ -133,11 +188,40 @@ class EditableListScreen(Screen):
                 return
             self._search = value
             self.reload()
+            self._rebuild_search_hits()
 
         self.app.push_screen(
             InputModal("Search", placeholder="filter…", default=self._search, allow_empty=True),
             _done,
         )
+
+    def _rebuild_search_hits(self) -> None:
+        needle = self._search.casefold().strip()
+        self._search_hits = []
+        self._search_idx = -1
+        if not needle:
+            return
+        for i, rid in enumerate(self._row_ids):
+            if needle in rid.casefold():
+                self._search_hits.append(i)
+
+    def action_search_next(self) -> None:
+        if not self._search_hits:
+            self._rebuild_search_hits()
+        if not self._search_hits:
+            self.notify("No search hits")
+            return
+        self._search_idx = (self._search_idx + 1) % len(self._search_hits)
+        self._go_row(self._search_hits[self._search_idx])
+
+    def action_search_prev(self) -> None:
+        if not self._search_hits:
+            self._rebuild_search_hits()
+        if not self._search_hits:
+            self.notify("No search hits")
+            return
+        self._search_idx = (self._search_idx - 1) % len(self._search_hits)
+        self._go_row(self._search_hits[self._search_idx])
 
     def action_edit(self) -> None:
         row_id = self._selected_id()
@@ -151,6 +235,44 @@ class EditableListScreen(Screen):
 
         self.app.push_screen(RecordEditScreen(self.adapter, row_id), _done)
 
+    def action_add(self) -> None:
+        modal_cls = _load_add_modal(self.adapter.id)
+        if modal_cls is None:
+            self.notify(f"Add not supported for {self.adapter.label}", severity="warning")
+            return
+
+        def _done(new_id: str | None) -> None:
+            if not new_id:
+                return
+            self.notify(f"Added {new_id}")
+            self.reload(select_id=new_id)
+
+        self.app.push_screen(modal_cls(), _done)
+
+    def action_command_mode(self) -> None:
+        self._set_mode(EditorMode.COMMAND)
+
+        def _done(raw: str | None) -> None:
+            self._set_mode(EditorMode.NORMAL)
+            if raw is None:
+                return
+            cmd, _ = parse_command(raw)
+            if cmd in {"quit", "quit!"}:
+                self.app.pop_screen()
+            elif cmd == "write":
+                self.notify("Open a row with e/i then :w to apply field edits")
+            else:
+                self.notify(f"Unknown command :{cmd}", severity="warning")
+
+        self.app.push_screen(CommandLineModal(), _done)
+
+    def action_escape(self) -> None:
+        self._modes.clear_pending()
+        if self._modes.mode is not EditorMode.NORMAL:
+            self._set_mode(EditorMode.NORMAL)
+            return
+        self.action_back()
+
     def action_refresh(self) -> None:
         self.reload(select_id=self._selected_id())
         self.notify("Refreshed")
@@ -160,15 +282,18 @@ class EditableListScreen(Screen):
 
     def action_help(self) -> None:
         actions = "\n".join(f"{k:<8} {label}" for _id, k, label in self.adapter.semantic_actions())
+        add_line = "A       add new record\n" if self.adapter.id in _ADD_MODALS else ""
         self.app.push_screen(
             HelpScreen(
                 f"{self.adapter.label} (editable)\n\n"
-                "e       edit fields (Ctrl+S review/apply)\n"
+                "e / i   edit fields (Ctrl+S / :w review/apply)\n"
+                f"{add_line}"
                 "f       cycle filter\n"
-                "/       search\n"
+                "/ n N   search\n"
                 "Ctrl+r  refresh\n"
                 "Esc/q   back\n"
                 f"{actions}\n\n"
+                f"{VIM_HELP_COMMON}\n"
                 "Enter inspects only — does not apply mutations."
             )
         )
@@ -179,7 +304,6 @@ class EditableListScreen(Screen):
             self.notify("Select a row first", severity="warning")
             return
 
-        # Changes Mark Applied needs confirm
         needs_confirm = action_id in {"apply", "dismiss", "done", "cancel", "retire"}
         payload: dict = {}
 
@@ -189,7 +313,7 @@ class EditableListScreen(Screen):
             try:
                 result = self.adapter.run_semantic(action_id, row_id, payload=payload)
             except StoreError as exc:
-                self.notify(str(exc), severity="error")
+                self.notify(format_error(exc), severity="error")
                 return
             msg = result.message
             if result.hidden_by_filter and result.filter_hint:

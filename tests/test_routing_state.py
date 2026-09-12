@@ -367,10 +367,10 @@ def test_production_semantic_fingerprint_stable_keys():
         "cry-baby",
         "joyo",
         "ch-1",
-        "alesis-return",
+        "alesis-return-1-2",
     ]
     assert [n["id"] for n in fingerprint["kaoss"]["branches"]["main"]["nodes"]] == [
-        "alesis-monitor",
+        "tascam-3-4",
         "kaoss-replay",
-        "tascam-9-10",
+        "tascam-15-16",
     ]

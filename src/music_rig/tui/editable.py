@@ -12,13 +12,18 @@ from music_rig.tui.working import ConcurrentModificationError, WorkingDocument, 
 
 @dataclass
 class WorkingRecord:
-    """Staged field mutations for one record, with source-hash concurrency."""
+    """Staged field mutations for one record, with source-hash concurrency.
+
+    Undo/redo applies to unsaved working-copy mutations only (before Apply).
+    """
 
     record_id: str
     baseline: dict[str, Any]
     source_path: Path | None = None
     source_hash: str | None = None
     mutations: dict[str, Any] = field(default_factory=dict)
+    _undo_stack: list[dict[str, Any]] = field(default_factory=list, repr=False)
+    _redo_stack: list[dict[str, Any]] = field(default_factory=list, repr=False)
 
     def __post_init__(self) -> None:
         if self.source_path is not None and self.source_hash is None and self.source_path.exists():
@@ -28,11 +33,21 @@ class WorkingRecord:
     def is_dirty(self) -> bool:
         return bool(self.mutations)
 
+    def _push_undo(self) -> None:
+        self._undo_stack.append(dict(self.mutations))
+        self._redo_stack.clear()
+
     def stage(self, name: str, value: Any) -> None:
         baseline = self.baseline.get(name)
         if _values_equal(baseline, value):
+            if name not in self.mutations:
+                return
+            self._push_undo()
             self.mutations.pop(name, None)
         else:
+            if self.mutations.get(name) == value:
+                return
+            self._push_undo()
             self.mutations[name] = value
 
     def get(self, name: str) -> Any:
@@ -47,6 +62,22 @@ class WorkingRecord:
 
     def discard(self) -> None:
         self.mutations.clear()
+        self._undo_stack.clear()
+        self._redo_stack.clear()
+
+    def undo(self) -> bool:
+        if not self._undo_stack:
+            return False
+        self._redo_stack.append(dict(self.mutations))
+        self.mutations = self._undo_stack.pop()
+        return True
+
+    def redo(self) -> bool:
+        if not self._redo_stack:
+            return False
+        self._undo_stack.append(dict(self.mutations))
+        self.mutations = self._redo_stack.pop()
+        return True
 
     def source_unchanged(self) -> bool:
         if self.source_path is None or self.source_hash is None:
