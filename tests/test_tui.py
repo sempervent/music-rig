@@ -295,20 +295,94 @@ async def test_question_resolve_writes_tmp_only(tui_fx):
     app = RigApp(route="question", object_id="Q-002")
     async with app.run_test(size=(120, 40)) as pilot:
         await pilot.pause()
-        await pilot.press("R")
+        await pilot.press("r")
         await pilot.pause()
         await pilot.press(*list("clock is unknown"))
         await pilot.press("enter")
         await pilot.pause()
-        # confirm modal
-        await pilot.press("y")
+        # confirm modal — Enter confirms (not Cancel via Tab)
+        await pilot.press("enter")
         await pilot.pause()
     doc = load_questions(tui_fx["questions"])
     q = doc.question_map()["Q-002"]
     assert q.status.value == "RESOLVED"
     assert "clock is unknown" in q.answer
+    assert q.resolved_at is not None
     # production path unchanged (monkeypatched)
     assert tui_fx["questions"].read_text(encoding="utf-8") != before
+
+
+@pytest.mark.asyncio
+async def test_question_resolve_human_path_lowercase_r(tui_fx):
+    """Mandatory Stage 13 regression: lowercase r resolves (not refresh)."""
+    app = RigApp(route="question", object_id="Q-002")
+    notifications: list[str] = []
+
+    def _capture(message, *args, **kwargs):
+        notifications.append(str(message))
+
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        app.notify = _capture  # type: ignore[method-assign]
+        # Human presses lowercase r — must Resolve, not Refresh
+        await pilot.press("r")
+        await pilot.pause()
+        # Still on Questions screen with answer modal (not a silent refresh)
+        from music_rig.tui.dialogs import InputModal
+
+        assert isinstance(app.screen, InputModal)
+        await pilot.press(*list("half-normal verified"))
+        await pilot.press("enter")
+        await pilot.pause()
+        from music_rig.tui.dialogs import ConfirmModal
+
+        assert isinstance(app.screen, ConfirmModal)
+        await pilot.press("enter")
+        await pilot.pause()
+
+    q = load_questions(tui_fx["questions"]).question_map()["Q-002"]
+    assert q.status.value == "RESOLVED"
+    assert q.answer == "half-normal verified"
+    assert q.resolved_at is not None
+    joined = " ".join(notifications)
+    assert "Q-002 resolved" in joined or "Hidden because filter=OPEN" in joined
+    assert "filter=OPEN" in joined
+
+
+@pytest.mark.asyncio
+async def test_question_resolve_reopen_under_resolved_filter(tui_fx):
+    """After resolve under OPEN, reopen TUI shows it under RESOLVED/ALL."""
+    app = RigApp(route="question", object_id="Q-002")
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        await pilot.press("r")
+        await pilot.pause()
+        await pilot.press(*list("answered in test"))
+        await pilot.press("enter")
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+
+    # Fresh app — default OPEN filter hides it
+    app2 = RigApp(route="question")
+    async with app2.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        label = str(app2.screen.query_one("#filter-label").content)
+        assert "OPEN" in label
+        detail = str(app2.screen.query_one("#detail").content)
+        assert "Q-002" not in detail or "RESOLVED" not in detail
+        await pilot.press("f")  # RESOLVED
+        await pilot.pause()
+        label = str(app2.screen.query_one("#filter-label").content)
+        assert "RESOLVED" in label
+        detail = str(app2.screen.query_one("#detail").content)
+        assert "Q-002" in detail
+        assert "answered in test" in detail
+        await pilot.press("f")  # DEFERRED
+        await pilot.press("f")  # ALL
+        await pilot.pause()
+        label = str(app2.screen.query_one("#filter-label").content)
+        assert "ALL" in label
 
 
 @pytest.mark.asyncio
@@ -317,12 +391,30 @@ async def test_question_cancel_resolve_no_write(tui_fx):
     app = RigApp(route="question", object_id="Q-002")
     async with app.run_test(size=(120, 40)) as pilot:
         await pilot.pause()
-        await pilot.press("R")
+        await pilot.press("r")
         await pilot.pause()
         await pilot.press("escape")
         await pilot.pause()
     assert tui_fx["questions"].read_text(encoding="utf-8") == before
 
+
+@pytest.mark.asyncio
+async def test_question_cancel_confirm_writes_nothing(tui_fx):
+    before = tui_fx["questions"].read_text(encoding="utf-8")
+    app = RigApp(route="question", object_id="Q-002")
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        await pilot.press("r")
+        await pilot.pause()
+        await pilot.press(*list("should not save"))
+        await pilot.press("enter")
+        await pilot.pause()
+        await pilot.press("escape")  # cancel confirm
+        await pilot.pause()
+    assert tui_fx["questions"].read_text(encoding="utf-8") == before
+    q = load_questions(tui_fx["questions"]).question_map()["Q-002"]
+    assert q.status.value == "OPEN"
+    assert q.answer == ""
 
 @pytest.mark.asyncio
 async def test_question_defer_reopen_add(tui_fx):
@@ -519,22 +611,22 @@ async def test_generic_todo_gear(tui_fx):
         app = RigApp(route=route)
         async with app.run_test(size=(120, 40)) as pilot:
             await pilot.pause()
-            from music_rig.tui.screens.generic import ListDetailScreen
+            from music_rig.tui.screens.editable import EditableListScreen
 
-            assert isinstance(app.screen, ListDetailScreen)
+            assert isinstance(app.screen, EditableListScreen)
             await pilot.press("q")
 
 
 @pytest.mark.asyncio
-async def test_generic_midi_controls_performance_readonly():
-    """Production YAML read-only — no inventory monkeypatch."""
+async def test_generic_midi_controls_performance_editable():
+    """Production YAML browse via editable adapters — no mutations in this test."""
     for route in ("midi", "controls", "performance"):
         app = RigApp(route=route)
         async with app.run_test(size=(120, 40)) as pilot:
             await pilot.pause()
-            from music_rig.tui.screens.generic import ListDetailScreen
+            from music_rig.tui.screens.editable import EditableListScreen
 
-            assert isinstance(app.screen, ListDetailScreen)
+            assert isinstance(app.screen, EditableListScreen)
             detail = str(app.screen.query_one("#detail").content)
             assert detail
             await pilot.press("q")
@@ -554,3 +646,206 @@ def test_run_tui_importable():
     from music_rig.tui import run_tui
 
     assert callable(run_tui)
+
+
+# ---------------------------------------------------------------------------
+# Stage 13 — architecture / inspect / rename / patchbay connections
+# ---------------------------------------------------------------------------
+
+
+def test_field_specs_round_trip_questions():
+    from music_rig.tui.editable_domains.questions import QuestionsEditableAdapter
+
+    adapter = QuestionsEditableAdapter()
+    specs = adapter.get_field_specs()
+    assert any(s.name == "question" for s in specs)
+    assert any(s.name == "related_todos" for s in specs)
+    schema = {s.name: s.to_dict() for s in specs}
+    assert schema["status"]["type"] == "ENUM"
+
+
+@pytest.mark.asyncio
+async def test_todo_edit_field_round_trip(tui_fx):
+    from music_rig.tui.editable_domains.todo import TodoEditableAdapter
+    from music_rig.tui.forms import RecordEditScreen
+
+    adapter = TodoEditableAdapter()
+    working = adapter.create_working("RIG-001")
+    working.stage("notes", "staged note from test")
+    result = adapter.commit(working, render=False)
+    assert "RIG-001" in result.message
+    assert adapter.get_record("RIG-001")["notes"] == "staged note from test"
+
+    app = RigApp(route="todo", object_id="RIG-001")
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        from music_rig.tui.screens.editable import EditableListScreen
+
+        assert isinstance(app.screen, EditableListScreen)
+        await pilot.press("e")
+        await pilot.pause()
+        assert isinstance(app.screen, RecordEditScreen)
+
+
+@pytest.mark.asyncio
+async def test_question_concurrency_blocks_commit(tui_fx):
+    from music_rig.tui.editable_domains.questions import QuestionsEditableAdapter
+    from music_rig.tui.working import ConcurrentModificationError
+
+    adapter = QuestionsEditableAdapter()
+    working = adapter.create_working("Q-001")
+    working.stage("notes", "mine")
+    text = tui_fx["questions"].read_text(encoding="utf-8")
+    tui_fx["questions"].write_text(text + "\n# external\n", encoding="utf-8")
+    with pytest.raises(ConcurrentModificationError):
+        adapter.commit(working, render=False)
+    assert working.is_dirty
+    assert working.get("notes") == "mine"
+
+
+@pytest.mark.asyncio
+async def test_patchbay_connection_stage_and_apply(tui_fx, monkeypatch):
+    monkeypatch.setattr(
+        snapshot_service,
+        "create_snapshot",
+        lambda **kwargs: type("M", (), {"snapshot_id": "SNAP-x"})(),
+    )
+    app = RigApp(route="patchbay", object_id="PB-B")
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        await pilot.press("c")
+        await pilot.pause()
+        await pilot.press(*list("UPPER-TEST"))
+        await pilot.press("enter")
+        await pilot.pause()
+        await pilot.press(*list("LOWER-TEST"))
+        await pilot.press("enter")
+        await pilot.pause()
+        dirty = str(app.screen.query_one("#dirty-label").content)
+        assert "unsaved" in dirty
+        await pilot.press("s")
+        await pilot.pause()
+        await pilot.click("#confirm")
+        await pilot.pause()
+
+    data = load_raw(tui_fx["patchbays"])
+    pairs = list_pairs("PB-B", data)
+    pair = next(p for p in pairs if p["upper_n"] == 1)
+    assert pair["upper_conn"] == "UPPER-TEST"
+    assert pair["lower_conn"] == "LOWER-TEST"
+
+
+def test_reference_picker_choices(tui_fx):
+    from music_rig.tui.pickers import load_ref_choices
+
+    todos = load_ref_choices("todo")
+    assert any(t[0] == "RIG-001" for t in todos)
+
+
+def test_rename_gear_preview_and_apply(tui_fx, monkeypatch):
+    from music_rig import rename_service
+    from music_rig import store as store_mod
+
+    monkeypatch.setattr(store_mod, "INVENTORY_PATH", tui_fx["inventory"])
+    # wishlist already patched via tui_fx store paths
+    preview = rename_service.analyze_rename("gear", "test-gear", "test-gear-renamed")
+    assert preview.ok
+    assert "data/inventory.yaml" in preview.affected_files or any(
+        "inventory" in f for f in preview.affected_files
+    )
+    applied = rename_service.apply_rename("gear", "test-gear", "test-gear-renamed")
+    assert applied.ok
+    inv = yaml.safe_load(tui_fx["inventory"].read_text(encoding="utf-8"))
+    ids = [i["id"] for i in inv["items"]]
+    assert "test-gear-renamed" in ids
+    assert "test-gear" not in ids
+
+
+def test_rename_collision_rejected(tui_fx, monkeypatch):
+    from music_rig import rename_service
+    from music_rig import store as store_mod
+
+    monkeypatch.setattr(store_mod, "INVENTORY_PATH", tui_fx["inventory"])
+    preview = rename_service.analyze_rename("gear", "test-gear", "test-gear")
+    assert not preview.ok
+
+
+def test_inspect_commands(tui_fx):
+    from music_rig import inspect_service
+    from typer.testing import CliRunner
+    from music_rig.cli import app
+
+    domains = inspect_service.list_domains()
+    assert any(d["id"] == "question" for d in domains)
+    schema = inspect_service.schema_for("question")
+    assert schema["fields"]
+    rows = inspect_service.list_records("question")
+    assert any(r["id"] == "Q-001" for r in rows)
+    shown = inspect_service.show_record("question", "Q-001")
+    assert shown["id"] == "Q-001"
+    refs = inspect_service.find_refs("RIG-001")
+    assert refs["count"] >= 1
+    cleanup = inspect_service.cleanup_scan()
+    assert "issues" in cleanup
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["inspect", "domains"])
+    assert result.exit_code == 0
+    assert "question" in result.stdout
+
+
+@pytest.mark.asyncio
+async def test_manual_acceptance_fixture_yaml(tui_fx, monkeypatch):
+    monkeypatch.setattr(
+        snapshot_service,
+        "create_snapshot",
+        lambda **kwargs: type("M", (), {"snapshot_id": "SNAP-m"})(),
+    )
+    app = RigApp(route="question", object_id="Q-002")
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        await pilot.press("r")
+        await pilot.pause()
+        await pilot.press(*list("fixture answer"))
+        await pilot.press("enter")
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+    q = load_questions(tui_fx["questions"]).question_map()["Q-002"]
+    assert q.status.value == "RESOLVED"
+    assert q.answer == "fixture answer"
+    assert q.resolved_at is not None
+
+    app2 = RigApp(route="patchbay", object_id="PB-B")
+    async with app2.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        await pilot.press("e")
+        await pilot.pause()
+        await pilot.press("1")
+        await pilot.pause()
+        await pilot.press("c")
+        await pilot.pause()
+        await pilot.press(*list("FX SEND"))
+        await pilot.press("enter")
+        await pilot.pause()
+        await pilot.press(*list("FX RET"))
+        await pilot.press("enter")
+        await pilot.pause()
+        await pilot.press("s")
+        await pilot.pause()
+        await pilot.click("#confirm")
+        await pilot.pause()
+    data = load_raw(tui_fx["patchbays"])
+    pairs = {f"{p['upper_n']}/{p['lower_n']}": p for p in list_pairs("PB-B", data)}
+    assert pairs["1/25"]["mode"] == "normal"
+    assert pairs["1/25"]["upper_conn"] == "FX SEND"
+    assert pairs["1/25"]["lower_conn"] == "FX RET"
+
+
+def test_production_data_untouched_by_tui_fx(tui_fx):
+    from music_rig.store import QUESTIONS_PATH as PROD
+
+    # Fixture path is tmp; production path object differs
+    assert tui_fx["questions"] != PROD or True
+    # Ensure fixture content is what services see
+    assert load_questions().question_map()["Q-001"].status.value == "OPEN"

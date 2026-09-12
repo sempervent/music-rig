@@ -194,6 +194,80 @@ def add_todo(
     return new_doc
 
 
+def update_todo_fields(
+    todo_id: str,
+    *,
+    task: str | None = None,
+    area: str | None = None,
+    priority: str | None = None,
+    status: TodoStatus | str | None = None,
+    definition_of_done: str | None = None,
+    notes: str | None = None,
+    depends_on: list[str] | None = None,
+    waiting_on: str | None = None,
+    next_session_why: str | None = None,
+    render: bool = True,
+    todo_path=None,
+    docs_todo=None,
+    docs_wishlist=None,
+) -> TodoTask:
+    """Patch mutable TODO fields. Status may also be set via set_todo_status."""
+    from music_rig.models import TodoPriority
+
+    doc = load_todo(todo_path)
+    current = get_task(doc, todo_id)
+    data = current.model_dump()
+    if task is not None:
+        cleaned = task.strip()
+        if not cleaned:
+            raise StoreError("Task text cannot be empty.")
+        data["task"] = cleaned
+    if area is not None:
+        cleaned_area = area.strip()
+        if not cleaned_area:
+            raise StoreError("Area cannot be empty.")
+        data["area"] = cleaned_area
+    if priority is not None:
+        data["priority"] = TodoPriority(str(priority).strip().upper())
+    if status is not None:
+        data["status"] = TodoStatus(status) if isinstance(status, str) else status
+    if definition_of_done is not None:
+        cleaned_dod = definition_of_done.strip()
+        if not cleaned_dod:
+            raise StoreError("Definition of done cannot be empty.")
+        data["definition_of_done"] = cleaned_dod
+    if notes is not None:
+        data["notes"] = notes
+    if depends_on is not None:
+        deps = [d.strip().upper() for d in depends_on if d.strip()]
+        known = doc.task_map()
+        for dep in deps:
+            if dep not in known:
+                raise StoreError(f"Dependency {dep} does not exist.")
+        data["depends_on"] = deps
+    if waiting_on is not None:
+        data["waiting_on"] = waiting_on.strip() or None
+    if next_session_why is not None:
+        data["next_session_why"] = next_session_why.strip() or None
+    updated = TodoTask.model_validate(data)
+    new_doc = _replace_task(doc, updated)
+    # Drop from next_session if terminal
+    if updated.status.value in TERMINAL_FOR_NEXT and updated.id in new_doc.next_session:
+        new_doc = TodoDocument(
+            next_session=[t for t in new_doc.next_session if t != updated.id],
+            tasks=list(new_doc.tasks),
+        )
+    save_todo(new_doc, todo_path)
+    if render:
+        render_docs(
+            todo_path=todo_path,
+            docs_todo=docs_todo,
+            docs_wishlist=docs_wishlist,
+            write=True,
+        )
+    return updated
+
+
 def migrate_next_status(doc: TodoDocument) -> TodoDocument:
     """Convert legacy NEXT status to READY; preserve next_session."""
     tasks = []

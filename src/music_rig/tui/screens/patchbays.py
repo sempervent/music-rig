@@ -31,7 +31,7 @@ class PatchbayListScreen(Screen):
         Binding("j", "cursor_down", "Down", show=False),
         Binding("k", "cursor_up", "Up", show=False),
         Binding("enter", "open", "Open"),
-        Binding("r", "refresh", "Refresh"),
+        Binding("ctrl+r", "refresh", "Refresh"),
         Binding("escape", "back", "Back"),
         Binding("q", "back", "Back"),
         Binding("question_mark", "help", "Help"),
@@ -47,7 +47,7 @@ class PatchbayListScreen(Screen):
         with Vertical(id="screen-body"):
             yield Static("Patchbays", id="screen-title")
             yield Static(
-                "Edit mode + hardware_model only · endpoint editing deferred (Stage 12)",
+                "Edit mode, connections, hardware_model · Ctrl+S apply · staged bulk edits",
                 id="home-subtitle",
             )
             yield DataTable(id="list-table", cursor_type="row")
@@ -101,8 +101,7 @@ class PatchbayListScreen(Screen):
     def action_help(self) -> None:
         self.app.push_screen(
             HelpScreen(
-                "Patchbay list\n\nEnter open bay editor\nr refresh\nEsc/q back\n\n"
-                "Endpoint editing is not implemented in Stage 12."
+                "Patchbay list\n\nEnter open bay editor\nCtrl+r refresh\nEsc/q back"
             )
         )
 
@@ -112,11 +111,13 @@ class PatchbayEditorScreen(Screen):
         Binding("j", "cursor_down", "Down", show=False),
         Binding("k", "cursor_up", "Up", show=False),
         Binding("e", "edit_mode", "Edit mode"),
+        Binding("c", "edit_connections", "Connections"),
         Binding("m", "edit_model", "Model"),
         Binding("n", "next_unknown", "Next UNKNOWN"),
-        Binding("s", "apply", "Apply"),
+        Binding("ctrl+s", "apply", "Apply"),
+        Binding("s", "apply", "Apply", show=False),
         Binding("o", "open_question", "Question"),
-        Binding("r", "refresh", "Refresh"),
+        Binding("ctrl+r", "refresh", "Refresh"),
         Binding("escape", "back", "Back"),
         Binding("q", "back", "Back"),
         Binding("question_mark", "help", "Help"),
@@ -169,22 +170,29 @@ class PatchbayEditorScreen(Screen):
         if model_base is not None and model_now != model_base:
             model_note = f"{model_base} -> {model_now} *"
         self.query_one("#dirty-label", Static).update(
-            f"Model: {model_note}  ·  {dirty.label() or 'clean'}"
+            f"Model: {model_note}  ·  {dirty.label() or 'clean'}  ·  Ctrl+S apply"
         )
         for pair in self._pairs():
             key = pb.pair_key(pair)
             effective, baseline = pb.staged_mode_for(self._working, self.bay_id, pair)
+            upper, upper_base = pb.staged_connection(self._working, pair, "upper")
+            lower, lower_base = pb.staged_connection(self._working, pair, "lower")
+            upper_disp = upper or "—"
+            if upper_base is not None and upper != upper_base:
+                upper_disp = f"{upper_disp} *"
+            lower_disp = lower or "—"
+            if lower_base is not None and lower != lower_base:
+                lower_disp = f"{lower_disp} *"
             table.add_row(
                 key,
-                str(pair.get("upper_conn") or "—"),
-                str(pair.get("lower_conn") or "—"),
+                upper_disp,
+                lower_disp,
                 mode_cell(effective, staged_from=baseline),
             )
             self._pair_keys.append(key)
         if select_pair and select_pair in self._pair_keys:
             table.move_cursor(row=self._pair_keys.index(select_pair))
         elif select_pair:
-            # try upper-only match
             for i, key in enumerate(self._pair_keys):
                 if key == select_pair or key.startswith(f"{select_pair}/") or key.split("/")[0] == select_pair:
                     table.move_cursor(row=i)
@@ -219,15 +227,17 @@ class PatchbayEditorScreen(Screen):
         mode_line = effective
         if baseline is not None:
             mode_line = f"{baseline} -> {effective} *"
+        upper, _ = pb.staged_connection(self._working, pair, "upper")
+        lower, _ = pb.staged_connection(self._working, pair, "lower")
         lines = [
             f"# Pair {key}",
             "",
-            f"Upper {pair['upper_n']}: {pair.get('upper_conn') or '—'}",
-            f"Lower {pair.get('lower_n')}: {pair.get('lower_conn') or '—'}",
+            f"Upper {pair['upper_n']}: {upper or '—'}",
+            f"Lower {pair.get('lower_n')}: {lower or '—'}",
             f"Mode: {mode_line}",
             f"Status: {pair.get('status') or '—'}",
             "",
-            "_Endpoint (connection) editing is not available in Stage 12._",
+            "e mode · c connections · m model · Ctrl+S apply",
             "",
             "## Related OPEN questions",
         ]
@@ -270,6 +280,44 @@ class PatchbayEditorScreen(Screen):
             self._reload_table(select_pair=key)
 
         self.app.push_screen(SelectModeModal(key, effective), _done)
+
+    def action_edit_connections(self) -> None:
+        assert self._working is not None
+        pair = self._selected_pair()
+        if pair is None:
+            return
+        key = pb.pair_key(pair)
+        upper_now, _ = pb.staged_connection(self._working, pair, "upper")
+        lower_now, _ = pb.staged_connection(self._working, pair, "lower")
+
+        def _after_upper(upper: str | None) -> None:
+            if upper is None:
+                return
+
+            def _after_lower(lower: str | None) -> None:
+                if lower is None:
+                    return
+                for side, value, baseline_key in (
+                    ("upper", upper, "upper_conn"),
+                    ("lower", lower, "lower_conn"),
+                ):
+                    baseline = str(pair.get(baseline_key) or "")
+                    mut_key = f"{side}:{key}"
+                    if value == baseline:
+                        self._working.unstage(mut_key)
+                    else:
+                        self._working.stage(mut_key, value)
+                self._reload_table(select_pair=key)
+
+            self.app.push_screen(
+                InputModal("Lower connection", default=lower_now, allow_empty=True),
+                _after_lower,
+            )
+
+        self.app.push_screen(
+            InputModal("Upper connection", default=upper_now, allow_empty=True),
+            _after_upper,
+        )
 
     def action_edit_model(self) -> None:
         assert self._working is not None
@@ -387,13 +435,14 @@ class PatchbayEditorScreen(Screen):
         self.app.push_screen(
             HelpScreen(
                 f"Patchbay {self.bay_id}\n\n"
-                "e  edit mode for selected pair\n"
-                "m  edit hardware_model\n"
-                "n  jump to next UNKNOWN mode\n"
-                "s  apply staged changes (with optional snapshot)\n"
-                "o  open related OPEN question\n"
-                "r  reload (discard if dirty)\n"
-                "Esc/q back (discard prompt if dirty)\n\n"
-                "Endpoint editing deferred — Stage 5 only supports mode + hardware_model safely."
+                "e       edit mode for selected pair\n"
+                "c       edit upper/lower connections\n"
+                "m       edit hardware_model\n"
+                "n       jump to next UNKNOWN mode\n"
+                "Ctrl+S  apply staged changes (optional snapshot)\n"
+                "o       open related OPEN question\n"
+                "Ctrl+r  reload (discard if dirty)\n"
+                "Esc/q   back (discard prompt if dirty)\n\n"
+                "Enter does not apply. Bulk stage then Apply."
             )
         )

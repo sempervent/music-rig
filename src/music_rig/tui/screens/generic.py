@@ -20,7 +20,7 @@ class ListDetailScreen(Screen):
         Binding("k", "cursor_up", "Up", show=False),
         Binding("enter", "inspect", "Inspect", show=False),
         Binding("slash", "search", "Search"),
-        Binding("r", "refresh", "Refresh"),
+        Binding("ctrl+r", "refresh", "Refresh"),
         Binding("escape", "back", "Back"),
         Binding("q", "back", "Back"),
         Binding("question_mark", "help", "Help"),
@@ -133,7 +133,7 @@ class ListDetailScreen(Screen):
                 f"{self.adapter.label} (read-only)\n\n"
                 "j/k  navigate\n"
                 "/    search\n"
-                "r    refresh\n"
+                "Ctrl+r refresh\n"
                 "Esc/q back\n"
                 f"{action_lines}"
             )

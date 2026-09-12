@@ -141,6 +141,11 @@ uv run rig tui question
 uv run rig tui question Q-008
 uv run rig tui patchbay PB-B
 
+# Structured inspection
+uv run rig inspect domains
+uv run rig inspect schema question
+uv run rig inspect cleanup --json
+
 # What should I do?
 uv run rig now
 uv run rig now --play
@@ -309,50 +314,54 @@ it must never be read or promoted as `VERIFIED` without direct evidence.
 
 `uv run rig tui` launches a Textual UI over the same services as the CLI. The TUI is
 **presentation only**: it never parses CLI output and never writes YAML from widgets.
-Editable domains mutate through `question_service` and `patchbay_state.propose_*` +
-`current_service.commit_patchbay` (optional `snapshot_service.create_snapshot` before
-patchbay apply). OBS / Ableton / MIDI / Stream Deck / macOS automation remain
-`NOT_IMPLEMENTED`.
+Editable domains use FieldSpecs + shared services with **Ctrl+S** review/apply.
+Questions: **`r` = Resolve**, **`Ctrl+r` = Refresh**. OBS / Ableton / MIDI / Stream Deck /
+macOS automation remain `NOT_IMPLEMENTED`.
+
+See [docs/tui.md](docs/tui.md) and root [SKILLS.md](SKILLS.md).
 
 ### CLI vs TUI
 
 | Concern | CLI | TUI |
 |---|---|---|
 | Scripting / CI | Preferred | Not for automation |
-| Browse + edit questions | `rig question …` | `rig tui question` |
-| Patchbay mode/model | `rig current patchbay …` | `rig tui patchbay` |
-| Read-only domains | Many `rig …` commands | Home → domain list/detail |
-| Endpoint jack editing | Supported via CURRENT cmds | **Deferred** (Stage 12) |
+| Browse + edit questions | `rig question …` | `rig tui question` (`r` resolve) |
+| Patchbay mode/model/connections | `rig current patchbay …` | `rig tui patchbay` |
+| Structured discovery | `rig inspect …` | Home → domain |
+| Agent skill guide | [SKILLS.md](SKILLS.md) | same |
 
 ### Coverage matrix
 
 | Domain | List | Detail | Edit |
 |---|---|---|---|
-| Questions | yes | yes | yes (resolve/defer/reopen/add) |
-| Patchbays | yes | yes | yes (mode + hardware_model only) |
-| TODO | yes | yes | next-session mark only |
-| Wishlist | yes | yes | — |
-| Inbox | yes | yes | — |
-| Changes | yes | yes | — |
-| Gear | yes | yes | — |
-| MIDI | yes | yes | — |
-| Controllers | yes | yes | — |
-| Ableton | yes | yes | — |
-| Performance | yes | yes (panic display only) | — |
-| Snapshots | yes | yes | create snapshot |
-| Backups | yes | yes | — |
-| Sessions | yes | yes | — |
-| Doctor / Status / Reconcile | yes | text view | — |
-| Automation | yes | capability status | — |
-
-Patchbay **endpoint** (upper/lower connection) editing is deferred: Stage 5 CURRENT
-mutations only support mode + hardware_model safely through the shared propose/commit
-path the TUI reuses.
+| Questions | yes | yes | yes (fields + resolve/defer/reopen) |
+| Patchbays | yes | yes | yes (mode, connections, model; staged) |
+| TODO | yes | yes | yes (fields + Next Session + status) |
+| Wishlist | yes | yes | yes |
+| Inbox | yes | yes | yes (dismiss / edit) |
+| Changes | yes | yes | yes (apply/dismiss) |
+| Gear | yes | yes | yes (+ `rig rename` for IDs) |
+| Channel map | yes | yes | yes (sources) |
+| Routing | yes | yes | yes (node mode; structural via CLI) |
+| MIDI | yes | yes | yes (documented state only) |
+| Controllers | yes | yes | yes (availability/evidence) |
+| Ableton | yes | yes | yes (metadata) |
+| Performance | yes | yes | partial (evidence; no execution) |
+| Backups | yes | yes | yes (plan fields; no secrets) |
+| Sessions | yes | yes | partial / ACTIVE |
+| Snapshots | yes | yes | create/browse only |
+| Doctor/Status/Reconcile/Automation | yes | yes | read-only |
 
 Direct launch examples: `rig tui`, `rig tui question Q-008`, `rig tui patchbay PB-B`,
-`rig tui todo|wish|inbox|changes|gear|midi|controls|ableton|performance|snapshot|backup|session|doctor|status|reconcile|automation`.
+`rig tui todo|wish|inbox|changes|gear|channels|routing|midi|controls|ableton|performance|…`.
 
-More detail: [docs/tui.md](docs/tui.md).
+```bash
+uv run rig inspect domains
+uv run rig inspect schema question
+uv run rig inspect cleanup --json
+```
+
+More detail: [docs/tui.md](docs/tui.md) and [SKILLS.md](SKILLS.md).
 
 ## Documentation CI/CD
 

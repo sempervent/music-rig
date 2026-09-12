@@ -11,10 +11,15 @@ from textual.widgets import Button, Checkbox, Input, Label, Static
 
 
 class ConfirmModal(ModalScreen[bool]):
-    """Yes/No confirmation. Result True on confirm."""
+    """Yes/No confirmation. Result True on confirm.
+
+    Enter always confirms (explicit binding), regardless of Tab focus.
+    Confirm is focused by default so keyboard users do not cancel by accident.
+    """
 
     BINDINGS = [
         Binding("escape", "cancel", "Cancel", show=False),
+        Binding("enter", "confirm", "Confirm", show=False, priority=True),
         Binding("y", "confirm", "Yes", show=False),
         Binding("n", "cancel", "No", show=False),
     ]
@@ -33,6 +38,9 @@ class ConfirmModal(ModalScreen[bool]):
             with Horizontal(id="modal-buttons"):
                 yield Button(self._confirm_label, variant="primary", id="confirm")
                 yield Button("Cancel", id="cancel")
+
+    def on_mount(self) -> None:
+        self.query_one("#confirm", Button).focus()
 
     def action_confirm(self) -> None:
         self.dismiss(True)
@@ -182,7 +190,10 @@ class SelectModeModal(ModalScreen[str | None]):
 class ApplyPatchbayModal(ModalScreen[tuple[bool, bool] | None]):
     """Apply staged patchbay changes. Returns (confirmed, create_snapshot) or None."""
 
-    BINDINGS = [Binding("escape", "cancel", "Cancel", show=False)]
+    BINDINGS = [
+        Binding("escape", "cancel", "Cancel", show=False),
+        Binding("enter", "confirm", "Apply", show=False, priority=True),
+    ]
 
     def __init__(self, summary: str) -> None:
         super().__init__()
@@ -200,6 +211,13 @@ class ApplyPatchbayModal(ModalScreen[tuple[bool, bool] | None]):
             with Horizontal(id="modal-buttons"):
                 yield Button("Apply", variant="primary", id="confirm")
                 yield Button("Cancel", id="cancel")
+
+    def on_mount(self) -> None:
+        self.query_one("#confirm", Button).focus()
+
+    def action_confirm(self) -> None:
+        snap = self.query_one("#snap-check", Checkbox).value
+        self.dismiss((True, snap))
 
     def action_cancel(self) -> None:
         self.dismiss(None)

@@ -16,7 +16,8 @@ class HomeScreen(Screen):
         Binding("j", "cursor_down", "Down", show=False),
         Binding("k", "cursor_up", "Up", show=False),
         Binding("enter", "open", "Open"),
-        Binding("r", "refresh", "Refresh"),
+        Binding("ctrl+r", "refresh", "Refresh"),
+        Binding("r", "refresh", "Refresh", show=False),
         Binding("q", "quit_app", "Quit"),
         Binding("question_mark", "help", "Help"),
     ]
@@ -26,7 +27,7 @@ class HomeScreen(Screen):
         with Vertical(id="home-body"):
             yield Static("music-rig — Interactive TUI", id="home-title")
             yield Static(
-                "Presentation only · mutations via shared services · Questions + Patchbays editable",
+                "✎ editable · derived views read-only · mutations via services · Ctrl+S apply",
                 id="home-subtitle",
             )
             yield DataTable(id="home-table", cursor_type="row")
@@ -81,9 +82,10 @@ class HomeScreen(Screen):
             HelpScreen(
                 "j/k or arrows  navigate\n"
                 "Enter          open domain\n"
-                "r              refresh counts\n"
+                "Ctrl+r / r     refresh counts\n"
                 "?              help\n"
                 "q              quit\n\n"
-                "Editable domains: Questions, Patchbays"
+                "✎ marks editable domains. Derived: Doctor/Status/Reconcile/Automation.\n"
+                "In editors: e edit, Ctrl+S review/apply. Questions: r=Resolve."
             )
         )

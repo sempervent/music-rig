@@ -10,12 +10,21 @@ from music_rig.models import CurrentPreview, QuestionStatus
 from music_rig.patchbay_state import (
     list_pairs,
     load_raw,
+    propose_set_connection,
     propose_set_model,
     propose_set_modes_batch,
 )
 from music_rig.store import load_questions
 from music_rig import store as store_mod
+from music_rig.tui.fields import FieldSpec, FieldType, enum_spec, text_spec
 from music_rig.tui.working import ConcurrentModificationError, WorkingDocument
+
+
+PAIR_FIELD_SPECS: list[FieldSpec] = [
+    text_spec("upper_connection", "Upper connection"),
+    text_spec("lower_connection", "Lower connection"),
+    enum_spec("mode", "Mode", ("normal", "half-normal", "thru", "unknown")),
+]
 
 
 def bay_summaries(data: dict[str, Any] | None = None) -> list[dict[str, Any]]:
@@ -85,6 +94,18 @@ def staged_mode_for(
     return baseline, None
 
 
+def staged_connection(
+    working: WorkingDocument[dict[str, Any]],
+    pair: dict[str, Any],
+    side: str,
+) -> tuple[str, str | None]:
+    key = f"{side}:{pair_key(pair)}"
+    baseline = str(pair.get(f"{side}_conn") or "")
+    if working.has(key):
+        return str(working.get(key)), baseline
+    return baseline, None
+
+
 def staged_model(working: WorkingDocument[dict[str, Any]], bay_id: str) -> tuple[str, str | None]:
     bay = (working.baseline.get("patchbays") or {}).get(bay_id.upper()) or {}
     baseline = str(bay.get("hardware_model") or "unknown")
@@ -100,17 +121,19 @@ def change_summary(working: WorkingDocument[dict[str, Any]], bay_id: str) -> str
         lines.append(f"hardware_model: {model_base!r} -> {model_now!r}")
     pairs = list_pairs(bay_id, working.baseline)
     for pair in pairs:
-        key = f"mode:{pair_key(pair)}"
-        if not working.has(key):
-            continue
-        before = str(pair.get("mode") or "unknown")
-        after = str(working.get(key))
-        lines.append(f"{pair_key(pair)}: {before} -> {after}")
+        pk = pair_key(pair)
+        if working.has(f"mode:{pk}"):
+            before = str(pair.get("mode") or "unknown")
+            after = str(working.get(f"mode:{pk}"))
+            lines.append(f"{pk} mode: {before} -> {after}")
+        for side in ("upper", "lower"):
+            key = f"{side}:{pk}"
+            if working.has(key):
+                before = str(pair.get(f"{side}_conn") or "")
+                after = str(working.get(key))
+                lines.append(f"{pk} {side}: {before!r} -> {after!r}")
     if len(lines) == 2:
         lines.append("(no changes)")
-    lines.append("")
-    lines.append("Endpoint (upper/lower connection) editing is not available in Stage 12.")
-    lines.append("Mode + hardware_model only.")
     return "\n".join(lines)
 
 
@@ -122,7 +145,7 @@ def apply_working(
     render: bool = True,
     patchbays_path: Path | None = None,
 ) -> CurrentPreview:
-    """Commit staged mode/model via propose_* + commit_patchbay. Optional snapshot first."""
+    """Commit staged mode/model/connections via propose_* + commit_patchbay."""
 
     def _commit(doc: WorkingDocument[dict[str, Any]]) -> None:
         nonlocal result
@@ -131,17 +154,35 @@ def apply_working(
         data = doc.baseline
         bay = bay_id.upper()
         mode_updates: list[tuple[str, str]] = []
+        conn_by_pair: dict[str, dict[str, str | None]] = {}
         for key, value in doc.mutations.items():
             if key.startswith("mode:"):
                 pair = key.removeprefix("mode:")
                 upper = pair.split("/", 1)[0]
                 mode_updates.append((upper, str(value)))
+            elif key.startswith("upper:") or key.startswith("lower:"):
+                side, _, pair = key.partition(":")
+                bucket = conn_by_pair.setdefault(pair, {"upper": None, "lower": None})
+                bucket[side] = str(value)
+
         preview_modes = None
         if mode_updates:
             preview_modes, data = propose_set_modes_batch(bay, mode_updates, data=data)
         preview_model = None
         if doc.has("model"):
             preview_model, data = propose_set_model(bay, str(doc.get("model")), data=data)
+
+        conn_previews: list[CurrentPreview] = []
+        for pair, sides in conn_by_pair.items():
+            jack = pair.split("/", 1)[0]
+            preview_c, data = propose_set_connection(
+                bay,
+                jack,
+                upper_connection=sides["upper"],
+                lower_connection=sides["lower"],
+                data=data,
+            )
+            conn_previews.append(preview_c)
 
         changed = False
         messages: list[str] = []
@@ -160,6 +201,12 @@ def apply_working(
             affected.extend(preview_model.affected_files)
             before["model"] = preview_model.before
             after["model"] = preview_model.after
+        for cp in conn_previews:
+            changed = changed or cp.changed
+            messages.append(cp.message)
+            affected.extend(cp.affected_files)
+            before.setdefault("connections", []).append(cp.before)
+            after.setdefault("connections", []).append(cp.after)
 
         preview = CurrentPreview(
             domain="patchbay",
