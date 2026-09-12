@@ -58,7 +58,12 @@ uv run rig reconcile plan question Q-008 --json
 
 # Questions
 uv run rig question list
+uv run rig question list --open
+uv run rig question list --unreconciled
 uv run rig question show Q-008
+uv run rig question answer Q-008 --answer "half-normal" --json
+uv run rig question target show Q-008 --json
+uv run rig question target set Q-008 --pair 1/25 --yes --json
 uv run rig question resolve Q-008
 uv run rig question todo Q-008
 

@@ -11,6 +11,8 @@ direct YAML edits for day-to-day mutations. Prefer:
 uv run rig <domain> <verb> …
 uv run rig reconcile …
 uv run rig inspect …
+uv run rig question answer … --json
+uv run rig question target set … --yes --json
 ```
 
 If a needed mutation has no service/CLI yet: **add the service + CLI first**, then
@@ -41,14 +43,21 @@ Evidence labels (`VERIFIED` | `INTENDED` | `UNKNOWN`) matter more than prose ton
      uv run rig status
      uv run rig doctor
      uv run rig reconcile queue --json
+     uv run rig inspect domains
      uv run rig inspect cleanup --json
 
-2. Work a factual uncertainty
+2. Work a factual uncertainty (human/observed answer — never invent)
      uv run rig question show Q-xxx
-     # Human (or verified observation) provides answer — agents must NOT invent it
-     uv run rig question resolve Q-xxx "<answer>"
+     uv run rig question answer Q-xxx --answer "<answer>" --json
+     # optional dry-run:
+     uv run rig question answer Q-xxx --answer "<answer>" --dry-run --json
 
-3. Reconcile answer into CURRENT (separate from resolve)
+3. Complete typed target if plan says NEEDS_AGENT_ACTION / missing_target_field
+     uv run rig question target show Q-xxx --json
+     uv run rig question target set Q-xxx --pair 1/25 --yes --json
+     # candidates come from canonical patchbay data only — no guessing
+
+4. Reconcile answer into CURRENT (separate from answer/resolve)
      uv run rig reconcile plan question Q-xxx --json
      uv run rig reconcile apply question Q-xxx --dry-run --json
      uv run rig reconcile apply question Q-xxx --yes --json
@@ -56,14 +65,59 @@ Evidence labels (`VERIFIED` | `INTENDED` | `UNKNOWN`) matter more than prose ton
      uv run rig reconcile finalize question Q-xxx --yes \
        --complete-linked-todos --apply-linked-changes --confirm-dod --json
 
-4. Validate
+5. Validate
      uv run rig check
      uv run rig render --check
 ```
 
-Resolve records an answer only. It does **not** set `reconciled_at` or rewrite
-CURRENT. Finalize sets `reconciled_at` after verify MATCH (or `--no-current-change`
-with `--note`).
+`answer` / `resolve` records an answer only. It does **not** set `reconciled_at`
+or rewrite CURRENT. Human message: “Answer recorded. CURRENT reconciliation
+still required.” Finalize sets `reconciled_at` after verify MATCH (or
+`--no-current-change` with `--note`).
+
+## Target completion workflow
+
+Typed targets (`QuestionTarget`) drive adapters. Incomplete targets block apply:
+
+```bash
+uv run rig question target show Q-008 --json
+uv run rig question target set Q-008 --domain patchbay.mode --bay PB-B --pair 1/25 --yes --json
+uv run rig question target set Q-008 --pair 1/25 --dry-run --json   # before/after
+uv run rig question target clear Q-008 --field pair --yes --json
+uv run rig question target clear Q-008 --yes --json                 # entire target
+```
+
+Validation is exact (bay exists, pair exists in bay, gear/path IDs exist). No fuzzy match.
+
+Structured NEEDS_AGENT_ACTION blockers look like:
+
+```json
+{
+  "code": "missing_target_field",
+  "field": "pair",
+  "candidates": ["1/25", "2/26"],
+  "suggested_commands": ["uv run rig question target set Q-xxx --pair 1/25 --yes"],
+  "message": "target.pair missing — set pair before apply"
+}
+```
+
+Candidates come from canonical data only. **Do not invent** production pairs
+(e.g. production Q-008 pair stays null until inspected).
+
+## VERIFY_ONLY domains
+
+These adapters never promote INTENDED→VERIFIED via `reconcile apply`:
+
+| Domain | Capability | Notes |
+|---|---|---|
+| `routing.verify` | VERIFY_ONLY | Inspect paths; finalize with `--no-current-change` |
+| `midi.verify` | VERIFY_ONLY | Topology evidence; no auto-match freeform |
+| `controls.verify` | VERIFY_ONLY | Controller evidence |
+| `ableton.template` | VERIFY_ONLY | Live-set match is offline/manual |
+| `midi.clock_master` | VERIFY_ONLY | Q-014 is physical practice (“in practice”); use `set-clock-master` then finalize — apply does not auto-write |
+| `inventory.patchbay_mapping` | MANUAL | hardware_model only; no `gear_ref` / `set-gear` yet |
+
+`patchbay.mode` is `APPLY_AND_VERIFY` when bay + pair + normalizable mode are known.
 
 ## Artifact lifecycle
 
@@ -74,9 +128,6 @@ with `--note`).
 | Change `CHG-*` | OPEN → APPLIED via `change_service` / finalize | Delete records |
 | Next Session | Max 3; remove on DONE | Leave DONE in next_session |
 
-Completing TODOs = status DONE + remove from `next_session`. Completing Changes =
-status APPLIED. Records stay in YAML forever.
-
 ## Reconciliation states
 
 `NEEDS_ANSWER` · `READY_TO_APPLY` · `NEEDS_AGENT_ACTION` · `CURRENT_MATCHES` ·
@@ -86,8 +137,6 @@ Capabilities: `APPLY_AND_VERIFY` | `VERIFY_ONLY` | `MANUAL` | `UNSUPPORTED`
 
 Adapters **normalize deterministically only** (e.g. `HALF_NORMAL` → `half-normal`).
 They must not fuzzy-NLP guess answers.
-
-Audit: `reconciled_at` + Change/TODO status. No separate `reconciliation-log.yaml`.
 
 ## Reconcile CLI
 
@@ -103,10 +152,11 @@ uv run rig reconcile finalize question Q-008 [--dry-run] [--yes] [--json] \
   [--complete-linked-todos] [--apply-linked-changes] [--confirm-dod] \
   [--no-current-change] [--note "..."] [--snapshot-before]
 uv run rig reconcile sweep [--dry-run|--write] [--yes] [--confirm-dod] [--json]
-# legacy
-uv run rig reconcile question Q-008
-uv run rig reconcile change CHG-001
 ```
+
+Sweep `--dry-run --json` includes grouped counts:
+`ready_to_finalize`, `needs_answer`, `needs_target_metadata`, `needs_agent_action`,
+`blocked_by_dod`, `already_reconciled` plus `suggested_next_commands`.
 
 JSON contract:
 
@@ -119,147 +169,90 @@ No Rich/ANSI in `--json` mode. Exit 0 for successful inspect including
 `NEEDS_AGENT_ACTION`. Verify returns `ok:true` with `verification=MISMATCH` and
 **exit 1** on mismatch.
 
-## Examples
-
-### 1) Patchbay mode (APPLY_AND_VERIFY)
+## Question list flags
 
 ```bash
-# Fixture/target must include pair (e.g. 1/25). Production Q-008 is bay-wide → NEEDS_AGENT.
-uv run rig question resolve Q-008 "half-normal"
+uv run rig question list                 # ACTIVE = OPEN + RESOLVED-unreconciled
+uv run rig question list --open
+uv run rig question list --unreconciled
+uv run rig question list --all
+```
+
+TODO list hides terminal statuses (DONE / CANCELLED / DEFERRED) unless `--all`.
+
+## Examples
+
+### 1) Patchbay mode with incomplete target (fixture-style)
+
+```bash
+uv run rig question answer Q-008 --answer "half-normal" --json
 uv run rig reconcile plan question Q-008 --json
-# READY_TO_APPLY when pair known + mode normalizes + CURRENT differs
-uv run rig reconcile apply question Q-008 --dry-run --json
+# → NEEDS_AGENT_ACTION + missing_target_field pair + candidates
+uv run rig question target set Q-008 --pair 1/25 --yes --json
+uv run rig reconcile plan question Q-008 --json   # READY_TO_APPLY
 uv run rig reconcile apply question Q-008 --yes --json
-uv run rig reconcile verify question Q-008 --json   # MATCH
+uv run rig reconcile verify question Q-008 --json
 uv run rig reconcile finalize question Q-008 --yes \
   --complete-linked-todos --apply-linked-changes --confirm-dod --json
 ```
 
-### 2) Freeform / NEEDS_AGENT_ACTION (no write)
+Production Q-008 has `bay: PB-B` and `pair: null` — do not invent the pair.
+
+### 2) MANUAL inventory mapping
 
 ```bash
 uv run rig reconcile plan question Q-007 --json
-# MANUAL inventory mapping — adapter suggests set-model commands; apply refuses
-uv run rig reconcile apply question Q-007 --yes --json   # error / no CURRENT write
+# MANUAL — set-model then finalize; no set-gear yet
 ```
 
-### 3) Q + TODO + Change finalize
+## Inspection
 
 ```bash
-uv run rig reconcile finalize question Q-xxx --yes \
-  --complete-linked-todos --apply-linked-changes --confirm-dod \
-  --note "CURRENT already matches" --no-current-change --json
-# Linked OPEN changes → APPLIED; linked TODOs → DONE; cleared from next_session
+uv run rig inspect domains               # Rich table (no tabs)
+uv run rig inspect domains --json        # + mutable/derived/supports_reconcile
+uv run rig inspect schema question
+uv run rig inspect list question --json
+uv run rig inspect cleanup --json        # missing targets, CURRENT_MATCHES, …
 ```
 
-## Canonical Data Sources
-
-| File | Domain |
-|---|---|
-| `data/todo.yaml` | Accepted work queue + Next Session |
-| `data/wishlist.yaml` | Acquisition ideas |
-| `data/open-questions.yaml` | Open / resolved / deferred questions |
-| `data/changes.yaml` | Structured change records |
-| `data/inbox.yaml` | Low-friction captures |
-| `data/inventory.yaml` | Owned gear |
-| `data/patchbays.yaml` | Patchbay jacks / modes / connections |
-| `data/channel-map.yaml` | TASCAM / Alesis channel sources |
-| `data/routing.yaml` | Routes + `named_paths` |
-| `data/midi.yaml` | MIDI topology (documented only; no TX) |
-| `data/controllers.yaml` | Controller mappings |
-| `data/ableton.yaml` | Ableton track/send/action registry |
-| `data/performance.yaml` | PFL performance bindings |
-| `data/control-surfaces.yaml` | Control surface profiles |
-| `data/backups.yaml` | Backup plan (no secrets; paths via `.rig.local.yaml`) |
-| `data/sessions/` | Studio session logs |
-| `.rig/snapshots/` | Immutable YAML snapshots |
-
-Local secrets/paths: gitignored `.rig.local.yaml` (see `.rig.local.example.yaml`).
+Human list output uses the shared presentation layer (`music_rig.presentation`).
+Never rely on tab-separated columns.
 
 ## Architecture
 
 ```text
 canonical YAML
-  → Pydantic models (music_rig.models / domain loaders)
+  → Pydantic models
   → domain service / propose_*
   → validate
-  → transactional write (store.write_documents / commit_*)
+  → transactional write
   → render projections
-  → TUI refresh / CLI output
+  → TUI refresh / CLI output (presentation.py for human tables)
 ```
 
-Reconciliation (`music_rig.reconciliation`) **orchestrates** existing CURRENT
-services; it does not duplicate editors.
+Reconciliation orchestrates existing CURRENT services; it does not duplicate editors.
+Textual widgets never write YAML.
 
-Textual widgets **never** write YAML.
+## TUI
 
-## CLI vs TUI
-
-| Need | Prefer |
-|---|---|
-| Scripted / agent mutation | CLI (`rig …`) |
-| Interactive browse/edit | `rig tui` / `rig tui <domain>` |
-| Agent discovery | `rig inspect …` |
-| Validation | `rig check`, `rig render --check`, `rig doctor` |
-
-Both CLI and TUI call the same services.
-
-## Safe Mutation Contract
-
-Do not directly mutate canonical YAML for ordinary ops.
-
-Prefer:
-
-```text
-model → service → proposed state → validate →
-transactional write → render → check
-```
-
-## Inspection and Cleanup
-
-```bash
-uv run rig inspect domains
-uv run rig inspect schema question
-uv run rig inspect list question --json
-uv run rig inspect show question Q-008 --json
-uv run rig inspect refs Q-008 --json
-uv run rig inspect cleanup --json
-```
-
-Cleanup reports dangling refs, BROKEN+mapped controls, RESOLVED-not-reconciled,
-reconciled-with-OPEN-change, unfinished linked TODOs, DONE-in-next_session, etc.
-There is **no** `cleanup --fix-all`.
-
-## Testing
-
-```bash
-uv sync --extra dev --extra docs
-uv run pytest
-```
-
-Never mutate production `data/*.yaml` in tests — use tmp fixtures + monkeypatch
-store paths. Leave `assets/` alone.
-
-## Validation Commands
-
-```bash
-uv run rig check
-uv run rig render --check
-uv run rig doctor
-uv run rig status
-```
+- `rig tui reconcile`: plan/apply/verify/finalize; **e** Edit Target opens pair
+  picker when `patchbay.mode` is missing `pair`.
+- Questions: **t** Target — pair picker when pair missing; **r** Resolve.
 
 ## Things Agents Must Never Do
 
 - Invent answers to OPEN questions or mark UNKNOWN as decided
+- Invent production target pairs / gear mappings
 - Direct-edit YAML for ordinary CURRENT/planning mutations
 - Execute OBS / Ableton / MIDI TX / Stream Deck / macOS automation
-- Promote INTENDED → VERIFIED without explicit verification
+- Promote INTENDED → VERIFIED without explicit verification (VERIFY_ONLY apply)
 - Commit secrets from `.rig.local.yaml` into canonical data
 - Blind-overwrite on concurrency conflicts
 - Commit/push unless the human explicitly asks
+- Mutate production data during tests — fixtures only
 
 ## Stage Boundaries / External Automation
 
-Through Stage 14: documentation + local services + TUI editing + reconciliation
-workflow. External live automation remains `NOT_IMPLEMENTED` / capability only.
+Through Stage 15: documentation + local services + TUI editing + reconciliation
+polish (presentation, answer/target CLI, structured blockers). External live
+automation remains `NOT_IMPLEMENTED` / capability only.

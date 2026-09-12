@@ -8,6 +8,7 @@ from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
 from textual.widgets import DataTable, Footer, Header, Static
 
+from music_rig import question_service
 from music_rig.reconciliation import service as reconcile_service
 from music_rig.models import ReconciliationState
 from music_rig.store import StoreError
@@ -23,6 +24,7 @@ class ReconcileScreen(Screen):
         Binding("v", "verify", "Verify"),
         Binding("f", "finalize", "Finalize"),
         Binding("o", "open_target", "Open Target"),
+        Binding("e", "edit_target", "Edit Target"),
         Binding("l", "open_related", "Related"),
         Binding("question_mark", "help", "Help"),
     ]
@@ -100,6 +102,9 @@ class ReconcileScreen(Screen):
             ]
             for cmd in shown.get("suggested_commands") or []:
                 lines.append(f"- `{cmd}`")
+            if item.state == ReconciliationState.NEEDS_AGENT_ACTION:
+                lines.append("")
+                lines.append("_Press **e** to Edit Target (pair picker when missing)._")
             detail.update("\n".join(lines))
         else:
             detail.update(
@@ -235,6 +240,68 @@ class ReconcileScreen(Screen):
                 return
         self.app.open_domain("question", item.artifact_id)  # type: ignore[attr-defined]
 
+    def action_edit_target(self) -> None:
+        """Edit typed target — pair picker when patchbay.mode is missing pair."""
+        item = self._selected()
+        if item is None or item.artifact_type != "question":
+            self.notify("Select a question", severity="warning")
+            return
+        try:
+            q = question_service.get_question(item.artifact_id)
+        except StoreError as exc:
+            self.notify(str(exc), severity="error")
+            return
+        target = q.target
+        if (
+            target is not None
+            and target.domain == "patchbay.mode"
+            and target.bay
+            and not target.pair
+        ):
+            from music_rig import patchbay_state
+            from music_rig.tui.pickers import ReferencePickerModal
+
+            pairs = patchbay_state.list_pairs(target.bay)
+            choices = [
+                (
+                    (
+                        f"{p['upper_n']}/{p['lower_n']}"
+                        if p["lower_n"] is not None
+                        else str(p["upper_n"])
+                    ),
+                    f"mode={p['mode']} {p.get('upper_conn') or ''} / {p.get('lower_conn') or ''}",
+                )
+                for p in pairs
+            ]
+            if not choices:
+                self.notify(f"No pairs on {target.bay}", severity="warning")
+                return
+
+            def _picked(selected: list[str] | None) -> None:
+                if not selected:
+                    return
+                pair = selected[0]
+                try:
+                    question_service.set_target(
+                        q.id, pair=pair, dry_run=False, render=True
+                    )
+                except StoreError as exc:
+                    self.notify(str(exc), severity="error")
+                    return
+                self.notify(f"{q.id} target.pair = {pair}")
+                self.action_refresh()
+
+            self.app.push_screen(
+                ReferencePickerModal(
+                    f"Select pair for {q.id} ({target.bay})",
+                    choices,
+                    multi=False,
+                ),
+                _picked,
+            )
+            return
+        self.app.open_domain("question", item.artifact_id)  # type: ignore[attr-defined]
+
     def action_open_related(self) -> None:
         item = self._selected()
         if item is None:
@@ -257,7 +324,8 @@ class ReconcileScreen(Screen):
         self.app.push_screen(
             HelpScreen(
                 "p plan · a apply · v verify · f finalize\n"
-                "o open target · l related · r refresh · Esc back\n"
+                "o open target · e edit target (pair picker)\n"
+                "l related · r refresh · Esc back\n"
                 "Actions enable based on reconciliation state."
             )
         )

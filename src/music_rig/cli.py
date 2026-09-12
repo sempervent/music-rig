@@ -100,11 +100,23 @@ inbox_app = typer.Typer(help="Low-friction capture inbox.", no_args_is_help=True
 session_app = typer.Typer(help="Studio session logging.", no_args_is_help=True)
 changes_app = typer.Typer(help="Structured change records.", no_args_is_help=True)
 question_app = typer.Typer(
-    help="Unresolved factual questions (data/open-questions.yaml).",
+    help=(
+        "Unresolved factual questions (data/open-questions.yaml). "
+        "Use `answer` / `target` for noninteractive agent workflows; "
+        "resolve records an answer only — CURRENT still needs reconcile."
+    ),
+    no_args_is_help=True,
+)
+question_target_app = typer.Typer(
+    help="Show/set/clear typed question targets (exact refs; no fuzzy match).",
     no_args_is_help=True,
 )
 reconcile_app = typer.Typer(
-    help="Reconcile questions/changes into CURRENT via adapters (CLI-first).",
+    help=(
+        "Reconcile questions/changes into CURRENT via adapters (CLI-first). "
+        "VERIFY_ONLY domains never promote INTENDED→VERIFIED via apply. "
+        "Use plan → apply → verify → finalize; sweep never answers OPEN."
+    ),
     invoke_without_command=True,
     no_args_is_help=False,
 )
@@ -171,6 +183,7 @@ app.add_typer(inbox_app, name="inbox")
 app.add_typer(session_app, name="session")
 app.add_typer(changes_app, name="changes")
 app.add_typer(question_app, name="question")
+question_app.add_typer(question_target_app, name="target")
 app.add_typer(reconcile_app, name="reconcile")
 app.add_typer(path_app, name="path")
 app.add_typer(gear_app, name="gear")
@@ -314,7 +327,11 @@ def todo_list(
     table.add_column("Task")
     rows = 0
     for task in doc.tasks:
-        if not all_items and task.status in {TodoStatus.DONE, TodoStatus.CANCELLED}:
+        if not all_items and task.status in {
+            TodoStatus.DONE,
+            TodoStatus.CANCELLED,
+            TodoStatus.DEFERRED,
+        }:
             continue
         if status_filter and task.status != status_filter:
             continue
@@ -3995,6 +4012,7 @@ def reconcile_queue_cmd(
     ready: bool = typer.Option(False, "--ready"),
     as_json: bool = typer.Option(False, "--json"),
 ) -> None:
+    """List reconciliation queue (Rich table unless --json)."""
     try:
         items = reconcile_service.build_queue(
             artifact_type=artifact_type, state=state, ready=ready
@@ -4005,12 +4023,10 @@ def reconcile_queue_cmd(
         if as_json:
             _reconcile_emit(payload, as_json=True)
             return
-        console.print(f"[bold]RECONCILE QUEUE[/bold] ({len(items)})")
-        for item in items:
-            console.print(
-                f"  {item.artifact_type:<8} {item.artifact_id:<8} "
-                f"{item.state.value:<20} {item.summary[:60]}"
-            )
+        from music_rig.presentation import format_reconcile_queue_table
+
+        console.print(format_reconcile_queue_table(items, width=console.width))
+        console.print(f"[dim]{len(items)} item(s)[/dim]")
     except StoreError as exc:
         if as_json:
             _reconcile_emit(
@@ -4075,8 +4091,10 @@ def reconcile_plan_cmd(
             console.print(f"Desired: {plan.desired}")
         for op in plan.operations:
             console.print(f"  op: {op}")
+        from music_rig.presentation import blocker_message
+
         for b in plan.blockers:
-            console.print(f"  blocker: {b}")
+            console.print(f"  blocker: {blocker_message(b)}")
         for cmd in plan.suggested_commands:
             console.print(f"  $ {cmd}")
     except StoreError as exc:
@@ -4278,21 +4296,41 @@ def reconcile_question_cmd(
 
 @question_app.command("list")
 def question_list_cmd(
-    all_items: bool = typer.Option(False, "--all"),
+    all_items: bool = typer.Option(False, "--all", help="All statuses"),
+    open_only: bool = typer.Option(False, "--open", help="OPEN only"),
+    unreconciled: bool = typer.Option(
+        False, "--unreconciled", help="RESOLVED but not yet reconciled"
+    ),
     area: Optional[str] = typer.Option(None, "--area"),
 ) -> None:
+    """List questions. Default: ACTIVE (OPEN + RESOLVED-unreconciled)."""
     try:
-        items = question_service.list_questions(all_items=all_items, area=area)
+        items = question_service.list_questions(
+            all_items=all_items,
+            open_only=open_only,
+            unreconciled_only=unreconciled,
+            area=area,
+        )
     except StoreError as exc:
         _fail(str(exc))
-    title = "QUESTIONS" if all_items else "OPEN QUESTIONS"
+    if all_items:
+        title = "QUESTIONS (all)"
+    elif open_only:
+        title = "OPEN QUESTIONS"
+    elif unreconciled:
+        title = "UNRECONCILED QUESTIONS"
+    else:
+        title = "ACTIVE QUESTIONS"
     console.print(f"[bold]{title}[/bold]")
     if not items:
         console.print("(none)")
         return
     for q in items:
-        status = f"{q.status.value}  " if all_items else ""
-        console.print(f"{q.id}  {status}{q.area:<18} {q.question}")
+        status = f"{q.status.value}  "
+        recon = ""
+        if q.status.value == "RESOLVED" and q.reconciled_at is None:
+            recon = " [unreconciled]"
+        console.print(f"{q.id}  {status}{q.area:<18} {q.question}{recon}")
 
 
 @question_app.command("show")
@@ -4371,6 +4409,7 @@ def question_resolve_cmd(
     change: Optional[str] = typer.Option(None, "--change", help="Related CHG id"),
     no_render: bool = typer.Option(False, "--no-render"),
 ) -> None:
+    """Record an answer (interactive). Prefer `rig question answer` for agents."""
     try:
         if answer is None:
             answer = typer.prompt("Answer")
@@ -4387,9 +4426,163 @@ def question_resolve_cmd(
     console.print(f"{updated.id} resolved.")
     console.print("")
     console.print(
-        "If this answer changes documented CURRENT state,\n"
-        "reconcile the affected rig data before considering the work complete."
+        "Answer recorded. CURRENT reconciliation still required.\n"
+        f"Next: uv run rig reconcile plan question {updated.id} --json"
     )
+
+
+@question_app.command("answer")
+def question_answer_cmd(
+    question_id: str,
+    answer: str = typer.Option(..., "--answer", help="Non-empty answer text"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    change: Optional[str] = typer.Option(None, "--change", help="Related CHG id"),
+    no_render: bool = typer.Option(False, "--no-render"),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Noninteractive resolve: set RESOLVED + answer; reconciled_at stays null."""
+    try:
+        result = question_service.answer_question(
+            question_id,
+            answer,
+            dry_run=dry_run,
+            related_change=change,
+            render=not no_render and not dry_run,
+        )
+    except StoreError as exc:
+        if as_json:
+            typer.echo(
+                json.dumps(err_payload("store_error", str(exc)), indent=2, default=str)
+            )
+            raise typer.Exit(1)
+        _fail(str(exc))
+    # Drop non-serializable OpenQuestion if present
+    out = {k: v for k, v in result.items() if k != "question"}
+    out["reconciled_at"] = None
+    if result.get("question") is not None:
+        q = result["question"]
+        out["status"] = q.status.value
+        out["answer"] = q.answer
+        out["resolved_at"] = q.resolved_at.isoformat() if q.resolved_at else None
+    if as_json:
+        typer.echo(json.dumps(ok_payload("answer", out), indent=2, default=str))
+        return
+    console.print(result.get("message") or "Answer recorded.")
+    if dry_run:
+        console.print("[dim]dry-run — no write[/dim]")
+    console.print(f"Next: {result.get('next_command')}")
+
+
+@question_target_app.command("show")
+def question_target_show_cmd(
+    question_id: str,
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    try:
+        result = question_service.show_target(question_id)
+    except StoreError as exc:
+        if as_json:
+            typer.echo(
+                json.dumps(err_payload("store_error", str(exc)), indent=2, default=str)
+            )
+            raise typer.Exit(1)
+        _fail(str(exc))
+    if as_json:
+        typer.echo(json.dumps(ok_payload("target.show", result), indent=2, default=str))
+        return
+    console.print(f"[bold]{result['question_id']} target[/bold]")
+    console.print_json(data=result.get("target"))
+
+
+@question_target_app.command("set")
+def question_target_set_cmd(
+    question_id: str,
+    domain: Optional[str] = typer.Option(None, "--domain"),
+    bay: Optional[str] = typer.Option(None, "--bay"),
+    pair: Optional[str] = typer.Option(None, "--pair"),
+    path: Optional[str] = typer.Option(None, "--path"),
+    gear: Optional[str] = typer.Option(None, "--gear"),
+    device: Optional[str] = typer.Option(None, "--device"),
+    channel: Optional[str] = typer.Option(None, "--channel"),
+    branch: Optional[str] = typer.Option(None, "--branch"),
+    node: Optional[str] = typer.Option(None, "--node"),
+    context: Optional[str] = typer.Option(None, "--context"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    yes: bool = typer.Option(False, "--yes"),
+    no_render: bool = typer.Option(False, "--no-render"),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Set/merge typed target fields (exact refs). Requires --yes unless --dry-run."""
+    if not dry_run and not yes:
+        _fail("target set requires --yes (or --dry-run)")
+    try:
+        result = question_service.set_target(
+            question_id,
+            domain=domain,
+            bay=bay,
+            pair=pair,
+            path=path,
+            gear=gear,
+            device=device,
+            channel=channel,
+            branch=branch,
+            node=node,
+            context=context,
+            dry_run=dry_run,
+            render=not no_render and not dry_run,
+        )
+    except StoreError as exc:
+        if as_json:
+            typer.echo(
+                json.dumps(err_payload("store_error", str(exc)), indent=2, default=str)
+            )
+            raise typer.Exit(1)
+        _fail(str(exc))
+    if as_json:
+        typer.echo(json.dumps(ok_payload("target.set", result), indent=2, default=str))
+        return
+    console.print(f"[bold]TARGET {question_id}[/bold]")
+    console.print("before:")
+    console.print_json(data=result.get("before"))
+    console.print("after:")
+    console.print_json(data=result.get("after"))
+    if dry_run:
+        console.print("[dim]dry-run — no write[/dim]")
+
+
+@question_target_app.command("clear")
+def question_target_clear_cmd(
+    question_id: str,
+    field: Optional[list[str]] = typer.Option(
+        None, "--field", help="Clear specific field(s); omit to clear entire target"
+    ),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    yes: bool = typer.Option(False, "--yes"),
+    no_render: bool = typer.Option(False, "--no-render"),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Clear entire typed target, or specific fields with --field."""
+    if not dry_run and not yes:
+        _fail("target clear requires --yes (or --dry-run)")
+    try:
+        result = question_service.clear_target(
+            question_id,
+            fields=list(field) if field else None,
+            dry_run=dry_run,
+            render=not no_render and not dry_run,
+        )
+    except StoreError as exc:
+        if as_json:
+            typer.echo(
+                json.dumps(err_payload("store_error", str(exc)), indent=2, default=str)
+            )
+            raise typer.Exit(1)
+        _fail(str(exc))
+    if as_json:
+        typer.echo(json.dumps(ok_payload("target.clear", result), indent=2, default=str))
+        return
+    console.print(f"[bold]TARGET CLEAR {question_id}[/bold]")
+    console.print_json(data=result)
 
 
 @question_app.command("defer")
@@ -4533,7 +4726,14 @@ def inspect_domains(
     from music_rig import inspect_service
 
     payload = inspect_service.list_domains()
-    console.print(inspect_service.dumps(payload, as_json=as_json))
+    if as_json:
+        typer.echo(inspect_service.dumps(payload, as_json=True))
+        return
+    # Human: Rich table via presentation (no tabs); print as plain text
+    text = inspect_service.dumps(
+        payload, as_json=False, width=console.width, kind="domains"
+    )
+    console.print(text)
 
 
 @inspect_app.command("schema")
@@ -4547,7 +4747,7 @@ def inspect_schema(
         payload = inspect_service.schema_for(domain)
     except StoreError as exc:
         _fail(str(exc))
-    console.print(inspect_service.dumps(payload, as_json=True if as_json else True))
+    typer.echo(inspect_service.dumps(payload, as_json=True))
 
 
 @inspect_app.command("list")
@@ -4561,7 +4761,11 @@ def inspect_list(
         payload = inspect_service.list_records(domain)
     except StoreError as exc:
         _fail(str(exc))
-    console.print(inspect_service.dumps(payload, as_json=as_json))
+    if as_json:
+        typer.echo(inspect_service.dumps(payload, as_json=True))
+        return
+    text = inspect_service.dumps(payload, as_json=False, width=console.width)
+    console.print(text)
 
 
 @inspect_app.command("show")
@@ -4576,7 +4780,7 @@ def inspect_show(
         payload = inspect_service.show_record(domain, record_id)
     except StoreError as exc:
         _fail(str(exc))
-    console.print(inspect_service.dumps(payload, as_json=True if as_json else True))
+    typer.echo(inspect_service.dumps(payload, as_json=True))
 
 
 @inspect_app.command("refs")
@@ -4587,18 +4791,18 @@ def inspect_refs(
     from music_rig import inspect_service
 
     payload = inspect_service.find_refs(record_id)
-    console.print(inspect_service.dumps(payload, as_json=as_json or True))
+    typer.echo(inspect_service.dumps(payload, as_json=True))
 
 
 @inspect_app.command("cleanup")
 def inspect_cleanup(
     as_json: bool = typer.Option(False, "--json"),
 ) -> None:
-    """Scan for dangling refs / BROKEN+mapped. No --fix-all."""
+    """Scan for dangling refs / BROKEN+mapped / missing targets. No --fix-all."""
     from music_rig import inspect_service
 
     payload = inspect_service.cleanup_scan()
-    console.print(inspect_service.dumps(payload, as_json=as_json or True))
+    typer.echo(inspect_service.dumps(payload, as_json=True))
     if payload.get("count"):
         raise typer.Exit(1)
 
