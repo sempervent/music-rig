@@ -135,6 +135,12 @@ uv sync --extra dev --extra docs
 uv run rig --help
 uv run rig status
 
+# Interactive TUI (presentation layer; mutations via shared services)
+uv run rig tui
+uv run rig tui question
+uv run rig tui question Q-008
+uv run rig tui patchbay PB-B
+
 # What should I do?
 uv run rig now
 uv run rig now --play
@@ -298,6 +304,55 @@ operator-driven.
 MIDI physical links, channel assignments, clock state, and Ableton Track / Sync /
 Remote settings are separate evidence domains. `INTENDED` records design intent;
 it must never be read or promoted as `VERIFIED` without direct evidence.
+
+## Interactive TUI
+
+`uv run rig tui` launches a Textual UI over the same services as the CLI. The TUI is
+**presentation only**: it never parses CLI output and never writes YAML from widgets.
+Editable domains mutate through `question_service` and `patchbay_state.propose_*` +
+`current_service.commit_patchbay` (optional `snapshot_service.create_snapshot` before
+patchbay apply). OBS / Ableton / MIDI / Stream Deck / macOS automation remain
+`NOT_IMPLEMENTED`.
+
+### CLI vs TUI
+
+| Concern | CLI | TUI |
+|---|---|---|
+| Scripting / CI | Preferred | Not for automation |
+| Browse + edit questions | `rig question …` | `rig tui question` |
+| Patchbay mode/model | `rig current patchbay …` | `rig tui patchbay` |
+| Read-only domains | Many `rig …` commands | Home → domain list/detail |
+| Endpoint jack editing | Supported via CURRENT cmds | **Deferred** (Stage 12) |
+
+### Coverage matrix
+
+| Domain | List | Detail | Edit |
+|---|---|---|---|
+| Questions | yes | yes | yes (resolve/defer/reopen/add) |
+| Patchbays | yes | yes | yes (mode + hardware_model only) |
+| TODO | yes | yes | next-session mark only |
+| Wishlist | yes | yes | — |
+| Inbox | yes | yes | — |
+| Changes | yes | yes | — |
+| Gear | yes | yes | — |
+| MIDI | yes | yes | — |
+| Controllers | yes | yes | — |
+| Ableton | yes | yes | — |
+| Performance | yes | yes (panic display only) | — |
+| Snapshots | yes | yes | create snapshot |
+| Backups | yes | yes | — |
+| Sessions | yes | yes | — |
+| Doctor / Status / Reconcile | yes | text view | — |
+| Automation | yes | capability status | — |
+
+Patchbay **endpoint** (upper/lower connection) editing is deferred: Stage 5 CURRENT
+mutations only support mode + hardware_model safely through the shared propose/commit
+path the TUI reuses.
+
+Direct launch examples: `rig tui`, `rig tui question Q-008`, `rig tui patchbay PB-B`,
+`rig tui todo|wish|inbox|changes|gear|midi|controls|ableton|performance|snapshot|backup|session|doctor|status|reconcile|automation`.
+
+More detail: [docs/tui.md](docs/tui.md).
 
 ## Documentation CI/CD
 

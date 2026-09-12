@@ -1,0 +1,134 @@
+"""RigApp — Textual application shell for music-rig."""
+
+from __future__ import annotations
+
+from textual.app import App
+from textual.binding import Binding
+
+from music_rig.tui.adapters import get_adapter
+from music_rig.tui.navigation import normalize_route
+from music_rig.tui.screens.generic import ListDetailScreen
+from music_rig.tui.screens.home import HomeScreen
+from music_rig.tui.screens.patchbays import PatchbayEditorScreen, PatchbayListScreen
+from music_rig.tui.screens.questions import QuestionsScreen
+
+
+APP_CSS = """
+Screen {
+    background: $surface;
+}
+
+#home-title, #screen-title {
+    text-style: bold;
+    padding: 1 1 0 1;
+}
+
+#home-subtitle, #filter-label, #dirty-label {
+    color: $text-muted;
+    padding: 0 1 1 1;
+}
+
+#split {
+    height: 1fr;
+}
+
+#list-table {
+    width: 3fr;
+    height: 1fr;
+}
+
+#detail-pane {
+    width: 2fr;
+    height: 1fr;
+    border-left: solid $primary;
+    padding: 0 1;
+}
+
+#modal {
+    width: 70;
+    max-width: 90%;
+    height: auto;
+    max-height: 80%;
+    padding: 1 2;
+    background: $panel;
+    border: thick $primary;
+}
+
+#modal-title {
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+#modal-body {
+    margin-bottom: 1;
+}
+
+#modal-buttons {
+    height: auto;
+    align: center middle;
+}
+
+#modal-buttons Button {
+    margin: 0 1;
+}
+
+#mode-choices Button {
+    width: 100%;
+    margin: 0 0 1 0;
+}
+"""
+
+
+class RigApp(App[None]):
+    """Interactive presentation layer. Mutations go through shared services only."""
+
+    CSS = APP_CSS
+    TITLE = "music-rig"
+    BINDINGS = [
+        Binding("ctrl+c", "quit", "Quit", show=False),
+    ]
+
+    def __init__(
+        self,
+        *,
+        route: str | None = None,
+        object_id: str | None = None,
+        pair: str | None = None,
+    ) -> None:
+        super().__init__()
+        self._route = normalize_route(route)
+        self._object_id = object_id
+        self._pair = pair
+
+    def on_mount(self) -> None:
+        self.push_screen(HomeScreen())
+        if self._route:
+            self.open_domain(self._route, self._object_id, pair=self._pair)
+
+    def open_domain(
+        self,
+        domain: str,
+        object_id: str | None = None,
+        *,
+        pair: str | None = None,
+    ) -> None:
+        key = normalize_route(domain)
+        if key is None:
+            self.notify(f"Unknown domain {domain!r}", severity="error")
+            return
+        if key == "question":
+            self.push_screen(QuestionsScreen(initial_id=object_id))
+            return
+        if key == "patchbay":
+            if object_id:
+                self.push_screen(
+                    PatchbayEditorScreen(object_id, initial_pair=pair)
+                )
+            else:
+                self.push_screen(PatchbayListScreen())
+            return
+        adapter = get_adapter(key)
+        if adapter is None:
+            self.notify(f"Domain {key!r} not available", severity="error")
+            return
+        self.push_screen(ListDetailScreen(adapter, initial_id=object_id))

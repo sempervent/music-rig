@@ -59,6 +59,11 @@ uv run rig question show Q-008
 uv run rig question resolve Q-008
 uv run rig question todo Q-008
 
+# Interactive TUI
+uv run rig tui
+uv run rig tui question Q-008
+uv run rig tui patchbay PB-B
+
 # Work
 uv run rig todo start RIG-001
 uv run rig todo done RIG-001
@@ -168,6 +173,20 @@ uv run rig check
 - Mutation commands write YAML and re-render docs unless `--no-render` is passed.
 - No CLI mutation command commits or pushes Git.
 - Prefer the CLI/service layer for planning mutations when practical.
+
+### Interactive TUI (Stage 12)
+
+- `uv run rig tui` is a Textual presentation layer over the same services as the CLI.
+- TUI widgets must not parse CLI output and must not write YAML directly.
+- Editable domains today: **Questions** (`question_service`) and **Patchbays**
+  (`propose_set_modes_batch` / `propose_set_model` + `commit_patchbay`, optional
+  `snapshot_service.create_snapshot` before apply).
+- Patchbay endpoint (upper/lower connection) editing is deferred; mode +
+  `hardware_model` only.
+- Staged editors use `WorkingDocument` with source SHA-256 concurrency checks.
+- Resolving a question still does **not** rewrite CURRENT.
+- Do not implement OBS/Ableton/MIDI/Stream Deck/macOS automation from the TUI;
+  those families remain `NOT_IMPLEMENTED`.
 
 ### Evidence / truth hierarchy
 
