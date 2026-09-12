@@ -185,6 +185,9 @@ current_controls_app = typer.Typer(
 current_performance_app = typer.Typer(
     help="PFL performance binding/evidence mutations.", no_args_is_help=True
 )
+current_ableton_app = typer.Typer(
+    help="CURRENT Ableton template evidence mutations.", no_args_is_help=True
+)
 app.add_typer(todo_app, name="todo")
 app.add_typer(wish_app, name="wish")
 todo_app.add_typer(next_app, name="next")
@@ -214,6 +217,7 @@ current_app.add_typer(current_gear_app, name="gear")
 current_app.add_typer(current_midi_app, name="midi")
 current_app.add_typer(current_controls_app, name="controls")
 current_app.add_typer(current_performance_app, name="performance")
+current_app.add_typer(current_ableton_app, name="ableton")
 
 
 def _fail(message: str, code: int = 1) -> None:
@@ -1935,6 +1939,33 @@ def current_path_set_mode(
         question=question,
         change=change,
         answer_hint=mode.strip(),
+        no_render=no_render,
+    )
+
+
+@current_path_app.command("set-evidence")
+def current_path_set_evidence(
+    path: str,
+    evidence: str,
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    question: Optional[str] = typer.Option(None, "--question"),
+    change: Optional[str] = typer.Option(None, "--change"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    """Set NamedPath.evidence (VERIFIED|INTENDED|UNKNOWN) after human check."""
+    try:
+        preview, data = routing_state.propose_set_path_evidence(path, evidence)
+    except (StoreError, ValueError) as exc:
+        _fail(str(exc))
+    _commit_routing_preview(
+        preview,
+        data,
+        yes=yes,
+        dry_run=dry_run,
+        question=question,
+        change=change,
+        answer_hint=evidence.strip().upper(),
         no_render=no_render,
     )
 
@@ -3897,6 +3928,94 @@ def current_controls_set_evidence(
     _control_options(preview, data, yes, dry_run, question, change, no_render)
 
 
+@current_controls_app.command("set-context-evidence")
+def current_controls_set_context_evidence(
+    gear: str,
+    context: str,
+    evidence: str,
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    question: Optional[str] = typer.Option(None, "--question"),
+    change: Optional[str] = typer.Option(None, "--change"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    """Set ControllerContext.evidence (not whole controller)."""
+    try:
+        preview, data = control_state.propose_set_context_evidence(
+            gear, context, evidence
+        )
+    except (StoreError, ValueError) as exc:
+        _fail(str(exc))
+    _control_options(preview, data, yes, dry_run, question, change, no_render)
+
+
+@current_ableton_app.command("set-template-evidence")
+def current_ableton_set_template_evidence(
+    template_id: str,
+    evidence: str,
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    question: Optional[str] = typer.Option(None, "--question"),
+    change: Optional[str] = typer.Option(None, "--change"),
+    no_render: bool = typer.Option(False, "--no-render"),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Set AbletonTemplate.evidence after explicit human Live-set check."""
+    try:
+        preview, data = ableton_state.propose_set_template_evidence(
+            template_id, evidence
+        )
+    except (StoreError, ValueError) as exc:
+        if as_json:
+            _verify_emit(
+                err_payload("store_error", str(exc)), as_json=True, exit_code=1
+            )
+            return
+        _fail(str(exc))
+    if dry_run:
+        payload = {
+            "ok": True,
+            "operation": "current.ableton.set-template-evidence",
+            "result": {"dry_run": True, "preview": preview.model_dump(mode="json")},
+        }
+        if as_json:
+            typer.echo(json.dumps(payload, indent=2, default=str))
+            return
+        console.print(preview.message)
+        console.print("[dim]dry-run — no write[/dim]")
+        return
+    if not yes and not as_json:
+        if not typer.confirm(f"Apply {preview.message}?", default=False):
+            raise typer.Exit(0)
+    try:
+        committed = current_service.commit_ableton(
+            data,
+            preview,
+            dry_run=False,
+            render=not no_render,
+            question_id=question,
+            change_id=change,
+            resolve_q=False,
+            apply_chg=False,
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+    if as_json:
+        typer.echo(
+            json.dumps(
+                {
+                    "ok": True,
+                    "operation": "current.ableton.set-template-evidence",
+                    "result": committed.model_dump(mode="json"),
+                },
+                indent=2,
+                default=str,
+            )
+        )
+        return
+    console.print(committed.message)
+
+
 @current_controls_app.command("set-availability")
 def current_controls_set_availability(
     gear: str,
@@ -4320,7 +4439,19 @@ def _print_verify_card(card: dict) -> None:
                   f"[{(card.get('verification') or {}).get('kind', '—')}]")
     console.print(card.get("question") or "")
     console.print("")
+    console.print(f"[bold]Answer[/bold]: {card.get('answer')!r}")
+    vr = card.get("verification_result")
+    if vr:
+        console.print(
+            f"[bold]Last observation[/bold]: {vr.get('outcome')} "
+            f"value={vr.get('observed_value')!r} at {vr.get('observed_at')}"
+        )
+        if vr.get("note"):
+            console.print(f"  note: {vr['note']}")
+    else:
+        console.print("[bold]Last observation[/bold]: (none)")
     console.print(f"[bold]CURRENT[/bold]: {card.get('current')!r}")
+    console.print(f"[bold]Evidence[/bold]: {card.get('evidence')!r}")
     prompt = card.get("prompt") or ""
     if prompt:
         console.print("")
@@ -4337,8 +4468,11 @@ def _print_verify_card(card: dict) -> None:
     console.print("")
     console.print(
         f"[bold]Reconcile[/bold]: capability={recon.get('capability')} "
-        f"state={recon.get('state')} bucket={recon.get('after_answer_bucket')}"
+        f"state={recon.get('state')} bucket={recon.get('after_answer_bucket')} "
+        f"after_obs={recon.get('after_observation_bucket')}"
     )
+    for op_item in recon.get("operations") or []:
+        console.print(f"  op: {op_item}")
     from music_rig.presentation import blocker_message
 
     for b in recon.get("blockers") or []:
@@ -4507,8 +4641,12 @@ def _offer_reconcile_after_answer(question_id: str, *, answer_only: bool) -> Non
         return
 
     state = plan.state.value
-    if state == "READY_TO_APPLY" and plan.capability.value == "APPLY_AND_VERIFY":
-        if typer.confirm("Apply CURRENT mutation?", default=False):
+    if state == "READY_TO_APPLY" and plan.capability.value in {
+        "APPLY_AND_VERIFY",
+        "VERIFY_ONLY",
+        "HUMAN_VERIFY_THEN_APPLY",
+    }:
+        if typer.confirm("Apply CURRENT / evidence mutation?", default=False):
             try:
                 result = reconcile_service.apply_question(question_id, yes=True)
                 console.print_json(data=result)
@@ -4574,6 +4712,7 @@ def verify_run_cmd(
 ) -> None:
     """Interactive guided verification at the physical rig."""
     from music_rig import verification_service
+    from music_rig.models import VerificationOutcome
 
     try:
         card = verification_service.build_card(question_id)
@@ -4582,25 +4721,95 @@ def verify_run_cmd(
     if card.get("status") != "OPEN":
         _fail(f"{question_id} is {card.get('status')}; verify run expects OPEN")
     _print_verify_card(card)
+
+    kind = ((card.get("verification") or {}).get("kind") or "").upper()
+    behavioral = kind in {"CONTROLLER_MAPPING", "PERFORMANCE_TEST"}
+
+    if behavioral:
+        console.print("")
+        console.print("Behavioral check: [W]orked / [F]ailed / [U]nknown / cancel")
+        choice = typer.prompt("Result", default="").strip().casefold()
+        if not choice or choice in {"c", "cancel", "q"}:
+            console.print("[dim]Cancelled — no write.[/dim]")
+            raise typer.Exit(0)
+        if choice in {"w", "worked", "y", "yes"}:
+            outcome = VerificationOutcome.CONFIRMED
+            value = typer.prompt("Observed value / map note", default="")
+        elif choice in {"f", "failed", "n", "no"}:
+            outcome = VerificationOutcome.FAILED_TEST
+            value = typer.prompt("What failed (optional)", default="")
+        elif choice in {"u", "unknown"}:
+            outcome = VerificationOutcome.UNKNOWN
+            value = "UNKNOWN"
+        else:
+            _fail(f"Unrecognized behavioral result {choice!r}")
+        note_raw = typer.prompt("Observation note (optional)", default="")
+        try:
+            result = verification_service.record_observation(
+                question_id,
+                outcome,
+                value=value.strip() or None,
+                note=note_raw.strip() or None,
+                render=True,
+            )
+        except StoreError as exc:
+            _fail(str(exc))
+        console.print(
+            f"[green]Observation[/green] {outcome.value} "
+            f"value={result.get('verification_result', {}).get('observed_value')!r}"
+        )
+        if not answer_only and outcome != VerificationOutcome.UNKNOWN:
+            _offer_reconcile_after_answer(question_id, answer_only=False)
+        return
+
     value = _interactive_pick_answer(card)
     if value is None:
         console.print("[dim]Cancelled — no write.[/dim]")
         raise typer.Exit(0)
     note_raw = typer.prompt("Observation note (optional)", default="")
     note = note_raw.strip() or None
-    try:
-        result = verification_service.record_verified_answer(
-            question_id,
-            value,
-            note=note,
-            render=True,
-        )
-    except StoreError as exc:
-        _fail(str(exc))
-    console.print(
-        f"[green]Recorded[/green] {result.get('normalized_value')!r} "
-        f"(status RESOLVED; reconciled_at still null)"
+    record_obs = typer.confirm(
+        "Record as verified human observation?", default=True
     )
+    if record_obs:
+        # Infer CONFIRMED vs CORRECTED from CURRENT / prior answer
+        try:
+            q = question_service.get_question(question_id)
+            outcome = verification_service._infer_outcome_vs_current(  # noqa: SLF001
+                q, value
+            )
+        except StoreError:
+            outcome = VerificationOutcome.CORRECTED
+        if value.strip().casefold() == "unknown":
+            outcome = VerificationOutcome.UNKNOWN
+        try:
+            result = verification_service.record_observation(
+                question_id,
+                outcome,
+                value=value,
+                note=note,
+                render=True,
+            )
+        except StoreError as exc:
+            _fail(str(exc))
+        console.print(
+            f"[green]Observation[/green] {outcome.value} "
+            f"normalized={result.get('answer')!r}"
+        )
+    else:
+        try:
+            result = verification_service.record_verified_answer(
+                question_id,
+                value,
+                note=note,
+                render=True,
+            )
+        except StoreError as exc:
+            _fail(str(exc))
+        console.print(
+            f"[green]Recorded answer[/green] {result.get('normalized_value')!r} "
+            f"(no verification_result — evidence stays INTENDED)"
+        )
     _offer_reconcile_after_answer(question_id, answer_only=answer_only)
 
 
@@ -4655,6 +4864,134 @@ def verify_answer_cmd(
         console.print("[dim]dry-run — no write[/dim]")
     console.print(f"Next: {result.get('next_command')}")
 
+
+@verify_app.command("record")
+def verify_record_cmd(
+    question_id: str,
+    outcome: str = typer.Option(
+        ...,
+        "--outcome",
+        help="confirmed|corrected|unknown|failed_test",
+    ),
+    value: Optional[str] = typer.Option(None, "--value"),
+    note: Optional[str] = typer.Option(None, "--note"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    yes: bool = typer.Option(False, "--yes"),
+    as_json: bool = typer.Option(False, "--json"),
+    create_change: bool = typer.Option(
+        False, "--create-change", help="On FAILED_TEST, create OPEN Change"
+    ),
+) -> None:
+    """Record explicit human verification_result (observation ≠ answer alone)."""
+    from music_rig import verification_service
+
+    if not dry_run and not yes and not as_json:
+        if not typer.confirm(
+            f"Record {outcome} observation for {question_id}?", default=False
+        ):
+            console.print("[dim]Aborted.[/dim]")
+            raise typer.Exit(0)
+    try:
+        result = verification_service.record_observation(
+            question_id,
+            outcome,
+            value=value,
+            note=note,
+            dry_run=dry_run,
+            yes=yes or as_json,
+            create_change=create_change,
+            render=not dry_run,
+        )
+    except StoreError as exc:
+        if as_json:
+            _verify_emit(
+                err_payload("store_error", str(exc)), as_json=True, exit_code=1
+            )
+            return
+        _fail(str(exc))
+    out = {k: v for k, v in result.items() if k != "question"}
+    if result.get("question") is not None:
+        q = result["question"]
+        out["status"] = q.status.value
+        out["answer"] = q.answer
+        out["resolved_at"] = q.resolved_at.isoformat() if q.resolved_at else None
+    payload = ok_payload("verify.record", out)
+    if as_json:
+        _verify_emit(payload, as_json=True)
+        return
+    console.print(result.get("message") or "Observation recorded.")
+    if dry_run:
+        console.print("[dim]dry-run — no write[/dim]")
+        if result.get("evidence_plan"):
+            console.print(f"Evidence plan: {result['evidence_plan']}")
+    console.print(f"Next: {result.get('next_command')}")
+
+
+@verify_app.command("confirm")
+def verify_confirm_alias(
+    question_id: str,
+    value: Optional[str] = typer.Option(None, "--value"),
+    note: Optional[str] = typer.Option(None, "--note"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    yes: bool = typer.Option(False, "--yes"),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Alias: verify record --outcome confirmed."""
+    verify_record_cmd(
+        question_id,
+        outcome="confirmed",
+        value=value,
+        note=note,
+        dry_run=dry_run,
+        yes=yes,
+        as_json=as_json,
+        create_change=False,
+    )
+
+
+@verify_app.command("correct")
+def verify_correct_alias(
+    question_id: str,
+    value: str = typer.Option(..., "--value"),
+    note: Optional[str] = typer.Option(None, "--note"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    yes: bool = typer.Option(False, "--yes"),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Alias: verify record --outcome corrected."""
+    verify_record_cmd(
+        question_id,
+        outcome="corrected",
+        value=value,
+        note=note,
+        dry_run=dry_run,
+        yes=yes,
+        as_json=as_json,
+        create_change=False,
+    )
+
+
+@verify_app.command("fail")
+def verify_fail_alias(
+    question_id: str,
+    note: Optional[str] = typer.Option(None, "--note"),
+    value: Optional[str] = typer.Option(None, "--value"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    yes: bool = typer.Option(False, "--yes"),
+    as_json: bool = typer.Option(False, "--json"),
+    create_change: bool = typer.Option(False, "--create-change"),
+) -> None:
+    """Alias: verify record --outcome failed_test."""
+    verify_record_cmd(
+        question_id,
+        outcome="failed_test",
+        value=value,
+        note=note,
+        dry_run=dry_run,
+        yes=yes,
+        as_json=as_json,
+        create_change=create_change,
+    )
 
 @verify_app.command("session")
 def verify_session_cmd(

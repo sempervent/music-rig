@@ -5,13 +5,48 @@ from __future__ import annotations
 from typing import Any
 
 from music_rig.models import OpenQuestion, QuestionStatus, ReconciliationState
+from music_rig.reconciliation.action_packet import build_action_packet
 from music_rig.reconciliation.adapters.base import ReconciliationAdapter
 from music_rig.reconciliation.types import (
     Capability,
     Plan,
+    PlanOperationKind,
     VerificationStatus,
     VerifyResult,
+    op,
 )
+
+# Stage 17 MANUAL backlog classification (production Qs without APPLY adapters)
+MANUAL_CLASSIFICATION: dict[str, str] = {
+    "Q-001": "GENUINELY_AGENT_INTERPRETED",
+    "Q-002": "GENUINELY_AGENT_INTERPRETED",
+    "Q-003": "GENUINELY_AGENT_INTERPRETED",
+    "Q-005": "GENUINELY_DESCRIPTIVE",
+    "Q-006": "GENUINELY_DESCRIPTIVE",
+    "Q-007": "NEEDS_SMALL_SERVICE",
+    "Q-009": "GENUINELY_AGENT_INTERPRETED",
+    "Q-010": "GENUINELY_AGENT_INTERPRETED",
+    "Q-011": "GENUINELY_DESCRIPTIVE",
+    "Q-012": "STRUCTURABLE_NOW",  # inventory.location + set-location per gear
+    "Q-013": "NEEDS_SMALL_SERVICE",
+    "Q-019": "GENUINELY_DESCRIPTIVE",
+    "Q-020": "GENUINELY_DESCRIPTIVE",
+}
+
+_COMMAND_FAMILIES_BY_KIND: dict[str, list[str]] = {
+    "ROUTING_VISUAL": ["rig path show", "rig current path", "rig inspect"],
+    "MANUAL_FACT": ["rig inspect", "rig question answer", "rig change add"],
+    "BOARD_COMPARE": ["rig path show", "rig inspect"],
+    "INVENTORY_LOCATION": ["rig current gear set-location", "rig gear show"],
+    "POWER_AUDIT": ["rig gear show", "rig inspect"],
+    "CAMERA_AUDIT": ["rig inspect"],
+    "WORKFLOW": ["rig inspect", "rig performance"],
+    "PATCHBAY_UNIT": [
+        "rig current patchbay set-model",
+        "rig patchbay show",
+        "rig gear list",
+    ],
+}
 
 
 class UnsupportedAdapter(ReconciliationAdapter):
@@ -31,22 +66,68 @@ class UnsupportedAdapter(ReconciliationAdapter):
         elif question.status != QuestionStatus.RESOLVED or not question.answer.strip():
             state = ReconciliationState.NEEDS_ANSWER
         else:
-            state = ReconciliationState.BLOCKED
+            state = ReconciliationState.NEEDS_AGENT_ACTION
+
         domain = (
             question.target.domain
             if question.target and question.target.domain
             else "(none)"
         )
+        kind = question.verification.kind if question.verification else ""
+        families = list(_COMMAND_FAMILIES_BY_KIND.get(kind, ["rig inspect", "rig question"]))
+        classification = MANUAL_CLASSIFICATION.get(question.id, "GENUINELY_AGENT_INTERPRETED")
+        missing = None
+        if classification in {"NEEDS_SMALL_SERVICE", "GENUINELY_DESCRIPTIVE"}:
+            if domain == "(none)" and classification == "NEEDS_SMALL_SERVICE":
+                missing = f"no CURRENT entrypoint for {question.id} / {kind or 'unknown kind'}"
+        elif classification == "STRUCTURABLE_NOW" and kind == "INVENTORY_LOCATION":
+            families = ["rig current gear set-location", "rig gear show", "rig question target set"]
+
+        details: dict[str, Any] = {
+            "manual_classification": classification,
+        }
+        if state == ReconciliationState.NEEDS_AGENT_ACTION:
+            details["action_packet"] = build_action_packet(
+                question,
+                current_snapshot=None,
+                suggested_command_families=families,
+                postcondition=(
+                    "Answer interpreted into CURRENT via supported rig CLI; "
+                    "or finalize --no-current-change with explicit note"
+                ),
+                missing_capability=missing,
+            )
+
         return Plan(
             artifact_type="question",
             artifact_id=question.id,
             state=state,
             capability=self.capability,
-            blockers=[f"Unsupported reconciliation domain: {domain}"],
+            operations=[
+                op(
+                    PlanOperationKind.NO_CURRENT_CHANGE,
+                    note="agent interprets freeform / descriptive answer",
+                )
+            ]
+            if state == ReconciliationState.NEEDS_AGENT_ACTION
+            else [],
+            blockers=(
+                [
+                    {
+                        "code": "needs_agent_action",
+                        "message": f"Unsupported/manual domain: {domain}",
+                        "classification": classification,
+                    }
+                ]
+                if state == ReconciliationState.NEEDS_AGENT_ACTION
+                else []
+            ),
             suggested_commands=[
-                "Add a service+CLI adapter under music_rig.reconciliation.adapters, "
-                "then re-run reconcile plan"
+                f"uv run rig reconcile plan question {question.id} --json",
+                f"uv run rig reconcile finalize question {question.id} "
+                f"--no-current-change --note \"…\" --yes",
             ],
+            details=details,
         )
 
     def verify(self, question: OpenQuestion, *, paths: dict[str, Any]) -> VerifyResult:

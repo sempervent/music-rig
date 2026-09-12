@@ -6,12 +6,15 @@ from typing import Any
 
 from music_rig import patchbay_state
 from music_rig.models import OpenQuestion, QuestionStatus, ReconciliationState
+from music_rig.reconciliation.action_packet import build_action_packet
 from music_rig.reconciliation.adapters.base import ReconciliationAdapter
 from music_rig.reconciliation.types import (
     Capability,
     Plan,
+    PlanOperationKind,
     VerificationStatus,
     VerifyResult,
+    op,
 )
 
 
@@ -91,7 +94,32 @@ class InventoryMappingAdapter(ReconciliationAdapter):
                     "inventory.patchbay_mapping stays MANUAL until patchbay "
                     "schema gains an optional gear_ref / set-gear CURRENT mutation"
                 ),
+                "manual_classification": "NEEDS_SMALL_SERVICE",
+                "action_packet": build_action_packet(
+                    question,
+                    current_snapshot=current,
+                    suggested_command_families=[
+                        "rig current patchbay set-model",
+                        "rig patchbay list",
+                        "rig gear list",
+                        "rig reconcile finalize",
+                    ],
+                    postcondition="each PB letter hardware_model matches observed unit",
+                    missing_capability=(
+                        "patchbay gear_ref / set-gear not available yet"
+                    ),
+                )
+                if state == ReconciliationState.NEEDS_AGENT_ACTION
+                else None,
             },
+            operations=[
+                op(
+                    PlanOperationKind.NO_CURRENT_CHANGE,
+                    note="use set-model then finalize — no auto gear_ref bind",
+                )
+            ]
+            if state == ReconciliationState.NEEDS_AGENT_ACTION
+            else [],
         )
 
     def verify(self, question: OpenQuestion, *, paths: dict[str, Any]) -> VerifyResult:

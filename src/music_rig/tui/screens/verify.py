@@ -21,7 +21,9 @@ class VerifyScreen(Screen):
         Binding("escape", "back", "Back"),
         Binding("q", "back", "Back"),
         Binding("r", "refresh", "Refresh"),
-        Binding("v", "verify", "Verify"),
+        Binding("v", "verify", "Worked/Answer"),
+        Binding("f", "fail", "Failed"),
+        Binding("u", "unknown", "Unknown"),
         Binding("s", "skip", "Skip"),
         Binding("n", "next", "Next"),
         Binding("o", "open_target", "Open Target"),
@@ -111,16 +113,33 @@ class VerifyScreen(Screen):
             card.get("question") or "",
             "",
             f"**Area:** {card.get('area')}",
+            f"**Answer:** `{card.get('answer') or '—'}`",
             f"**CURRENT:** `{card.get('current')}`",
-            "",
-            f"**How to check:** {card.get('prompt') or '—'}",
-            "",
-            f"**Accepted:** {accepted.get('answer_type')} "
-            f"{accepted.get('choices') or '(TEXT / UNKNOWN)'}",
-            "",
-            f"**Reconcile:** {recon.get('capability')} / {recon.get('state')} "
-            f"/ {recon.get('after_answer_bucket')}",
+            f"**Evidence:** `{card.get('evidence')}`",
         ]
+        vr = card.get("verification_result")
+        if vr:
+            lines.append(
+                f"**Observed:** {vr.get('outcome')} `{vr.get('observed_value')}` "
+                f"@ {vr.get('observed_at')}"
+            )
+        else:
+            lines.append("**Observed:** (none — not VERIFIED from inference)")
+        lines.extend(
+            [
+                "",
+                f"**How to check:** {card.get('prompt') or '—'}",
+                "",
+                f"**Accepted:** {accepted.get('answer_type')} "
+                f"{accepted.get('choices') or '(TEXT / UNKNOWN)'}",
+                "",
+                f"**Reconcile:** {recon.get('capability')} / {recon.get('state')} "
+                f"/ {recon.get('after_answer_bucket')} / "
+                f"obs={recon.get('after_observation_bucket')}",
+            ]
+        )
+        for op_item in recon.get("operations") or []:
+            lines.append(f"- op: `{op_item}`")
         for b in recon.get("blockers") or []:
             lines.append(f"- blocker: {blocker_message(b)}")
         related = card.get("related_work") or []
@@ -132,7 +151,9 @@ class VerifyScreen(Screen):
                     f"- {w.get('id')} {w.get('priority')} {w.get('status')}"
                 )
         lines.append("")
-        lines.append("v Verify · s Skip · n Next · o Target · e Edit · c Reconcile")
+        lines.append(
+            "v Worked/Answer · f Failed · u Unknown · s Skip · n Next · c Reconcile"
+        )
         detail.update("\n".join(lines))
 
     def action_back(self) -> None:
@@ -142,7 +163,9 @@ class VerifyScreen(Screen):
         self.app.push_screen(
             HelpScreen(
                 "Verify\n\n"
-                "v  answer selected question (structured picker)\n"
+                "v  worked / answer (structured picker)\n"
+                "f  failed test (FAILED_TEST — no VERIFIED)\n"
+                "u  could not determine (UNKNOWN)\n"
                 "s  skip for this session\n"
                 "n  jump to next recommended\n"
                 "o  open typed target domain\n"
@@ -150,10 +173,51 @@ class VerifyScreen(Screen):
                 "c  open reconcile for this question\n"
                 "r  refresh\n"
                 "Esc/q  back\n\n"
-                "Guides observation; you supply facts.\n"
-                "UNKNOWN is valid. Never invent from manuals.\n"
-                "Answers → question_service; CURRENT → reconcile."
+                "Documented ≠ Observed ≠ VERIFIED.\n"
+                "Never invent observation from manuals.\n"
+                "Answers → question_service; observations → verify record;\n"
+                "CURRENT → reconcile."
             )
+        )
+
+    def action_fail(self) -> None:
+        item = self._selected()
+        if item is None:
+            return
+        self._record_outcome(item.question_id, "failed_test")
+
+    def action_unknown(self) -> None:
+        item = self._selected()
+        if item is None:
+            return
+        self._record_outcome(item.question_id, "unknown", value="UNKNOWN")
+
+    def _record_outcome(
+        self, question_id: str, outcome: str, *, value: str | None = None
+    ) -> None:
+        def _confirmed(ok: bool | None) -> None:
+            if not ok:
+                return
+            try:
+                verification_service.record_observation(
+                    question_id,
+                    outcome,
+                    value=value,
+                    render=False,
+                )
+            except StoreError as exc:
+                self.notify(str(exc), severity="error")
+                return
+            self.notify(f"{question_id}: {outcome}")
+            self.action_refresh()
+
+        self.app.push_screen(
+            ConfirmModal(
+                f"Record {outcome} for {question_id}?",
+                "Explicit human observation only. Does not invent VERIFIED.",
+                confirm_label="Record",
+            ),
+            _confirmed,
         )
 
     def action_skip(self) -> None:
@@ -277,14 +341,30 @@ class VerifyScreen(Screen):
             if not ok:
                 return
             try:
-                result = verification_service.record_verified_answer(
-                    question_id, value, render=True
+                from music_rig.models import VerificationOutcome
+
+                q = None
+                try:
+                    from music_rig import question_service
+
+                    q = question_service.get_question(question_id)
+                    outcome = verification_service._infer_outcome_vs_current(  # noqa: SLF001
+                        q, value
+                    )
+                except StoreError:
+                    outcome = VerificationOutcome.CORRECTED
+                if value.strip().casefold() == "unknown":
+                    outcome = VerificationOutcome.UNKNOWN
+                result = verification_service.record_observation(
+                    question_id, outcome, value=value, render=False
                 )
             except StoreError as exc:
                 self.notify(str(exc), severity="error")
                 return
-            normalized = result.get("normalized_value")
-            self.notify(f"Recorded {question_id} = {normalized!r}")
+            normalized = (result.get("verification_result") or {}).get(
+                "observed_value"
+            ) or result.get("answer")
+            self.notify(f"Observed {question_id} = {normalized!r}")
             try:
                 plan = reconcile_service.plan_question(question_id)
                 state = plan.state.value
@@ -303,8 +383,8 @@ class VerifyScreen(Screen):
 
         self.app.push_screen(
             ConfirmModal(
-                f"Record answer for {question_id}?",
-                f"Value: {value!r}\nCURRENT is not mutated until you reconcile.",
+                f"Record observation for {question_id}?",
+                f"Value: {value!r}\nSets verification_result (human observation).",
                 confirm_label="Record",
             ),
             _confirmed,

@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import copy
 from pathlib import Path
 from typing import Any
 
-from music_rig.models import AbletonDocument
+from music_rig.models import AbletonDocument, CurrentPreview, MidiEvidenceStatus
 from music_rig.store import ABLETON_PATH, StoreError, _dump_yaml, parse_existing_yaml
 
 ABLETON_HEADER = (
@@ -56,3 +57,54 @@ def dump_with_header(data: dict[str, Any], *, existing_text: str | None = None) 
     if not header.endswith("\n"):
         header += "\n"
     return header + _dump_yaml(data)
+
+
+def _snapshot(value: Any) -> Any:
+    if hasattr(value, "model_dump"):
+        return value.model_dump(mode="json", exclude_none=True)
+    return value
+
+
+def propose_set_template_evidence(
+    template_id: str,
+    evidence: MidiEvidenceStatus | str,
+    *,
+    ableton_path: Path | None = None,
+    data: dict[str, Any] | None = None,
+) -> tuple[CurrentPreview, dict[str, Any]]:
+    """Set AbletonTemplate.evidence only (does not invent Live Set contents)."""
+    status = (
+        evidence
+        if isinstance(evidence, MidiEvidenceStatus)
+        else MidiEvidenceStatus(str(evidence).strip().upper())
+    )
+    tid = template_id.strip()
+    if not tid:
+        raise StoreError("template_id is required")
+    raw = copy.deepcopy(data if data is not None else load_raw(ableton_path))
+    doc = AbletonDocument.model_validate(raw)
+    template = next((t for t in doc.templates if t.id == tid), None)
+    if template is None:
+        known = ", ".join(t.id for t in doc.templates) or "(none)"
+        raise StoreError(f"Unknown Ableton template {tid!r}; known: {known}")
+    before = _snapshot(template)
+    updated = template.model_copy(update={"evidence": status})
+    after = _snapshot(updated)
+    templates = []
+    for t in raw.get("templates") or []:
+        if isinstance(t, dict) and t.get("id") == tid:
+            templates.append(after)
+        else:
+            templates.append(t)
+    raw["templates"] = templates
+    AbletonDocument.model_validate(raw)
+    preview = CurrentPreview(
+        domain="ableton.template_evidence",
+        target=tid,
+        before=before if isinstance(before, dict) else {"value": before},
+        after=after if isinstance(after, dict) else {"value": after},
+        changed=before != after,
+        affected_files=["data/ableton.yaml", "docs/ableton-track-map.md"],
+        message=f"Ableton template {tid} evidence → {status.value}",
+    )
+    return preview, raw

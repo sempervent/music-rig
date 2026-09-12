@@ -256,6 +256,18 @@ def format_verify_summary_table(
             )
         )
 
+    by_obs = summary.get("after_observation_capability") or {}
+    if by_obs:
+        rows = [[k, str(v)] for k, v in by_obs.items()]
+        sections.append(
+            render_table(
+                ["After-observation capability", "Count"],
+                rows,
+                title="AFTER OBSERVATION",
+                width=width,
+            )
+        )
+
     by_kind = summary.get("by_kind") or {}
     if by_kind:
         rows = [[k, str(v)] for k, v in by_kind.items()]

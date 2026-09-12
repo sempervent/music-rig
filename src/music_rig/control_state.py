@@ -372,6 +372,73 @@ def propose_set_evidence(gear_ref: str, context_id: str, control_id: str, eviden
     )
 
 
+def propose_set_context_evidence(
+    gear_ref: str,
+    context_id: str,
+    evidence,
+    *,
+    controllers_path: Path | None = None,
+    inventory_path: Path | None = None,
+    midi_path: Path | None = None,
+    ableton_path: Path | None = None,
+    performance_path: Path | None = None,
+    data: dict[str, Any] | None = None,
+) -> tuple[CurrentPreview, dict[str, Any]]:
+    """Set ControllerContext.evidence only — not the whole controller."""
+    status = (
+        evidence
+        if isinstance(evidence, MidiEvidenceStatus)
+        else MidiEvidenceStatus(str(evidence).upper())
+    )
+    raw = copy.deepcopy(data if data is not None else load_raw(controllers_path))
+    doc = _validated(
+        raw,
+        inventory_path=inventory_path,
+        midi_path=midi_path,
+        ableton_path=ableton_path,
+        performance_path=performance_path,
+    )
+    gear = gear_ref.strip()
+    cid = context_id.strip()
+    controller = next((c for c in doc.controllers if c.gear_ref == gear), None)
+    if controller is None:
+        raise StoreError(f"Unknown controller gear_ref {gear!r}.")
+    ctx = next((c for c in controller.contexts if c.id == cid), None)
+    if ctx is None:
+        raise StoreError(f"Unknown context {gear}/{cid}.")
+    before = _snapshot(ctx)
+    updated = ctx.model_copy(update={"evidence": status})
+    after = _snapshot(updated)
+    for body in raw.get("controllers") or []:
+        if isinstance(body, dict) and body.get("gear_ref") == gear:
+            contexts = []
+            for c in body.get("contexts") or []:
+                if isinstance(c, dict) and c.get("id") == cid:
+                    contexts.append(after)
+                else:
+                    contexts.append(c)
+            body["contexts"] = contexts
+    _validated(
+        raw,
+        inventory_path=inventory_path,
+        midi_path=midi_path,
+        ableton_path=ableton_path,
+        performance_path=performance_path,
+    )
+    return (
+        CurrentPreview(
+            domain="controls.context_evidence",
+            target=f"{gear}/{cid}",
+            before=before if isinstance(before, dict) else {"value": before},
+            after=after if isinstance(after, dict) else {"value": after},
+            changed=before != after,
+            affected_files=["data/controllers.yaml", "docs/controller-mappings.md"],
+            message=f"{gear}/{cid} context evidence → {status.value}",
+        ),
+        raw,
+    )
+
+
 def propose_set_availability(
     gear_ref: str, context_id: str, control_id: str, availability, **kwargs
 ):
