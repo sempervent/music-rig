@@ -35,6 +35,7 @@ nav:
   - Open Questions: open-questions.md
   - Operational readiness: operational-readiness.md
   - Known-good ops: known-good-ops.md
+  - Jam now: jam-now.md
   - Human handoff: human-handoff.md
   - Stage 25 live validation: stage-25-live-validation.md
   - Interactive TUI: tui.md

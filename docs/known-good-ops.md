@@ -91,7 +91,6 @@ Result log:
 
 ## Still open (blocks “fully known” but not necessarily “can play”)
 
-- Q-008 PB-B modes — CURRENT set to `normal` for represented pairs; HUMAN answer still DRAFT (needs finalize without `--am-bot`)
-- Q-017 ZeRO templates — HUMAN: no names → UNKNOWN (BOT draft only; needs answer + verify-record)
-- Thru5 OUT destinations reported (SL-2, SR-18, miniKORG, KAOSS); OUT number → device map UNKNOWN (RIG-037)
-- RIG-031 DoD — HUMAN YES in chat; needs `rig todo done RIG-031` without `--am-bot`
+- Thru5 OUT number → device map UNKNOWN (deferred — destinations known as a set: SL-2, SR-18, miniKORG, KAOSS). Not required to jam.
+- Remaining OPEN Questions: Q-005, Q-009, Q-010, Q-012, Q-013, Q-019 (not jam blockers)
+- RIG-037 incomplete until OUT numbers are typed (optional later)
