@@ -393,6 +393,8 @@ uv run mkdocs build --strict
 
 Coverage measures `music_rig` excluding thin `cli.py` wiring and the Textual `tui/` package (logic lives in services; TUI has dedicated pilot tests). CI fails under 75%. Parallelism is `-n auto` → `max(1, cpu_count - 2)`; use `-n0` to debug. Async tests are plain `async def test_*` via pytest-asyncio `asyncio_mode = auto`.
 
+Test layout (unit / integration / smoke by module): [docs/testing.md](docs/testing.md).
+
 - Local preview:
 
 ```bash

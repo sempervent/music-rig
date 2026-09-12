@@ -40,7 +40,7 @@ package = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["src", "tests"]
 # pytest-asyncio: auto-detect `async def test_*` / async fixtures (no sync wrappers).
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
@@ -54,8 +54,14 @@ addopts = [
 # -n auto → pytest_xdist_auto_num_workers in tests/conftest.py → max(1, cpu_count - 2)
 # Enforce --cov-fail-under=75 on the full suite (CI + local validation below).
 # Subset / debug: uv run pytest path -n0 --cov-fail-under=0
+markers = [
+    "unit: fast isolated unit tests",
+    "integration: service/CLI/TUI workflows on fixture repos",
+    "smoke: thin production-readonly or CLI surface checks",
+]
 filterwarnings = [
-    # Intentional Textual Header defect probe (tests/test_zzz_textual_header_defect.py)
+    # Intentional Textual Header defect probe
+    # (tests/integration/tui/test_textual_header_defect.py)
     "ignore:coroutine 'Header._on_mount.<locals>.set_title' was never awaited:RuntimeWarning",
 ]
 

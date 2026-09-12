@@ -1,16 +1,11 @@
-"""Stage 18 — TUI reliability, Answer UX, patchbay MODE, Vim modes, Add, round-trips.
-
-Fixture-only mutations. Never touches production data/.
-"""
+"""Tests migrated to integration/tui/test_persist_roundtrip.py."""
 
 from __future__ import annotations
 
 import shutil
 from pathlib import Path
-
 import pytest
 import yaml
-
 from music_rig import store
 from music_rig.patchbay_state import list_pairs, load_raw
 from music_rig.store import StoreError, load_questions
@@ -19,12 +14,6 @@ from music_rig.tui.editable_domains import registry
 from music_rig.tui.modes import EditorMode, parse_command
 from music_rig.tui.save_outcome import SaveOutcome
 from music_rig.tui.working import ConcurrentModificationError, WorkingDocument
-
-
-# ---------------------------------------------------------------------------
-# Question answer persistence + visibility
-# ---------------------------------------------------------------------------
-
 
 @pytest.mark.asyncio
 async def test_answer_persists_and_question_visible(tui_fx):
@@ -56,7 +45,6 @@ async def test_answer_persists_and_question_visible(tui_fx):
         assert "visible-answer-persist" in detail
         assert "Unrelated MIDI clock?" in detail
 
-
 @pytest.mark.asyncio
 async def test_resolve_does_not_invent_verification_result(tui_fx):
     app = RigApp(route="question", object_id="Q-002")
@@ -75,12 +63,6 @@ async def test_resolve_does_not_invent_verification_result(tui_fx):
     assert q.status.value == "RESOLVED"
     assert q.answer == "resolved-only"
     assert q.verification_result is None
-
-
-# ---------------------------------------------------------------------------
-# Patchbay MODE
-# ---------------------------------------------------------------------------
-
 
 @pytest.mark.asyncio
 async def test_patchbay_mode_persist_and_reopen(tui_fx, monkeypatch):
@@ -115,7 +97,6 @@ async def test_patchbay_mode_persist_and_reopen(tui_fx, monkeypatch):
         detail = str(app2.screen.query_one("#detail").content)
         assert "normal" in detail.lower()
 
-
 @pytest.mark.asyncio
 async def test_patchbay_space_cycles_mode_staged(tui_fx):
     app = RigApp(route="patchbay", object_id="PB-B")
@@ -127,7 +108,6 @@ async def test_patchbay_space_cycles_mode_staged(tui_fx):
         dirty = str(app.screen.query_one("#dirty-label").content)
         assert "unsaved" in dirty
         assert tui_fx["patchbays"].read_text(encoding="utf-8") == before
-
 
 @pytest.mark.asyncio
 async def test_select_mode_modal_enter_esc(tui_fx):
@@ -145,7 +125,6 @@ async def test_select_mode_modal_enter_esc(tui_fx):
 
         assert isinstance(app.screen, PatchbayEditorScreen)
 
-
 @pytest.mark.asyncio
 async def test_patchbay_related_question_shows_text(tui_fx):
     app = RigApp(route="patchbay", object_id="PB-B")
@@ -154,12 +133,6 @@ async def test_patchbay_related_question_shows_text(tui_fx):
         detail = str(app.screen.query_one("#detail").content)
         assert "Q-001" in detail
         assert "What mode is PB-B 1/25?" in detail
-
-
-# ---------------------------------------------------------------------------
-# Generic edit round-trips
-# ---------------------------------------------------------------------------
-
 
 def test_round_trip_todo_wishlist_gear(tui_fx):
     from music_rig.tui.editable_domains.todo import TodoEditableAdapter
@@ -196,12 +169,13 @@ def test_round_trip_todo_wishlist_gear(tui_fx):
     gear.commit(gw, render=False)
     assert gear.get_record("test-gear")["notes"] == "stage18-gear-note"
 
-
 def test_round_trip_controller_ableton_performance_backup(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     """Fixture copies under tmp — assert production hashes unchanged."""
-    root = Path(__file__).resolve().parents[1]
+    from music_rig.store import ROOT
+
+    root = ROOT
     prod_hashes = {
         name: (root / "data" / name).read_bytes()
         for name in (
@@ -294,13 +268,6 @@ def test_round_trip_controller_ableton_performance_backup(
     for name, before in prod_hashes.items():
         assert (root / "data" / name).read_bytes() == before, f"production {name} mutated"
 
-
-
-# ---------------------------------------------------------------------------
-# Add flows
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.asyncio
 async def test_add_question_todo_wish_inbox_change_gear(tui_fx):
     from music_rig.tui.screens.create import (
@@ -390,101 +357,6 @@ async def test_add_question_todo_wish_inbox_change_gear(tui_fx):
     inv = yaml.safe_load(tui_fx["inventory"].read_text(encoding="utf-8"))
     assert any("Stage18 Widget" in (i.get("name") or "") for i in inv.get("items") or [])
 
-
-# ---------------------------------------------------------------------------
-# Vim modes
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_vim_navigation_and_modes(tui_fx):
-    app = RigApp(route="question")
-    async with app.run_test(size=(120, 40)) as pilot:
-        await pilot.pause()
-        banner = str(app.screen.query_one("#mode-banner").content)
-        assert "NORMAL" in banner
-        await pilot.press("j")
-        await pilot.press("k")
-        await pilot.press("G")
-        await pilot.pause()
-        await pilot.press("g")
-        await pilot.press("g")
-        await pilot.pause()
-        await pilot.press("a")
-        await pilot.pause()
-        from music_rig.tui.screens.answer import AnswerScreen
-
-        assert isinstance(app.screen, AnswerScreen)
-        assert "INSERT" in str(app.screen.query_one("#mode-banner").content)
-        await pilot.press("j")
-        assert "j" in app.screen.query_one("#answer-input").text
-        await pilot.press("escape")
-        await pilot.pause()
-        assert "NORMAL" in str(app.screen.query_one("#mode-banner").content)
-
-
-@pytest.mark.asyncio
-async def test_vim_command_q_refuses_dirty_qbang_discards(tui_fx):
-    before = tui_fx["patchbays"].read_text(encoding="utf-8")
-    app = RigApp(route="patchbay", object_id="PB-B")
-    async with app.run_test(size=(120, 40)) as pilot:
-        await pilot.pause()
-        await pilot.press("space")
-        await pilot.pause()
-        await pilot.press("colon")
-        await pilot.pause()
-        from music_rig.tui.dialogs import CommandLineModal
-
-        assert isinstance(app.screen, CommandLineModal)
-        app.screen.query_one("#modal-input").value = ":q"
-        await pilot.press("enter")
-        await pilot.pause()
-        from music_rig.tui.screens.patchbays import PatchbayEditorScreen
-
-        assert isinstance(app.screen, PatchbayEditorScreen)
-        await pilot.press("colon")
-        await pilot.pause()
-        app.screen.query_one("#modal-input").value = ":q!"
-        await pilot.press("enter")
-        await pilot.pause()
-    assert tui_fx["patchbays"].read_text(encoding="utf-8") == before
-
-
-@pytest.mark.asyncio
-async def test_vim_undo_staged(tui_fx):
-    app = RigApp(route="patchbay", object_id="PB-B")
-    async with app.run_test(size=(120, 40)) as pilot:
-        await pilot.pause()
-        await pilot.press("space")
-        await pilot.pause()
-        assert "unsaved" in str(app.screen.query_one("#dirty-label").content)
-        await pilot.press("u")
-        await pilot.pause()
-        dirty = str(app.screen.query_one("#dirty-label").content)
-        assert "unsaved" not in dirty
-
-
-def test_working_document_undo_redo():
-    doc = WorkingDocument({"a": 1})
-    doc.stage("x", 1)
-    doc.stage("y", 2)
-    assert doc.undo()
-    assert "y" not in doc.mutations
-    assert doc.redo()
-    assert doc.get("y") == 2
-
-
-def test_parse_command_aliases():
-    assert parse_command(":w")[0] == "write"
-    assert parse_command(":q!")[0] == "quit!"
-    assert parse_command(":wq")[0] == "wq"
-
-
-# ---------------------------------------------------------------------------
-# Failed save + concurrent modification
-# ---------------------------------------------------------------------------
-
-
 def test_failed_commit_retains_mutations(tui_fx, monkeypatch):
     from music_rig.tui.editable_domains.questions import QuestionsEditableAdapter
 
@@ -501,7 +373,6 @@ def test_failed_commit_retains_mutations(tui_fx, monkeypatch):
     assert working.is_dirty
     assert working.get("notes") == "keep-me"
 
-
 def test_concurrent_modification_retains(tui_fx):
     from music_rig.tui.editable_domains.questions import QuestionsEditableAdapter
 
@@ -515,67 +386,3 @@ def test_concurrent_modification_retains(tui_fx):
     assert working.is_dirty
     assert working.get("notes") == "mine"
 
-
-# ---------------------------------------------------------------------------
-# Registry / bindings / debug
-# ---------------------------------------------------------------------------
-
-
-def test_registry_every_editable_has_adapter_and_coverage():
-    domains = registry.editable_domains_with_adapters()
-    for key in domains:
-        cov = registry.coverage_for(key)
-        assert cov is not None, f"missing coverage marker for {key}"
-        assert cov["view"] == "yes"
-        assert cov["round_trip"] in {"yes", "partial"}
-        assert cov["vim_modal"] == "yes"
-        if key == "patchbay":
-            continue
-        assert registry.get_adapter(key) is not None, f"missing adapter for {key}"
-
-
-def test_save_outcome_enum():
-    assert SaveOutcome.SUCCESS.ok
-    assert not SaveOutcome.FAILED.ok
-
-
-def test_ctrl_s_binding_has_priority():
-    from music_rig.tui.forms import RecordEditScreen
-    from music_rig.tui.editable_domains.todo import TodoEditableAdapter
-
-    bindings = RecordEditScreen(TodoEditableAdapter(), "RIG-001").BINDINGS
-    ctrl_s = [b for b in bindings if getattr(b, "key", None) == "ctrl+s"]
-    assert ctrl_s and ctrl_s[0].priority is True
-
-
-@pytest.mark.asyncio
-async def test_mode_banner_on_editable(tui_fx):
-    app = RigApp(route="todo")
-    async with app.run_test(size=(120, 40)) as pilot:
-        await pilot.pause()
-        banner = str(app.screen.query_one("#mode-banner").content)
-        assert EditorMode.NORMAL.value in banner
-
-
-def test_debug_format_error():
-    from music_rig.tui.debug import format_error, set_debug, is_debug
-
-    set_debug(False)
-    assert "boom" in format_error(RuntimeError("boom"))
-    set_debug(True)
-    assert is_debug()
-    assert "boom" in format_error(RuntimeError("boom"))
-    set_debug(False)
-
-
-def test_cli_tui_debug_flag():
-    import re
-
-    from typer.testing import CliRunner
-
-    from music_rig.cli import app
-
-    result = CliRunner().invoke(app, ["tui", "--help"])
-    assert result.exit_code == 0
-    plain = re.sub(r"\x1b\[[0-9;]*m", "", result.stdout)
-    assert "--debug" in plain
