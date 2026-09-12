@@ -1,4 +1,11 @@
-"""midi.clock_master — VERIFY_ONLY; set-clock-master → NEEDS_AGENT_ACTION."""
+"""midi.clock_master — VERIFY_ONLY (physical practice; do not auto-apply).
+
+Q-014 asks whether Ableton is master *in practice* (KAOSS/SL-2 may lead).
+`rig current midi set-clock-master` can document CURRENT, but reconcile apply
+must not promote INTENDED→VERIFIED or invent physical verification. Leave
+VERIFY_ONLY; agent runs set-clock-master + finalize with --no-current-change
+when appropriate.
+"""
 
 from __future__ import annotations
 
@@ -82,12 +89,34 @@ class MidiClockAdapter(ReconciliationAdapter):
             current=current,
             desired=endpoint or question.answer.strip() or None,
             blockers=(
-                ["Use set-clock-master CLI then verify; adapter is VERIFY_ONLY"]
+                [
+                    {
+                        "code": "verify_only",
+                        "field": "clock.master",
+                        "message": (
+                            "midi.clock_master is VERIFY_ONLY (physical practice). "
+                            "Use set-clock-master to document CURRENT, then finalize; "
+                            "reconcile apply will not auto-write or promote INTENDED→VERIFIED."
+                        ),
+                        "candidates": [endpoint] if endpoint else [],
+                        "suggested_commands": [
+                            c
+                            for c in cmds
+                            if "set-clock-master" in c or "finalize" in c
+                        ],
+                    }
+                ]
                 if state == ReconciliationState.NEEDS_AGENT_ACTION
                 and question.status == QuestionStatus.RESOLVED
                 else []
             ),
             suggested_commands=cmds,
+            details={
+                "capability_reason": (
+                    "Q semantics are physical verification of clock leadership; "
+                    "not a pure documented-CURRENT set"
+                ),
+            },
         )
 
     def verify(self, question: OpenQuestion, *, paths: dict[str, Any]) -> VerifyResult:

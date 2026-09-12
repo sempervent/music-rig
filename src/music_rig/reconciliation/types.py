@@ -34,7 +34,8 @@ class Plan:
     operations: list[dict[str, Any]] = field(default_factory=list)
     postconditions: list[str] = field(default_factory=list)
     closable: list[str] = field(default_factory=list)
-    blockers: list[str] = field(default_factory=list)
+    # Strings or structured dicts ({code, field, candidates, suggested_commands, message})
+    blockers: list[Any] = field(default_factory=list)
     suggested_commands: list[str] = field(default_factory=list)
     details: dict[str, Any] = field(default_factory=dict)
 

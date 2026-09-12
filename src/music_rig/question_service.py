@@ -43,13 +43,38 @@ def get_question(
 def list_questions(
     *,
     all_items: bool = False,
+    open_only: bool = False,
+    unreconciled_only: bool = False,
     area: str | None = None,
     questions_path: Path | None = None,
 ) -> list[OpenQuestion]:
+    """List questions.
+
+    Default (no flags): ACTIVE = OPEN + RESOLVED with reconciled_at null.
+    --open: OPEN only
+    --unreconciled: RESOLVED with reconciled_at null
+    --all: every status
+    """
     doc = load_questions(questions_path)
     items = list(doc.questions)
-    if not all_items:
+    if all_items:
+        pass
+    elif open_only:
         items = [q for q in items if q.status == QuestionStatus.OPEN]
+    elif unreconciled_only:
+        items = [
+            q
+            for q in items
+            if q.status == QuestionStatus.RESOLVED and q.reconciled_at is None
+        ]
+    else:
+        # ACTIVE
+        items = [
+            q
+            for q in items
+            if q.status == QuestionStatus.OPEN
+            or (q.status == QuestionStatus.RESOLVED and q.reconciled_at is None)
+        ]
     if area:
         needle = area.casefold()
         items = [q for q in items if needle in q.area.casefold()]
@@ -583,3 +608,291 @@ def open_question_count(*, questions_path: Path | None = None) -> int:
         for q in load_questions(questions_path).questions
         if q.status == QuestionStatus.OPEN
     )
+
+
+def _target_dict(q: OpenQuestion) -> dict | None:
+    if q.target is None:
+        return None
+    return {k: v for k, v in q.target.model_dump().items() if v is not None}
+
+
+def answer_question(
+    question_id: str,
+    answer: str,
+    *,
+    dry_run: bool = False,
+    related_change: str | None = None,
+    clock: Clock = default_clock,
+    render: bool = True,
+    questions_path: Path | None = None,
+    changes_path: Path | None = None,
+    docs_todo=None,
+    docs_wishlist=None,
+    docs_questions=None,
+) -> dict:
+    """Noninteractive resolve: RESOLVED + answer + resolved_at; reconciled_at stays null."""
+    cleaned = answer.strip()
+    if not cleaned:
+        raise StoreError("Resolved questions require a non-empty answer.")
+    current = get_question(question_id, questions_path=questions_path)
+    before = {
+        "id": current.id,
+        "status": current.status.value,
+        "answer": current.answer,
+        "resolved_at": current.resolved_at.isoformat() if current.resolved_at else None,
+        "reconciled_at": (
+            current.reconciled_at.isoformat() if current.reconciled_at else None
+        ),
+    }
+    if dry_run:
+        return {
+            "dry_run": True,
+            "question_id": current.id,
+            "before": before,
+            "after": {
+                "id": current.id,
+                "status": QuestionStatus.RESOLVED.value,
+                "answer": cleaned,
+                "resolved_at": "(would set)",
+                "reconciled_at": None,
+            },
+            "next_command": f"uv run rig reconcile plan question {current.id} --json",
+            "message": "Answer recorded. CURRENT reconciliation still required.",
+        }
+    updated = resolve_question(
+        question_id,
+        cleaned,
+        related_change=related_change,
+        clock=clock,
+        render=render,
+        questions_path=questions_path,
+        changes_path=changes_path,
+        docs_todo=docs_todo,
+        docs_wishlist=docs_wishlist,
+        docs_questions=docs_questions,
+    )
+    return {
+        "dry_run": False,
+        "question_id": updated.id,
+        "before": before,
+        "after": {
+            "id": updated.id,
+            "status": updated.status.value,
+            "answer": updated.answer,
+            "resolved_at": updated.resolved_at.isoformat() if updated.resolved_at else None,
+            "reconciled_at": None,
+        },
+        "question": updated,
+        "next_command": f"uv run rig reconcile plan question {updated.id} --json",
+        "message": "Answer recorded. CURRENT reconciliation still required.",
+    }
+
+
+_TARGET_FIELDS = (
+    "domain",
+    "bay",
+    "pair",
+    "path",
+    "gear",
+    "device",
+    "channel",
+    "branch",
+    "node",
+    "context",
+)
+
+
+def show_target(
+    question_id: str, *, questions_path: Path | None = None
+) -> dict:
+    q = get_question(question_id, questions_path=questions_path)
+    return {
+        "question_id": q.id,
+        "target": _target_dict(q),
+    }
+
+
+def validate_target_refs(
+    target: dict,
+    *,
+    patchbays_path: Path | None = None,
+    routing_path: Path | None = None,
+    inventory_path: Path | None = None,
+) -> None:
+    """Exact-ref validation via existing services. No fuzzy match."""
+    from music_rig import inventory_state, patchbay_state, routing_state
+    from music_rig.models import QuestionTarget
+
+    qt = QuestionTarget.model_validate(
+        {k: v for k, v in target.items() if v not in (None, "", [])}
+    )
+    if qt.bay:
+        data = patchbay_state.load_raw(patchbays_path)
+        bay_id = qt.bay.strip().upper()
+        bays = data.get("patchbays") or {}
+        if bay_id not in bays:
+            raise StoreError(f"Patchbay {bay_id} does not exist.")
+        if qt.pair:
+            try:
+                patchbay_state.resolve_pair(bay_id, qt.pair, data)
+            except StoreError as exc:
+                raise StoreError(str(exc)) from exc
+    if qt.path:
+        rdata = routing_state.load_raw(routing_path)
+        try:
+            routing_state.get_named_path(rdata, qt.path)
+        except StoreError as exc:
+            raise StoreError(str(exc)) from exc
+    if qt.gear:
+        inv = inventory_state.load_document(inventory_path)
+        if inv.resolve(qt.gear) is None:
+            raise StoreError(f"Gear {qt.gear!r} does not exist in inventory.")
+
+
+def set_target(
+    question_id: str,
+    *,
+    domain: str | None = None,
+    bay: str | None = None,
+    pair: str | None = None,
+    path: str | None = None,
+    gear: str | None = None,
+    device: str | None = None,
+    channel: str | None = None,
+    branch: str | None = None,
+    node: str | None = None,
+    context: str | None = None,
+    clear_fields: list[str] | None = None,
+    dry_run: bool = False,
+    render: bool = True,
+    questions_path: Path | None = None,
+    patchbays_path: Path | None = None,
+    routing_path: Path | None = None,
+    inventory_path: Path | None = None,
+    docs_todo=None,
+    docs_wishlist=None,
+    docs_questions=None,
+) -> dict:
+    """Merge typed target fields onto a question. Validates refs exactly."""
+    from music_rig.models import QuestionTarget
+
+    q = get_question(question_id, questions_path=questions_path)
+    before = _target_dict(q)
+    merged: dict = dict(before or {})
+    updates = {
+        "domain": domain,
+        "bay": bay,
+        "pair": pair,
+        "path": path,
+        "gear": gear,
+        "device": device,
+        "channel": channel,
+        "branch": branch,
+        "node": node,
+        "context": context,
+    }
+    any_set = False
+    for key, value in updates.items():
+        if value is not None:
+            merged[key] = value.strip() if isinstance(value, str) else value
+            any_set = True
+    for field in clear_fields or []:
+        fname = field.strip().lower()
+        if fname not in _TARGET_FIELDS:
+            raise StoreError(f"Unknown target field {field!r}")
+        merged.pop(fname, None)
+        any_set = True
+    if not any_set:
+        raise StoreError("Provide at least one target field to set or clear.")
+    if "domain" not in merged or not str(merged.get("domain") or "").strip():
+        raise StoreError("Typed target requires a domain.")
+    if merged.get("bay"):
+        merged["bay"] = str(merged["bay"]).strip().upper()
+    validate_target_refs(
+        merged,
+        patchbays_path=patchbays_path,
+        routing_path=routing_path,
+        inventory_path=inventory_path,
+    )
+    after = {
+        k: v
+        for k, v in QuestionTarget.model_validate(merged).model_dump().items()
+        if v is not None
+    }
+    if dry_run:
+        return {
+            "dry_run": True,
+            "question_id": q.id,
+            "before": before,
+            "after": after,
+        }
+    updated = update_question_fields(
+        question_id,
+        target=after,
+        render=render,
+        questions_path=questions_path,
+        docs_todo=docs_todo,
+        docs_wishlist=docs_wishlist,
+        docs_questions=docs_questions,
+    )
+    return {
+        "dry_run": False,
+        "question_id": updated.id,
+        "before": before,
+        "after": _target_dict(updated),
+    }
+
+
+def clear_target(
+    question_id: str,
+    *,
+    fields: list[str] | None = None,
+    dry_run: bool = False,
+    render: bool = True,
+    questions_path: Path | None = None,
+    patchbays_path: Path | None = None,
+    routing_path: Path | None = None,
+    inventory_path: Path | None = None,
+    docs_todo=None,
+    docs_wishlist=None,
+    docs_questions=None,
+) -> dict:
+    """Clear entire target, or clear specific fields when `fields` is provided."""
+    q = get_question(question_id, questions_path=questions_path)
+    before = _target_dict(q)
+    if fields:
+        return set_target(
+            question_id,
+            clear_fields=fields,
+            dry_run=dry_run,
+            render=render,
+            questions_path=questions_path,
+            patchbays_path=patchbays_path,
+            routing_path=routing_path,
+            inventory_path=inventory_path,
+            docs_todo=docs_todo,
+            docs_wishlist=docs_wishlist,
+            docs_questions=docs_questions,
+        )
+    if dry_run:
+        return {
+            "dry_run": True,
+            "question_id": q.id,
+            "before": before,
+            "after": None,
+        }
+    updated = update_question_fields(
+        question_id,
+        clear_target=True,
+        render=render,
+        questions_path=questions_path,
+        docs_todo=docs_todo,
+        docs_wishlist=docs_wishlist,
+        docs_questions=docs_questions,
+    )
+    return {
+        "dry_run": False,
+        "question_id": updated.id,
+        "before": before,
+        "after": None,
+    }

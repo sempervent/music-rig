@@ -736,18 +736,51 @@ def sweep(
     qdoc = load_questions(questions_path)
     eligible: list[str] = []
     skipped: list[dict[str, str]] = []
+    counts = {
+        "ready_to_finalize": 0,
+        "needs_answer": 0,
+        "needs_target_metadata": 0,
+        "needs_agent_action": 0,
+        "blocked_by_dod": 0,
+        "already_reconciled": 0,
+    }
     for q in qdoc.questions:
+        if q.reconciled_at is not None:
+            counts["already_reconciled"] += 1
+            continue
         if q.status == QuestionStatus.OPEN:
             skipped.append({"id": q.id, "reason": "OPEN — sweep never answers"})
-            continue
-        if q.reconciled_at is not None:
+            counts["needs_answer"] += 1
             continue
         if q.status != QuestionStatus.RESOLVED:
             continue
         st = question_state(q, paths=paths)
         adapter = _adapter_for(q)
         verify = adapter.verify(q, paths=paths)
-        if st == ReconciliationState.CURRENT_MATCHES or (
+        plan = adapter.plan(q, paths=paths)
+        if st == ReconciliationState.NEEDS_ANSWER:
+            counts["needs_answer"] += 1
+            skipped.append({"id": q.id, "reason": f"state {st.value}"})
+            continue
+        if st == ReconciliationState.NEEDS_AGENT_ACTION:
+            missing_target = False
+            for b in plan.blockers:
+                if isinstance(b, dict) and b.get("code") == "missing_target_field":
+                    missing_target = True
+                    break
+                if isinstance(b, str) and "target." in b and "missing" in b.lower():
+                    missing_target = True
+                    break
+            if missing_target:
+                counts["needs_target_metadata"] += 1
+            else:
+                counts["needs_agent_action"] += 1
+            skipped.append({"id": q.id, "reason": f"state {st.value}"})
+            continue
+        if st in {
+            ReconciliationState.CURRENT_MATCHES,
+            ReconciliationState.READY_TO_FINALIZE,
+        } or (
             verify.status == VerificationStatus.MATCH
             and st
             in {
@@ -756,7 +789,6 @@ def sweep(
                 ReconciliationState.READY_TO_APPLY,
             }
         ):
-            # READY_TO_APPLY with MATCH shouldn't happen; include READY_TO_FINALIZE
             if st == ReconciliationState.READY_TO_APPLY and verify.status != VerificationStatus.MATCH:
                 skipped.append({"id": q.id, "reason": f"state {st.value}"})
                 continue
@@ -766,8 +798,8 @@ def sweep(
             } and verify.status != VerificationStatus.MATCH:
                 skipped.append({"id": q.id, "reason": f"state {st.value}"})
                 continue
-            # Only CURRENT_MATCHES or verify MATCH (→ READY_TO_FINALIZE)
             if st == ReconciliationState.CURRENT_MATCHES or verify.status == VerificationStatus.MATCH:
+                counts["ready_to_finalize"] += 1
                 eligible.append(q.id)
             else:
                 skipped.append({"id": q.id, "reason": f"state {st.value}"})
@@ -776,7 +808,6 @@ def sweep(
 
     results = []
     for qid in eligible:
-        q = question_service.get_question(qid, questions_path=questions_path)
         try:
             results.append(
                 finalize_question(
@@ -804,6 +835,27 @@ def sweep(
             )
         except StoreError as exc:
             skipped.append({"id": qid, "reason": str(exc)})
+            if "confirm-dod" in str(exc).lower() or "definition of done" in str(exc).lower():
+                counts["blocked_by_dod"] += 1
+                counts["ready_to_finalize"] = max(0, counts["ready_to_finalize"] - 1)
+
+    suggested_next: list[str] = []
+    if counts["needs_answer"]:
+        suggested_next.append("uv run rig question list --open")
+        suggested_next.append(
+            "uv run rig question answer Q-xxx --answer \"...\" --json"
+        )
+    if counts["needs_target_metadata"]:
+        suggested_next.append(
+            "uv run rig question target set Q-xxx --pair <pair> --yes --json"
+        )
+        suggested_next.append("uv run rig reconcile plan question Q-xxx --json")
+    if counts["ready_to_finalize"]:
+        suggested_next.append(
+            "uv run rig reconcile sweep --write --yes --confirm-dod --json"
+        )
+    if counts["needs_agent_action"]:
+        suggested_next.append("uv run rig reconcile queue --state NEEDS_AGENT_ACTION --json")
 
     return {
         "dry_run": dry_run,
@@ -812,6 +864,8 @@ def sweep(
         "would_finalize": [r["question_id"] for r in results] if dry_run else [],
         "results": results,
         "skipped": skipped,
+        "counts": counts,
+        "suggested_next_commands": suggested_next,
     }
 
 
@@ -824,12 +878,13 @@ def cleanup_reconciliation_issues(
     questions_path: Path | None = None,
     changes_path: Path | None = None,
     todo_path: Path | None = None,
-) -> list[dict[str, str]]:
+) -> list[dict[str, Any]]:
     """Inspect cleanup extras for reconciliation hygiene."""
-    issues: list[dict[str, str]] = []
+    issues: list[dict[str, Any]] = []
     qdoc = load_questions(questions_path)
     cdoc = load_changes(changes_path)
     tdoc = load_todo(todo_path)
+    paths = _paths(questions=questions_path, changes=changes_path, todo=todo_path)
     for q in qdoc.questions:
         if q.status == QuestionStatus.RESOLVED and q.reconciled_at is None:
             issues.append(
@@ -838,8 +893,42 @@ def cleanup_reconciliation_issues(
                     "code": "resolved_not_reconciled",
                     "id": q.id,
                     "detail": "RESOLVED but reconciled_at is null",
+                    "suggested_commands": [
+                        f"uv run rig reconcile plan question {q.id} --json",
+                        f"uv run rig reconcile finalize question {q.id} --yes --json",
+                    ],
                 }
             )
+            try:
+                plan = _adapter_for(q).plan(q, paths=paths)
+                if plan.state == ReconciliationState.CURRENT_MATCHES:
+                    issues.append(
+                        {
+                            "severity": "info",
+                            "code": "current_matches",
+                            "id": q.id,
+                            "detail": "CURRENT already matches answer — ready to finalize",
+                            "suggested_commands": [
+                                f"uv run rig reconcile finalize question {q.id} "
+                                f"--yes --no-current-change --note \"matches\" --json"
+                            ],
+                        }
+                    )
+                for b in plan.blockers:
+                    if isinstance(b, dict) and b.get("code") == "missing_target_field":
+                        issues.append(
+                            {
+                                "severity": "warning",
+                                "code": "missing_target_field",
+                                "id": q.id,
+                                "field": b.get("field"),
+                                "detail": b.get("message") or "missing target field",
+                                "candidates": b.get("candidates") or [],
+                                "suggested_commands": b.get("suggested_commands") or [],
+                            }
+                        )
+            except Exception:
+                pass
         if q.reconciled_at is not None:
             for cid in q.related_changes:
                 chg = cdoc.item_map().get(cid)
@@ -850,6 +939,9 @@ def cleanup_reconciliation_issues(
                             "code": "reconciled_open_change",
                             "id": q.id,
                             "detail": f"reconciled but linked change {cid} still OPEN",
+                            "suggested_commands": [
+                                f"uv run rig changes apply {cid} --yes"
+                            ],
                         }
                     )
             for tid in q.related_todos:
@@ -865,8 +957,40 @@ def cleanup_reconciliation_issues(
                             "code": "reconciled_unfinished_todo",
                             "id": q.id,
                             "detail": f"reconciled but linked TODO {tid} is {task.status.value}",
+                            "suggested_commands": [f"uv run rig todo done {tid}"],
                         }
                     )
+        # Incomplete targets on OPEN questions (RESOLVED covered via plan blockers above)
+        if q.status == QuestionStatus.OPEN and q.reconciled_at is None:
+            if q.target and q.target.domain == "patchbay.mode" and q.target.bay and not q.target.pair:
+                from music_rig import patchbay_state
+
+                try:
+                    pairs = patchbay_state.list_pairs(q.target.bay, paths.get("patchbays"))
+                    candidates = [
+                        (
+                            f"{p['upper_n']}/{p['lower_n']}"
+                            if p["lower_n"] is not None
+                            else str(p["upper_n"])
+                        )
+                        for p in pairs
+                    ]
+                except Exception:
+                    candidates = []
+                issues.append(
+                    {
+                        "severity": "warning",
+                        "code": "missing_target_field",
+                        "id": q.id,
+                        "field": "pair",
+                        "detail": "patchbay.mode target missing pair",
+                        "candidates": candidates,
+                        "suggested_commands": [
+                            f"uv run rig question target set {q.id} --pair {c} --yes"
+                            for c in candidates[:5]
+                        ],
+                    }
+                )
     for tid in tdoc.next_session:
         task = tdoc.task_map().get(tid)
         if task and task.status == TodoStatus.DONE:
@@ -876,6 +1000,9 @@ def cleanup_reconciliation_issues(
                     "code": "done_in_next_session",
                     "id": tid,
                     "detail": "DONE TODO still listed in next_session",
+                    "suggested_commands": [
+                        f"uv run rig todo next remove {tid}"
+                    ],
                 }
             )
     return issues

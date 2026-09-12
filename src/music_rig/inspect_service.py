@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from music_rig.presentation import format_domains_table, format_id_label_rows
 from music_rig.store import (
     StoreError,
     load_changes,
@@ -19,30 +20,158 @@ from music_rig.store import (
 from music_rig.tui.editable_domains import registry
 
 
+# Domains that participate in reconcile adapters (supports_reconcile=True when
+# listed here or when inspect id maps to a reconcile target domain prefix).
+_RECONCILE_DOMAIN_HINTS = frozenset(
+    {
+        "question",
+        "patchbay",
+        "midi",
+        "controls",
+        "ableton",
+        "routing",
+        "gear",
+        "reconcile",
+    }
+)
+
+_DERIVED_DOMAINS = frozenset(
+    {"doctor", "status", "reconcile", "automation", "snapshot"}
+)
+
+_MUTABLE_DOMAINS = frozenset(
+    {
+        "question",
+        "todo",
+        "wish",
+        "inbox",
+        "changes",
+        "gear",
+        "channels",
+        "routing",
+        "midi",
+        "controls",
+        "ableton",
+        "performance",
+        "backup",
+        "patchbay",
+        "session",
+    }
+)
+
+
+def _supports_reconcile(domain_id: str) -> bool:
+    from music_rig.reconciliation.adapters import registered_domains
+
+    if domain_id in _RECONCILE_DOMAIN_HINTS:
+        return True
+    for rd in registered_domains():
+        if rd.startswith(domain_id + ".") or domain_id.startswith(rd.split(".")[0]):
+            return True
+    return False
+
+
 def list_domains() -> list[dict[str, Any]]:
-    rows = []
+    rows: list[dict[str, Any]] = []
     for adapter in registry.all_adapters():
+        did = adapter.id
+        editable = True
         rows.append(
             {
-                "id": adapter.id,
+                "id": did,
                 "label": adapter.label,
-                "editable": True,
+                "editable": editable,
                 "fields": len(adapter.get_field_specs()),
                 "source": str(adapter.source_path()) if adapter.source_path() else None,
+                "mutable": did in _MUTABLE_DOMAINS,
+                "derived": did in _DERIVED_DOMAINS,
+                "supports_reconcile": _supports_reconcile(did),
+                "inspectable": True,
             }
         )
     # Specialized / non-adapter domains
-    rows.extend(
-        [
-            {"id": "patchbay", "label": "Patchbays", "editable": True, "fields": None, "source": "data/patchbays.yaml"},
-            {"id": "snapshot", "label": "Snapshots", "editable": False, "fields": None, "source": ".rig/snapshots"},
-            {"id": "session", "label": "Sessions", "editable": "partial", "fields": None, "source": "data/sessions"},
-            {"id": "doctor", "label": "Doctor", "editable": False, "fields": None, "source": None},
-            {"id": "status", "label": "Status", "editable": False, "fields": None, "source": None},
-            {"id": "reconcile", "label": "Reconcile", "editable": False, "fields": None, "source": None},
-            {"id": "automation", "label": "Automation", "editable": False, "fields": None, "source": None},
-        ]
-    )
+    extras = [
+        {
+            "id": "patchbay",
+            "label": "Patchbays",
+            "editable": True,
+            "fields": None,
+            "source": "data/patchbays.yaml",
+            "mutable": True,
+            "derived": False,
+            "supports_reconcile": True,
+            "inspectable": True,
+        },
+        {
+            "id": "snapshot",
+            "label": "Snapshots",
+            "editable": False,
+            "fields": None,
+            "source": ".rig/snapshots",
+            "mutable": False,
+            "derived": True,
+            "supports_reconcile": False,
+            "inspectable": True,
+        },
+        {
+            "id": "session",
+            "label": "Sessions",
+            "editable": "partial",
+            "fields": None,
+            "source": "data/sessions",
+            "mutable": True,
+            "derived": False,
+            "supports_reconcile": False,
+            "inspectable": True,
+        },
+        {
+            "id": "doctor",
+            "label": "Doctor",
+            "editable": False,
+            "fields": None,
+            "source": None,
+            "mutable": False,
+            "derived": True,
+            "supports_reconcile": False,
+            "inspectable": True,
+        },
+        {
+            "id": "status",
+            "label": "Status",
+            "editable": False,
+            "fields": None,
+            "source": None,
+            "mutable": False,
+            "derived": True,
+            "supports_reconcile": False,
+            "inspectable": True,
+        },
+        {
+            "id": "reconcile",
+            "label": "Reconcile",
+            "editable": False,
+            "fields": None,
+            "source": None,
+            "mutable": False,
+            "derived": True,
+            "supports_reconcile": True,
+            "inspectable": True,
+        },
+        {
+            "id": "automation",
+            "label": "Automation",
+            "editable": False,
+            "fields": None,
+            "source": None,
+            "mutable": False,
+            "derived": True,
+            "supports_reconcile": False,
+            "inspectable": True,
+        },
+    ]
+    rows.extend(extras)
+    # Deterministic ordering by id
+    rows.sort(key=lambda r: str(r["id"]))
     return rows
 
 
@@ -132,8 +261,8 @@ def find_refs(record_id: str) -> dict[str, Any]:
 
 
 def cleanup_scan() -> dict[str, Any]:
-    """Report dangling refs / BROKEN+mapped / empty optional noise — no aesthetic rules."""
-    issues: list[dict[str, str]] = []
+    """Report dangling refs / BROKEN+mapped / reconciliation hygiene — no aesthetic rules."""
+    issues: list[dict[str, Any]] = []
 
     todo_ids = set(load_todo().task_map())
     change_ids = set(load_changes().item_map())
@@ -162,7 +291,12 @@ def cleanup_scan() -> dict[str, Any]:
         for tid in w.todo_refs:
             if tid not in todo_ids:
                 issues.append(
-                    {"severity": "error", "code": "dangling_ref", "id": w.item, "detail": f"todo_refs {tid}"}
+                    {
+                        "severity": "error",
+                        "code": "dangling_ref",
+                        "id": w.item,
+                        "detail": f"todo_refs {tid}",
+                    }
                 )
         if w.inventory_ref and w.inventory_ref not in gear_ids:
             issues.append(
@@ -226,18 +360,33 @@ def cleanup_scan() -> dict[str, Any]:
     return {"issues": issues, "count": len(issues)}
 
 
-def dumps(payload: Any, *, as_json: bool) -> str:
+def dumps(
+    payload: Any,
+    *,
+    as_json: bool,
+    width: int | None = None,
+    kind: str | None = None,
+) -> str:
+    """Serialize inspect payloads.
+
+    Human list output uses Rich tables (no literal tabs). JSON is plain text only.
+    """
     if as_json:
         return json.dumps(payload, indent=2, default=str)
     if isinstance(payload, list):
-        lines = []
-        for row in payload:
-            if isinstance(row, dict) and "id" in row:
-                extra = row.get("label") or row.get("cells") or ""
-                lines.append(f"{row['id']}\t{extra}")
-            else:
-                lines.append(str(row))
-        return "\n".join(lines)
+        if kind == "domains" or (
+            payload
+            and isinstance(payload[0], dict)
+            and "label" in payload[0]
+            and "id" in payload[0]
+            and ("supports_reconcile" in payload[0] or "mutable" in payload[0])
+        ):
+            return format_domains_table(payload, width=width)
+        if payload and isinstance(payload[0], dict) and "id" in payload[0]:
+            return format_id_label_rows(payload, width=width)
+        lines = [str(row) for row in payload]
+        text = "\n".join(lines)
+        return text.replace("\t", " ")
     if isinstance(payload, dict):
         return json.dumps(payload, indent=2, default=str)
-    return str(payload)
+    return str(payload).replace("\t", " ")

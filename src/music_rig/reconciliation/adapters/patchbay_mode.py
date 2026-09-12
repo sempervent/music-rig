@@ -82,7 +82,18 @@ class PatchbayModeAdapter(ReconciliationAdapter):
                 artifact_id=question.id,
                 state=ReconciliationState.BLOCKED,
                 capability=self.capability,
-                blockers=["Missing target.bay for patchbay.mode"],
+                blockers=[
+                    {
+                        "code": "missing_target_field",
+                        "field": "bay",
+                        "message": "Missing target.bay for patchbay.mode",
+                        "candidates": [],
+                        "suggested_commands": [
+                            f"uv run rig question target set {question.id} "
+                            f"--domain patchbay.mode --bay PB-B --yes"
+                        ],
+                    }
+                ],
             )
         bay = target.bay.strip().upper()
         current = self.read_current(question, paths=paths)
@@ -96,7 +107,9 @@ class PatchbayModeAdapter(ReconciliationAdapter):
                 current=current,
                 desired=None,
                 blockers=["Question must be RESOLVED with a non-empty answer"],
-                suggested_commands=[f"uv run rig question resolve {question.id}"],
+                suggested_commands=[
+                    f"uv run rig question answer {question.id} --answer \"<mode>\" --json"
+                ],
             )
 
         mode = normalize_mode(question.answer)
@@ -109,11 +122,23 @@ class PatchbayModeAdapter(ReconciliationAdapter):
                 current=current,
                 desired=question.answer.strip(),
                 blockers=[
-                    "Answer does not normalize to a patchbay mode "
-                    "(normal | half-normal | thru)"
+                    {
+                        "code": "answer_not_normalizable",
+                        "field": "answer",
+                        "message": (
+                            "Answer does not normalize to a patchbay mode "
+                            "(normal | half-normal | thru)"
+                        ),
+                        "candidates": ["normal", "half-normal", "thru"],
+                        "suggested_commands": [
+                            f"uv run rig question answer {question.id} "
+                            f"--answer \"half-normal\" --json"
+                        ],
+                    }
                 ],
                 suggested_commands=[
-                    f"uv run rig question resolve {question.id}  # re-answer with a mode token"
+                    f"uv run rig question answer {question.id} "
+                    f"--answer \"half-normal\" --json"
                 ],
             )
 
@@ -121,14 +146,21 @@ class PatchbayModeAdapter(ReconciliationAdapter):
             data = patchbay_state.load_raw(paths.get("patchbays"))
             pairs = patchbay_state.list_pairs(bay, data)
             unknown = [p for p in pairs if p["mode"] == "unknown"]
+            candidates: list[str] = []
             for p in (unknown or pairs):
                 pair_label = (
                     f"{p['upper_n']}/{p['lower_n']}"
                     if p["lower_n"] is not None
                     else str(p["upper_n"])
                 )
+                candidates.append(pair_label)
                 suggested.append(
-                    f"uv run rig current patchbay set-mode {bay} {pair_label} {mode} "
+                    f"uv run rig question target set {question.id} --pair {pair_label} --yes"
+                )
+            # Prefer target-set for reconcile; keep one set-mode hint as fallback
+            if candidates:
+                suggested.append(
+                    f"uv run rig current patchbay set-mode {bay} {candidates[0]} {mode} "
                     f"--question {question.id}"
                 )
             return Plan(
@@ -139,10 +171,24 @@ class PatchbayModeAdapter(ReconciliationAdapter):
                 current=current,
                 desired=mode,
                 blockers=[
-                    "target.pair missing — choose a pair or run suggested set-mode commands"
+                    {
+                        "code": "missing_target_field",
+                        "field": "pair",
+                        "message": "target.pair missing — set pair before apply",
+                        "candidates": candidates,
+                        "suggested_commands": [
+                            f"uv run rig question target set {question.id} "
+                            f"--pair {c} --yes"
+                            for c in candidates[:8]
+                        ],
+                    }
                 ],
                 suggested_commands=suggested,
-                details={"unknown_pair_count": len(unknown), "bay": bay},
+                details={
+                    "unknown_pair_count": len(unknown),
+                    "bay": bay,
+                    "pair_candidates": candidates,
+                },
             )
 
         pair = target.pair.strip()

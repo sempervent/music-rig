@@ -307,6 +307,49 @@ class QuestionsScreen(Screen):
         if target is None:
             self.notify("No typed target on this question", severity="warning")
             return
+        # Pair picker when patchbay.mode is missing pair
+        if (
+            target.domain == "patchbay.mode"
+            and target.bay
+            and not target.pair
+        ):
+            from music_rig import patchbay_state
+            from music_rig.tui.pickers import ReferencePickerModal
+
+            pairs = patchbay_state.list_pairs(target.bay)
+            choices = [
+                (
+                    (
+                        f"{p['upper_n']}/{p['lower_n']}"
+                        if p["lower_n"] is not None
+                        else str(p["upper_n"])
+                    ),
+                    f"mode={p['mode']}",
+                )
+                for p in pairs
+            ]
+            if choices:
+
+                def _picked(selected: list[str] | None) -> None:
+                    if not selected:
+                        return
+                    try:
+                        question_service.set_target(q.id, pair=selected[0], render=True)
+                    except StoreError as exc:
+                        self.notify(str(exc), severity="error")
+                        return
+                    self.notify(f"{q.id} target.pair = {selected[0]}")
+                    self.reload(select_id=q.id)
+
+                self.app.push_screen(
+                    ReferencePickerModal(
+                        f"Select pair for {q.id} ({target.bay})",
+                        choices,
+                        multi=False,
+                    ),
+                    _picked,
+                )
+                return
         if target.domain in {"patchbay.mode", "patchbay.model", "patchbay.connection"} and target.bay:
             self.app.open_domain(  # type: ignore[attr-defined]
                 "patchbay",

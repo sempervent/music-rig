@@ -50,8 +50,33 @@ class InventoryMappingAdapter(ReconciliationAdapter):
                 []
                 if state != ReconciliationState.NEEDS_AGENT_ACTION
                 else [
-                    "Physical unit→PB letter mapping is MANUAL; "
-                    "record observed models via set-model then finalize"
+                    {
+                        "code": "manual_inventory_mapping",
+                        "field": "hardware_model",
+                        "message": (
+                            "Physical unit→PB letter mapping is MANUAL. "
+                            "Patchbays expose hardware_model (free text) only — "
+                            "no gear_ref field yet; APPLY_AND_VERIFY / "
+                            "rig current patchbay set-gear is not available. "
+                            "Record observed models via set-model then finalize."
+                        ),
+                        "candidates": sorted(
+                            [
+                                bid
+                                for bid, body in (
+                                    (patchbay_state.load_raw(paths.get("patchbays")).get("patchbays") or {})
+                                ).items()
+                                if isinstance(body, dict)
+                            ]
+                        ),
+                        "suggested_commands": [
+                            "uv run rig patchbay list",
+                            f"uv run rig current patchbay set-model PB-A "
+                            f"\"<observed model>\" --question {question.id}",
+                            f"uv run rig reconcile finalize question {question.id} "
+                            f"--no-current-change --note \"...\" --yes",
+                        ],
+                    }
                 ]
             ),
             suggested_commands=[
@@ -61,6 +86,12 @@ class InventoryMappingAdapter(ReconciliationAdapter):
                 f"uv run rig reconcile finalize question {question.id} "
                 f"--no-current-change --note \"...\" --yes",
             ],
+            details={
+                "gap": (
+                    "inventory.patchbay_mapping stays MANUAL until patchbay "
+                    "schema gains an optional gear_ref / set-gear CURRENT mutation"
+                ),
+            },
         )
 
     def verify(self, question: OpenQuestion, *, paths: dict[str, Any]) -> VerifyResult:
