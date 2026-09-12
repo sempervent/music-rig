@@ -9,9 +9,9 @@ See [MIDI Topology](midi-topology.md) for physical-link evidence.
 
 ## Clock state
 
-Master: **ableton** — INTENDED
+Master: **ableton** — VERIFIED
 
-Desired default. Not VERIFIED CURRENT — see Q-014 and TODO RIG-031. Do not treat this as confirmed practice yet.
+evidence_basis=HUMAN_ANSWER
 
 | Destination | Enabled | Evidence | Notes |
 |---|---|---|---|

@@ -139,6 +139,10 @@ Is Ableton definitely the master clock in practice, or do KAOSS/SL-2 sometimes l
 
 **Resolved at:** 2026-09-12T11:44:53.155699-04:00
 
+**Reconciled at:** 2026-09-12T14:44:04.272290-04:00
+
+**Reconciliation note:** HUMAN answer: Ableton is master clock; evidence VERIFIED via HUMAN_ANSWER. Linked RIG-031 left open (HUMAN DoD).
+
 ### Q-020 — OPEN
 
 What is the default one-player loop-building order (RC-1 vs KAOSS vs future RC-600)?
