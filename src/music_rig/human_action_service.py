@@ -87,6 +87,31 @@ def create_request(
         else HumanActionType(str(action_type))
     )
     artifact = artifact_id.strip().upper()
+    # Do not re-queue authority for facts the HUMAN already finalized.
+    if kind is HumanActionType.QUESTION_ANSWER and artifact.startswith("Q-"):
+        q = load_questions().question_map().get(artifact)
+        if (
+            q is not None
+            and q.status is QuestionStatus.RESOLVED
+            and q.answer_actor is AnswerActor.HUMAN
+        ):
+            raise StoreError(
+                f"{artifact} already has a HUMAN FINAL answer — "
+                "do not create another HumanActionRequest for the same fact."
+            )
+    if kind is HumanActionType.TODO_DOD_CONFIRMATION:
+        task = load_todo().task_map().get(artifact)
+        if task is not None and task.status is TodoStatus.DONE:
+            raise StoreError(
+                f"{artifact} is already DONE — do not create another DoD confirmation request."
+            )
+    if kind is HumanActionType.VERIFICATION_RESULT and artifact.startswith("Q-"):
+        q = load_questions().question_map().get(artifact)
+        if q is not None and q.verification_result is not None:
+            raise StoreError(
+                f"{artifact} already has a verification_result — "
+                "do not create a duplicate observation request."
+            )
     # Supersede older pending requests for same type+artifact.
     items: list[HumanActionRequest] = []
     for existing in doc.items:
@@ -305,12 +330,27 @@ def accept(
     if offer_reconcile and updated.action_type in {
         HumanActionType.QUESTION_ANSWER,
         HumanActionType.VERIFICATION_RESULT,
-        HumanActionType.HUMAN_CLARIFICATION,
     }:
         out["suggested_next"] = f"uv run rig reconcile plan question {updated.artifact_id} --json"
         out["reconcile_prompt"] = (
             f"{updated.artifact_id} answer recorded. Reconciliation is now possible. "
             f"Review with: uv run rig reconcile plan question {updated.artifact_id}"
+        )
+    elif (
+        offer_reconcile
+        and updated.action_type is HumanActionType.HUMAN_CLARIFICATION
+        and updated.artifact_id.startswith("Q-")
+    ):
+        out["suggested_next"] = f"uv run rig reconcile plan question {updated.artifact_id} --json"
+        out["reconcile_prompt"] = (
+            f"{updated.artifact_id} clarification recorded. "
+            f"Review with: uv run rig reconcile plan question {updated.artifact_id}"
+        )
+    elif offer_reconcile and updated.action_type is HumanActionType.HUMAN_CLARIFICATION:
+        out["suggested_next"] = "uv run rig --am-bot human pending"
+        out["reconcile_prompt"] = (
+            f"{updated.artifact_id} clarification recorded (not a Question — "
+            "no reconcile plan). BOT will apply typed CURRENT updates from the accepted value."
         )
     return out
 
@@ -381,52 +421,131 @@ def _dispatch(
     raise StoreError(f"Unsupported action type {item.action_type}")
 
 
+def interpret_review_input(
+    raw: str,
+    *,
+    action_type: HumanActionType,
+) -> dict[str, str]:
+    """Parse HUMAN review prompt input.
+
+    Known menu tokens stay commands. Any other non-empty text is HUMAN input
+    (freeform) for answer/clarification types — never discarded as unrecognized.
+    """
+    text = (raw or "").strip()
+    low = text.lower()
+    if low in {"q", "quit"}:
+        return {"decision": "quit"}
+    if low in {"s", "skip"} or text == "":
+        return {"decision": "skip"}
+    if low in {"r", "reject"}:
+        return {"decision": "reject"}
+    if low in {"e", "edit"}:
+        return {"decision": "edit"}
+    if low in {"a", "accept", "y", "yes"}:
+        return {"decision": "accept"}
+    # Free text
+    if action_type in {
+        HumanActionType.QUESTION_ANSWER,
+        HumanActionType.HUMAN_CLARIFICATION,
+    }:
+        return {"decision": "freeform", "value": text}
+    if action_type is HumanActionType.VERIFICATION_RESULT:
+        return {"decision": "freeform_note", "value": text}
+    if action_type is HumanActionType.TODO_DOD_CONFIRMATION:
+        # Do not silently treat prose as DoD yes.
+        return {"decision": "need_explicit_dod", "value": text}
+    return {"decision": "skip"}
+
+
 def _apply_freeform_clarification(
     item: HumanActionRequest,
     *,
     final_value: str,
     render: bool,
 ) -> dict:
-    """Apply non-Question clarifications carefully (no invented typed links)."""
+    """Apply non-Question clarifications.
+
+    THRU5-OUT-MAP accepts device-level fanout prose. Exact THRU socket numbers
+    are intentionally not required and must not be invented.
+    """
     from music_rig import midi_state
     from music_rig.current_service import commit_midi
-    from music_rig.models import CurrentPreview
+    from music_rig.models import CurrentPreview, MidiEvidenceStatus
     from music_rig.store import MIDI_PATH
 
     if item.artifact_id != "THRU5-OUT-MAP":
         raise StoreError(f"Unsupported freeform clarification artifact {item.artifact_id!r}")
-    raw = midi_state.load_raw()
-    devices = raw.get("devices") or []
-    found = False
-    for device in devices:
+
+    cleaned = final_value.strip()
+    if not cleaned:
+        raise StoreError("THRU5-OUT-MAP clarification cannot be empty.")
+
+    # Device-level destinations known from HUMAN intent.
+    fanout = [
+        ("boss-sl-2", "SL-2"),
+        ("alesis-sr-18", "SR-18"),
+        ("korg-minikorg", "miniKORG"),
+        ("kaoss-replay", "KAOSS"),
+    ]
+    data = midi_state.load_raw()
+    for device in data.get("devices") or []:
         if device.get("gear_ref") == "cme-midi-thru5-wc":
-            note = (device.get("notes") or "").rstrip()
-            addition = f"HUMAN OUT map: {final_value.strip()}"
-            if addition not in note:
-                device["notes"] = f"{note}\n{addition}".strip() if note else addition
-            found = True
+            device["notes"] = (
+                "Hardware thru distribution — OWNED; not a programmable remapper. "
+                "Q-015: fed from U6MIDI Pro OUT 1 into Thru5 WC IN 1. "
+                "HUMAN: device-level THRU fanout to SL-2, SR-18, miniKORG, KAOSS. "
+                "Individual physical THRU socket assignment intentionally not tracked. "
+                f"Clarification: {cleaned}"
+            )
             break
-    if not found:
+    else:
         raise StoreError("cme-midi-thru5-wc missing from midi.yaml")
-    # Still no typed OUT→device links — HUMAN text only until structured links are added.
-    unknowns = list(raw.get("unknowns") or [])
-    marker = "Thru5 OUT number → device map recorded as HUMAN clarification"
+
+    existing = {(c.get("source"), c.get("destination")) for c in data.get("connections") or []}
+    created: list[str] = []
+    for gear, _label in fanout:
+        if ("cme-midi-thru5-wc", gear) in existing:
+            continue
+        _preview, data = midi_state.propose_add_link(
+            source="cme-midi-thru5-wc",
+            source_port="THRU",
+            destination=gear,
+            destination_port="UNSPECIFIED",
+            transport="DIN",
+            status=MidiEvidenceStatus.VERIFIED,
+            notes=(
+                "Device-level fanout (HUMAN). Exact physical THRU jack intentionally not tracked."
+            ),
+            data=data,
+        )
+        created.append(gear)
+
+    unknowns = [
+        u
+        for u in (data.get("unknowns") or [])
+        if "OUT port numbers UNKNOWN" not in u and "OUT number" not in u
+    ]
+    marker = (
+        "Thru5 individual physical THRU socket → device assignment intentionally not tracked "
+        "(device-level fanout is CURRENT)"
+    )
     if marker not in unknowns:
-        unknowns = [u for u in unknowns if "OUT port numbers UNKNOWN" not in u]
         unknowns.insert(0, marker)
-        raw["unknowns"] = unknowns
+    data["unknowns"] = unknowns
+
     preview = CurrentPreview(
         domain="midi.verify",
         target="cme-midi-thru5-wc",
-        before={"notes": "prior"},
-        after={"notes": "HUMAN OUT map recorded"},
+        before={"fanout": "prior"},
+        after={"fanout": "SL-2, SR-18, miniKORG, KAOSS"},
         changed=True,
-        message="Record HUMAN Thru5 OUT clarification (no typed links invented)",
+        message="Record HUMAN device-level Thru5 fanout (no THRU jack numbers invented)",
     )
-    commit_midi(raw, preview, render=render, midi_path=MIDI_PATH)
+    commit_midi(data, preview, render=render, midi_path=MIDI_PATH)
     return {
         "artifact_id": item.artifact_id,
-        "recorded": final_value.strip(),
-        "typed_links_created": False,
-        "note": "OUT mapping text stored; create typed MIDI links in a follow-up once verified.",
+        "recorded": cleaned,
+        "typed_links_created": created,
+        "jack_numbers_tracked": False,
+        "note": "Device-level fanout recorded; individual THRU sockets not tracked.",
     }

@@ -56,7 +56,7 @@ def test_load_repo_todo_yaml():
     doc = load_todo()
     assert len(doc.tasks) == 44
     # RIG-003 completed via approved Q-001 reconciliation; Next Session is top active work.
-    assert doc.next_session == ["RIG-001", "RIG-002"]
+    assert doc.next_session == ["RIG-046", "RIG-038"]
     assert doc.next_id() == "RIG-049"
     ids = {t.id for t in doc.tasks}
     assert "RIG-032" in ids

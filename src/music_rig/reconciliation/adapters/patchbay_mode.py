@@ -29,6 +29,32 @@ def normalize_mode(raw: str) -> str | None:
     return cleaned
 
 
+def extract_uniform_mode(raw: str) -> str | None:
+    """Accept exact modes or bay-wide attestations like 'all … pairs are normal'."""
+    direct = normalize_mode(raw)
+    if direct is not None:
+        return direct
+    text = " ".join(str(raw).strip().lower().replace("_", "-").split())
+    # Order matters: half-normal before normal.
+    for mode in ("half-normal", "thru", "normal"):
+        needle = mode.replace("-", " ")
+        if (
+            text == mode
+            or text.endswith(f" are {mode}")
+            or text.endswith(f" is {mode}")
+            or text.endswith(f" to {mode}")
+            or f" are {needle}" in text
+            or f" is {needle}" in text
+            or text.endswith(mode)
+        ):
+            # Require an all/every/represented cue for prose (avoid matching random sentences).
+            if text == mode or any(
+                cue in text for cue in ("all ", "every ", "represented ", "populated ")
+            ):
+                return mode
+    return None
+
+
 class PatchbayModeAdapter(ReconciliationAdapter):
     domain = "patchbay.mode"
     capability = Capability.APPLY_AND_VERIFY
@@ -144,7 +170,7 @@ class PatchbayModeAdapter(ReconciliationAdapter):
                 ],
             )
 
-        mode = normalize_mode(question.answer)
+        mode = extract_uniform_mode(question.answer)
         if mode is None:
             ans = [suggest_answer(question.id, placeholder="half-normal")]
             return Plan(
@@ -173,6 +199,25 @@ class PatchbayModeAdapter(ReconciliationAdapter):
         if not target.pair:
             data = patchbay_state.load_raw(paths.get("patchbays"))
             pairs = patchbay_state.list_pairs(bay, data)
+            # Bay-wide attestation: if every listed pair already matches, CURRENT matches.
+            if pairs and all(p["mode"] == mode for p in pairs):
+                return Plan(
+                    artifact_type="question",
+                    artifact_id=question.id,
+                    state=ReconciliationState.CURRENT_MATCHES,
+                    capability=self.capability,
+                    current=current,
+                    desired=mode,
+                    operations=[],
+                    postconditions=[f"{bay} all pairs mode == {mode}"],
+                    closable=list(question.related_todos) + list(question.related_changes),
+                    suggestions=[
+                        suggest_finalize(
+                            question.id, confirm_current_reconciled=True, note="bay-wide match"
+                        )
+                    ],
+                    details={"bay_wide": True, "mode": mode, "pair_count": len(pairs)},
+                )
             unknown = [p for p in pairs if p["mode"] == "unknown"]
             candidates: list[str] = []
             suggestions: list[ActionSuggestion] = []

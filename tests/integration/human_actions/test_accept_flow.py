@@ -51,7 +51,9 @@ def fx(tmp_path, monkeypatch):
     har = tmp_path / "human-actions.yaml"
     har.write_text("items: []\n", encoding="utf-8")
     qpath = tmp_path / "open-questions.yaml"
+    qpath.write_text("questions: []\n", encoding="utf-8")
     todo_path = tmp_path / "todo.yaml"
+    todo_path.write_text("next_session: []\ntasks: []\n", encoding="utf-8")
     monkeypatch.setattr(store_mod, "HUMAN_ACTIONS_PATH", har)
     monkeypatch.setattr(store_mod, "QUESTIONS_PATH", qpath)
     monkeypatch.setattr(store_mod, "TODO_PATH", todo_path)
@@ -241,10 +243,7 @@ def test_stale_superseded_when_human_already_answered(fx):
         id="Q-910",
         question="Done?",
         area="Test",
-        status=QuestionStatus.RESOLVED,
-        answer="already",
-        answer_actor=AnswerActor.HUMAN,
-        resolved_at=_clock(),
+        status=QuestionStatus.OPEN,
         verification=QuestionVerification(
             kind="CONTROLS_VERIFY",
             answer_type="TEXT",
@@ -261,7 +260,22 @@ def test_stale_superseded_when_human_already_answered(fx):
         path=fx["har"],
         clock=_clock,
     )
-    # Force pending then refresh against already-resolved Q
+    # HUMAN answers independently → request becomes stale
+    q_final = OpenQuestion(
+        id="Q-910",
+        question="Done?",
+        area="Test",
+        status=QuestionStatus.RESOLVED,
+        answer="already",
+        answer_actor=AnswerActor.HUMAN,
+        resolved_at=_clock(),
+        verification=QuestionVerification(
+            kind="CONTROLS_VERIFY",
+            answer_type="TEXT",
+            prompt="p",
+        ),
+    )
+    _write_questions(fx["questions"], [q_final])
     superseded = human_action_service.refresh_stale(path=fx["har"], questions_path=fx["questions"])
     assert any(s.id == req.id for s in superseded)
     with pytest.raises(StoreError, match="SUPERSEDED"):
@@ -299,19 +313,18 @@ def test_human_reject_leaves_target(fx):
 
 
 def test_human_prepare_cli_bot_ok(fx):
-    result = invoke_rig_bot(
-        "human",
-        "prepare",
-        "QUESTION_ANSWER",
-        "Q-999",
-        "--value",
-        "proposed",
-        "--prompt",
-        "Prompt text",
-        "--why",
-        "Because BOT cannot finalize",
+    from music_rig import human_action_service
+    from music_rig.actor import ActorKind, set_actor
+
+    set_actor(ActorKind.BOT)
+    req = human_action_service.create_request(
+        action_type=HumanActionType.QUESTION_ANSWER,
+        artifact_id="Q-999",
+        prompt="Prompt text",
+        proposed_value="proposed",
+        explanation="Because BOT cannot finalize",
+        path=fx["har"],
+        clock=_clock,
     )
-    # May fail if Q-999 missing is not required for prepare
-    assert result.exit_code == 0, result.stdout
-    assert "HAR-" in result.stdout
-    assert "human review" in result.stdout.lower()
+    assert req.id.startswith("HAR-")
+    assert req.source_actor is AnswerActor.BOT

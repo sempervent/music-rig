@@ -80,7 +80,7 @@ def test_create_and_bot_cannot_accept(tmp_path, monkeypatch):
 
     req = human_action_service.create_request(
         action_type=HumanActionType.QUESTION_ANSWER,
-        artifact_id="Q-008",
+        artifact_id="Q-808",
         prompt="What modes?",
         proposed_value="All normal",
         explanation="BOT prepared from Stage 25",
