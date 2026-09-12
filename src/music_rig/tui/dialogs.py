@@ -1,4 +1,10 @@
-"""Modal dialogs for the music-rig TUI."""
+"""Modal dialogs for the music-rig TUI.
+
+Result ownership: each modal completes its result exactly once via ``complete()``.
+Keyboard bindings and button activation converge on the same semantic handlers;
+buttons use Textual ``action=`` so Enter-on-focused-button does not also fire a
+separate ``Button.Pressed`` dismiss path alongside a screen Enter binding.
+"""
 
 from __future__ import annotations
 
@@ -9,8 +15,10 @@ from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, Checkbox, Input, Label, Static
 
+from music_rig.tui.screen_results import SingleShotMixin
 
-class ConfirmModal(ModalScreen[bool]):
+
+class ConfirmModal(SingleShotMixin, ModalScreen[bool]):
     """Yes/No confirmation. Result True on confirm.
 
     Enter always confirms (explicit binding), regardless of Tab focus.
@@ -24,7 +32,9 @@ class ConfirmModal(ModalScreen[bool]):
         Binding("n", "cancel", "No", show=False),
     ]
 
-    def __init__(self, title: str, body: str = "", *, confirm_label: str = "Confirm") -> None:
+    def __init__(
+        self, title: str, body: str = "", *, confirm_label: str = "Confirm"
+    ) -> None:
         super().__init__()
         self._title = title
         self._body = body
@@ -36,25 +46,22 @@ class ConfirmModal(ModalScreen[bool]):
             if self._body:
                 yield Static(self._body, id="modal-body")
             with Horizontal(id="modal-buttons"):
-                yield Button(self._confirm_label, variant="primary", id="confirm")
-                yield Button("Cancel", id="cancel")
+                yield Button(
+                    self._confirm_label,
+                    variant="primary",
+                    id="confirm",
+                    action="screen.confirm",
+                )
+                yield Button("Cancel", id="cancel", action="screen.cancel")
 
     def on_mount(self) -> None:
         self.query_one("#confirm", Button).focus()
 
     def action_confirm(self) -> None:
-        self.dismiss(True)
+        self.complete(True)
 
     def action_cancel(self) -> None:
-        self.dismiss(False)
-
-    @on(Button.Pressed, "#confirm")
-    def _on_confirm(self) -> None:
-        self.dismiss(True)
-
-    @on(Button.Pressed, "#cancel")
-    def _on_cancel(self) -> None:
-        self.dismiss(False)
+        self.complete(False)
 
 
 class DiscardModal(ConfirmModal):
@@ -66,8 +73,8 @@ class DiscardModal(ConfirmModal):
         )
 
 
-class InputModal(ModalScreen[str | None]):
-    """Single-line input. Returns stripped text, or None on cancel. Empty cancel if allow_empty=False."""
+class InputModal(SingleShotMixin, ModalScreen[str | None]):
+    """Single-line input. Returns stripped text, or None on cancel."""
 
     BINDINGS = [
         Binding("escape", "cancel", "Cancel", show=False),
@@ -103,37 +110,32 @@ class InputModal(ModalScreen[str | None]):
                 id="modal-input",
             )
             with Horizontal(id="modal-buttons"):
-                yield Button("OK", variant="primary", id="confirm")
-                yield Button("Cancel", id="cancel")
+                yield Button("OK", variant="primary", id="confirm", action="screen.submit")
+                yield Button("Cancel", id="cancel", action="screen.cancel")
 
     def on_mount(self) -> None:
         self.query_one("#modal-input", Input).focus()
 
     def action_cancel(self) -> None:
-        self.dismiss(None)
+        self.complete(None)
+
+    def action_submit(self) -> None:
+        value = self.query_one("#modal-input", Input).value
+        self._finish(value)
 
     @on(Input.Submitted, "#modal-input")
     def _on_submit(self, event: Input.Submitted) -> None:
         self._finish(event.value)
-
-    @on(Button.Pressed, "#confirm")
-    def _on_confirm(self) -> None:
-        value = self.query_one("#modal-input", Input).value
-        self._finish(value)
-
-    @on(Button.Pressed, "#cancel")
-    def _on_cancel(self) -> None:
-        self.dismiss(None)
 
     def _finish(self, value: str) -> None:
         cleaned = value.strip()
         if not cleaned and not self._allow_empty:
             self.notify("Value cannot be empty", severity="warning")
             return
-        self.dismiss(cleaned)
+        self.complete(cleaned)
 
 
-class SelectModeModal(ModalScreen[str | None]):
+class SelectModeModal(SingleShotMixin, ModalScreen[str | None]):
     """Pick a canonical patchbay mode. Focus primary; Enter confirms; 1–4 keys."""
 
     MODES = ("normal", "half-normal", "thru", "unknown")
@@ -161,56 +163,54 @@ class SelectModeModal(ModalScreen[str | None]):
                 id="modal-body",
             )
             with Vertical(id="mode-choices"):
-                yield Button("1 normal", variant="primary", id="mode-normal")
-                yield Button("2 half-normal", id="mode-half-normal")
-                yield Button("3 thru", id="mode-thru")
-                yield Button("4 unknown", id="mode-unknown")
-                yield Button("Cancel", id="cancel")
+                yield Button(
+                    "1 normal",
+                    variant="primary",
+                    id="mode-normal",
+                    action="screen.pick_normal",
+                )
+                yield Button(
+                    "2 half-normal", id="mode-half-normal", action="screen.pick_half"
+                )
+                yield Button("3 thru", id="mode-thru", action="screen.pick_thru")
+                yield Button(
+                    "4 unknown", id="mode-unknown", action="screen.pick_unknown"
+                )
+                yield Button("Cancel", id="cancel", action="screen.cancel")
 
     def on_mount(self) -> None:
-        # Focus primary (normal) so Enter confirms a selection immediately.
         self.query_one("#mode-normal", Button).focus()
         self._selected = "normal"
 
     def action_cancel(self) -> None:
-        self.dismiss(None)
+        self.complete(None)
 
     def action_confirm_focused(self) -> None:
         focused = self.focused
         if isinstance(focused, Button):
             bid = focused.id or ""
             if bid.startswith("mode-"):
-                self.dismiss(bid.removeprefix("mode-"))
+                self.complete(bid.removeprefix("mode-"))
                 return
             if bid == "cancel":
-                self.dismiss(None)
+                self.complete(None)
                 return
-        self.dismiss(self._selected)
+        self.complete(self._selected)
 
     def action_pick_normal(self) -> None:
-        self.dismiss("normal")
+        self.complete("normal")
 
     def action_pick_half(self) -> None:
-        self.dismiss("half-normal")
+        self.complete("half-normal")
 
     def action_pick_thru(self) -> None:
-        self.dismiss("thru")
+        self.complete("thru")
 
     def action_pick_unknown(self) -> None:
-        self.dismiss("unknown")
-
-    @on(Button.Pressed, "#cancel")
-    def _on_cancel(self) -> None:
-        self.dismiss(None)
-
-    @on(Button.Pressed)
-    def _on_mode(self, event: Button.Pressed) -> None:
-        bid = event.button.id or ""
-        if bid.startswith("mode-"):
-            self.dismiss(bid.removeprefix("mode-"))
+        self.complete("unknown")
 
 
-class CommandLineModal(ModalScreen[str | None]):
+class CommandLineModal(SingleShotMixin, ModalScreen[str | None]):
     """Vim COMMAND mode line (:w, :q, :wq, :q!)."""
 
     BINDINGS = [
@@ -236,15 +236,14 @@ class CommandLineModal(ModalScreen[str | None]):
         inp.focus()
 
     def action_cancel(self) -> None:
-        self.dismiss(None)
+        self.complete(None)
 
     @on(Input.Submitted, "#modal-input")
     def _submit(self, event: Input.Submitted) -> None:
-        self.dismiss(event.value)
+        self.complete(event.value)
 
 
-
-class ApplyPatchbayModal(ModalScreen[tuple[bool, bool] | None]):
+class ApplyPatchbayModal(SingleShotMixin, ModalScreen[tuple[bool, bool] | None]):
     """Apply staged patchbay changes. Returns (confirmed, create_snapshot) or None."""
 
     BINDINGS = [
@@ -266,30 +265,23 @@ class ApplyPatchbayModal(ModalScreen[tuple[bool, bool] | None]):
                 id="snap-check",
             )
             with Horizontal(id="modal-buttons"):
-                yield Button("Apply", variant="primary", id="confirm")
-                yield Button("Cancel", id="cancel")
+                yield Button(
+                    "Apply", variant="primary", id="confirm", action="screen.confirm"
+                )
+                yield Button("Cancel", id="cancel", action="screen.cancel")
 
     def on_mount(self) -> None:
         self.query_one("#confirm", Button).focus()
 
     def action_confirm(self) -> None:
         snap = self.query_one("#snap-check", Checkbox).value
-        self.dismiss((True, snap))
+        self.complete((True, snap))
 
     def action_cancel(self) -> None:
-        self.dismiss(None)
-
-    @on(Button.Pressed, "#confirm")
-    def _on_confirm(self) -> None:
-        snap = self.query_one("#snap-check", Checkbox).value
-        self.dismiss((True, snap))
-
-    @on(Button.Pressed, "#cancel")
-    def _on_cancel(self) -> None:
-        self.dismiss(None)
+        self.complete(None)
 
 
-class HelpScreen(ModalScreen[None]):
+class HelpScreen(SingleShotMixin, ModalScreen[None]):
     BINDINGS = [
         Binding("escape", "close", "Close", show=True),
         Binding("q", "close", "Close", show=False),
@@ -304,11 +296,7 @@ class HelpScreen(ModalScreen[None]):
         with Vertical(id="modal"):
             yield Label("Keyboard help", id="modal-title")
             yield Static(self._text, id="modal-body")
-            yield Button("Close", id="close")
+            yield Button("Close", id="close", action="screen.close")
 
     def action_close(self) -> None:
-        self.dismiss(None)
-
-    @on(Button.Pressed, "#close")
-    def _on_close(self) -> None:
-        self.dismiss(None)
+        self.complete(None)

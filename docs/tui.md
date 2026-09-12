@@ -33,6 +33,31 @@ uv run rig tui --debug          # or RIG_DEBUG=1 — logs python/textual paths +
 Screens use ``RigHeader`` (not Textual's stock ``Header``) so rapid Questions ↔
 Reconcile navigation cannot hit Textual 8.2.8's ``HeaderTitle`` lifecycle race.
 
+## Modal / screen result ownership
+
+Hard rules for result-bearing ``Screen`` / ``ModalScreen``:
+
+- **Exactly one completion** per push. Prefer one semantic handler (`complete()` /
+  `SingleShotMixin`) shared by keyboard bindings and button `action=` paths.
+- Do **not** mix `Binding("enter") → dismiss` with a focused `Button` that also
+  posts `Button.Pressed → dismiss` for the same physical Enter unless you have
+  proven one action cannot trigger both (prefer `action=` on buttons).
+- **Child screens return intent; requesters navigate.** Example: `AnswerScreen`
+  dismisses with `AnswerResult(next_action=RECONCILE|NONE)`; `QuestionsScreen`
+  reloads, then optionally `open_domain("reconcile", …)`.
+- **Never** `push` a sibling screen from a child and then `dismiss` the child
+  (Textual `dismiss` pops the *top* screen — the sibling — leaving the child
+  with an already-finished result Future → `InvalidStateError` on a later Esc).
+
+| Screen | Completes result | Opens sibling itself? | Notes |
+|---|---|---|---|
+| AnswerScreen | yes (`AnswerResult`) | no | Parent opens Reconcile |
+| ConfirmModal | yes | no | Enter/y/n + button `action=` |
+| SelectModeModal | yes | no | Enter / 1–4 / button `action=` |
+| InputModal | yes | no | Submit / OK / Esc |
+| QuestionsScreen | no (list) | yes (Answer, etc.) | Owns post-answer nav |
+| ReconcileScreen | no (list) | yes (modals) | — |
+
 ## Vim-like modes
 
 Footer / banner shows `-- NORMAL --` / `-- INSERT --` / `-- COMMAND --`.

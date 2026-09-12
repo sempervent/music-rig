@@ -3,6 +3,9 @@
 Save Draft → OPEN + DRAFT answer_state (resolved_at/reconciled_at null).
 Answer & Resolve → FINAL (RESOLVED + resolved_at); reconciled_at stays null.
 Answering does NOT invent verification_result (Stage 17).
+
+Navigation after success is returned as :class:`AnswerResult.next_action`;
+the requester (QuestionsScreen) performs subsequent screen pushes.
 """
 
 from __future__ import annotations
@@ -19,10 +22,15 @@ from music_rig.models import OpenQuestion, QuestionStatus
 from music_rig.store import StoreError
 from music_rig.tui.debug import format_error
 from music_rig.tui.dialogs import ConfirmModal, HelpScreen
+from music_rig.tui.header import RigHeader
 from music_rig.tui.modes import EditorMode, ModeController
 from music_rig.tui.save_outcome import SaveOutcome
+from music_rig.tui.screen_results import (
+    AnswerNextAction,
+    AnswerResult,
+    SingleShotMixin,
+)
 from music_rig.tui.widgets import format_target
-from music_rig.tui.header import RigHeader
 
 
 def _answer_context_markdown(q: OpenQuestion) -> str:
@@ -90,10 +98,11 @@ def _answer_context_markdown(q: OpenQuestion) -> str:
     return "\n".join(lines)
 
 
-class AnswerScreen(Screen[tuple[SaveOutcome, str | None]]):
+class AnswerScreen(SingleShotMixin, Screen[AnswerResult]):
     """Split: question context stays visible; answer input below.
 
-    Returns (outcome, question_id) so the list can refresh / explain filter hiding.
+    Dismisses with :class:`AnswerResult` so the list can refresh and optionally
+    open Reconcile — without this screen mutating the stack itself.
     """
 
     BINDINGS = [
@@ -128,16 +137,10 @@ class AnswerScreen(Screen[tuple[SaveOutcome, str | None]]):
             )
             yield TextArea(id="answer-input")
             with Horizontal(id="modal-buttons"):
-                if self.resolve_on_save:
-                    yield Button(
-                        "Answer & Resolve", variant="primary", id="btn-resolve"
-                    )
-                    yield Button("Save Draft", id="btn-draft")
-                else:
-                    yield Button(
-                        "Answer & Resolve", variant="primary", id="btn-resolve"
-                    )
-                    yield Button("Save Draft", id="btn-draft")
+                yield Button(
+                    "Answer & Resolve", variant="primary", id="btn-resolve"
+                )
+                yield Button("Save Draft", id="btn-draft")
                 yield Button("Cancel", id="btn-cancel")
         yield Footer()
 
@@ -146,7 +149,7 @@ class AnswerScreen(Screen[tuple[SaveOutcome, str | None]]):
             self._q = question_service.get_question(self.question_id)
         except StoreError as exc:
             self.notify(format_error(exc), severity="error")
-            self.dismiss((SaveOutcome.FAILED, None))
+            self.complete(AnswerResult(SaveOutcome.FAILED, None))
             return
         self.query_one("#answer-context", Static).update(
             _answer_context_markdown(self._q)
@@ -171,7 +174,7 @@ class AnswerScreen(Screen[tuple[SaveOutcome, str | None]]):
         if self._modes.mode is EditorMode.INSERT:
             self._set_mode(EditorMode.NORMAL)
             return
-        self.dismiss((SaveOutcome.CANCELLED, None))
+        self.complete(AnswerResult(SaveOutcome.CANCELLED, None))
 
     def action_help(self) -> None:
         self.app.push_screen(
@@ -192,7 +195,6 @@ class AnswerScreen(Screen[tuple[SaveOutcome, str | None]]):
 
     def action_save_draft(self) -> None:
         if self.resolve_on_save:
-            # Opened as Resolve: Ctrl+S commits FINAL (Stage 18 compat)
             self._do_answer_resolve()
             return
         self._do_save_draft()
@@ -234,16 +236,19 @@ class AnswerScreen(Screen[tuple[SaveOutcome, str | None]]):
                 return
 
             def _recon(choice: bool | None) -> None:
-                # True = Reconcile Now, False/None = Later
-                if choice:
-                    try:
-                        self.app.open_domain("reconcile", updated.id)  # type: ignore[attr-defined]
-                    except Exception:
-                        self.notify(
-                            f"Open reconcile: uv run rig reconcile plan question "
-                            f"{updated.id}"
-                        )
-                self.dismiss((SaveOutcome.SUCCESS, updated.id))
+                # True = Reconcile Now → parent opens reconcile after dismiss.
+                next_action = (
+                    AnswerNextAction.RECONCILE
+                    if choice
+                    else AnswerNextAction.NONE
+                )
+                self.complete(
+                    AnswerResult(
+                        SaveOutcome.SUCCESS,
+                        updated.id,
+                        next_action,
+                    )
+                )
 
             self.notify(
                 f"{updated.id} answered and resolved. "
@@ -304,7 +309,7 @@ class AnswerScreen(Screen[tuple[SaveOutcome, str | None]]):
             f"Saved draft {fresh.id}. Status OPEN / answer_state "
             f"{fields['answer_state']}. Resolve when final."
         )
-        self.dismiss((SaveOutcome.SUCCESS, fresh.id))
+        self.complete(AnswerResult(SaveOutcome.SUCCESS, fresh.id))
 
     @on(Button.Pressed, "#btn-draft")
     def _btn_draft(self) -> None:
@@ -316,4 +321,4 @@ class AnswerScreen(Screen[tuple[SaveOutcome, str | None]]):
 
     @on(Button.Pressed, "#btn-cancel")
     def _btn_cancel(self) -> None:
-        self.dismiss((SaveOutcome.CANCELLED, None))
+        self.complete(AnswerResult(SaveOutcome.CANCELLED, None))

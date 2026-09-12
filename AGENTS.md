@@ -209,6 +209,10 @@ uv run rig check
 - Snapshots / doctor / status / automation remain non-mutating views.
 - Staged editors use source SHA-256 concurrency checks (no blind overwrite).
 - Resolving a question still does **not** rewrite CURRENT or set `reconciled_at`.
+- Screen/modal results are **single-shot**: one semantic completion per push;
+  child screens return navigation intent (`AnswerResult`); the requester owns
+  subsequent `push_screen` / `open_domain`. Never push a sibling then dismiss
+  the child underneath it. See [docs/tui.md](docs/tui.md).
 - Agent guide: root `SKILLS.md` (CLI-first; do not automate TUI). Discovery:
   `uv run rig inspect …`.
 - Do not implement OBS/Ableton/MIDI/Stream Deck/macOS automation from the TUI;

@@ -326,6 +326,8 @@ The TUI is a **human editor** over the same services as the CLI. Agents should p
   RESOLVED/RECONCILED. Default filter ACTIVE.
 - Vim-like modes for extenders: NORMAL / INSERT / COMMAND (`:w` apply, `:q` /
   `:q!`). See [docs/tui.md](docs/tui.md). Do not teach agents to drive Pilot/TUI.
+- Result-bearing screens/modals complete **once**; children return intent, parents
+  navigate (never push a sibling then dismiss the child). See `docs/tui.md`.
 - `rig tui --debug` / `RIG_DEBUG=1` for pipeline diagnostics only.
 
 ## Live Rig Data Changes During Development

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
@@ -15,14 +14,15 @@ from music_rig.tui.dialogs import CommandLineModal, ConfirmModal, DiscardModal, 
 from music_rig.tui.editable import BaseEditableAdapter, DiffRow, WorkingRecord
 from music_rig.tui.editors import FieldForm
 from music_rig.tui.fields import FieldSpec, FieldType
+from music_rig.tui.header import RigHeader
 from music_rig.tui.modes import VIM_HELP_COMMON, EditorMode, ModeController, parse_command
 from music_rig.tui.pickers import OrderedListEditorModal, ReferencePickerModal, load_ref_choices
 from music_rig.tui.save_outcome import SaveOutcome
+from music_rig.tui.screen_results import SingleShotMixin
 from music_rig.tui.working import ConcurrentModificationError
-from music_rig.tui.header import RigHeader
 
 
-class ReviewChangesModal(ModalScreen[bool]):
+class ReviewChangesModal(SingleShotMixin, ModalScreen[bool]):
     """Show before/after table; Enter/Apply confirms."""
 
     BINDINGS = [
@@ -41,8 +41,8 @@ class ReviewChangesModal(ModalScreen[bool]):
             table = DataTable(id="diff-table", cursor_type="row")
             yield table
             with Horizontal(id="modal-buttons"):
-                yield Button("Apply", variant="primary", id="confirm")
-                yield Button("Cancel", id="cancel")
+                yield Button("Apply", variant="primary", id="confirm", action="screen.confirm")
+                yield Button("Cancel", id="cancel", action="screen.cancel")
 
     def on_mount(self) -> None:
         table = self.query_one("#diff-table", DataTable)
@@ -52,21 +52,13 @@ class ReviewChangesModal(ModalScreen[bool]):
         self.query_one("#confirm", Button).focus()
 
     def action_confirm(self) -> None:
-        self.dismiss(True)
+        self.complete(True)
 
     def action_cancel(self) -> None:
-        self.dismiss(False)
-
-    @on(Button.Pressed, "#confirm")
-    def _ok(self) -> None:
-        self.dismiss(True)
-
-    @on(Button.Pressed, "#cancel")
-    def _cancel(self) -> None:
-        self.dismiss(False)
+        self.complete(False)
 
 
-class ConflictModal(ModalScreen[str | None]):
+class ConflictModal(SingleShotMixin, ModalScreen[str | None]):
     """Concurrency conflict: reload/discard, view diff, or cancel. Retains edits on cancel/diff."""
 
     BINDINGS = [
@@ -92,33 +84,30 @@ class ConflictModal(ModalScreen[str | None]):
                 id="modal-body",
             )
             with Vertical(id="mode-choices"):
-                yield Button("1 Reload and discard mine", id="reload")
-                yield Button("2 View my staged difference", id="diff")
-                yield Button("3 Cancel (keep edits)", variant="primary", id="cancel")
+                yield Button(
+                    "1 Reload and discard mine", id="reload", action="screen.reload"
+                )
+                yield Button(
+                    "2 View my staged difference", id="diff", action="screen.diff"
+                )
+                yield Button(
+                    "3 Cancel (keep edits)",
+                    variant="primary",
+                    id="cancel",
+                    action="screen.cancel",
+                )
 
     def on_mount(self) -> None:
         self.query_one("#cancel", Button).focus()
 
     def action_reload(self) -> None:
-        self.dismiss("reload")
+        self.complete("reload")
 
     def action_diff(self) -> None:
-        self.dismiss("diff")
+        self.complete("diff")
 
     def action_cancel(self) -> None:
-        self.dismiss(None)
-
-    @on(Button.Pressed, "#reload")
-    def _reload(self) -> None:
-        self.dismiss("reload")
-
-    @on(Button.Pressed, "#diff")
-    def _diff(self) -> None:
-        self.dismiss("diff")
-
-    @on(Button.Pressed, "#cancel")
-    def _cancel(self) -> None:
-        self.dismiss(None)
+        self.complete(None)
 
 
 class RecordEditScreen(Screen[bool]):

@@ -33,9 +33,10 @@ from music_rig.models import (
 )
 from music_rig.store import StoreError, load_questions, load_todo
 from music_rig.tui.debug import format_error
+from music_rig.tui.screen_results import SingleShotMixin
 
 
-class AddRecordModal(ModalScreen[str | None]):
+class AddRecordModal(SingleShotMixin, ModalScreen[str | None]):
     """Generic multi-field add modal. Returns new record id or None."""
 
     BINDINGS = [
@@ -74,8 +75,8 @@ class AddRecordModal(ModalScreen[str | None]):
                     allow_blank=False,
                 )
             with Horizontal(id="modal-buttons"):
-                yield Button("Create", variant="primary", id="confirm")
-                yield Button("Cancel", id="cancel")
+                yield Button("Create", variant="primary", id="confirm", action="screen.submit")
+                yield Button("Cancel", id="cancel", action="screen.cancel")
 
     def on_mount(self) -> None:
         first = self.query(Input)
@@ -83,7 +84,7 @@ class AddRecordModal(ModalScreen[str | None]):
             list(first)[0].focus()
 
     def action_cancel(self) -> None:
-        self.dismiss(None)
+        self.complete(None)
 
     def _values(self) -> dict[str, str]:
         out: dict[str, str] = {}
@@ -101,14 +102,6 @@ class AddRecordModal(ModalScreen[str | None]):
     def _input_submit(self) -> None:
         self._finish()
 
-    @on(Button.Pressed, "#confirm")
-    def _confirm(self) -> None:
-        self._finish()
-
-    @on(Button.Pressed, "#cancel")
-    def _cancel(self) -> None:
-        self.dismiss(None)
-
     def _finish(self) -> None:
         # Subclasses override create(); base dismisses with None
         try:
@@ -119,7 +112,7 @@ class AddRecordModal(ModalScreen[str | None]):
         except Exception as exc:
             self.notify(format_error(exc, prefix="FAILED: "), severity="error")
             return
-        self.dismiss(new_id)
+        self.complete(new_id)
 
     def create(self, values: dict[str, str]) -> str:
         raise NotImplementedError

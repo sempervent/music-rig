@@ -29,10 +29,10 @@ from music_rig.tui.adapters.questions import (
 )
 from music_rig.tui.debug import format_error
 from music_rig.tui.dialogs import CommandLineModal, ConfirmModal, HelpScreen, InputModal
-from music_rig.tui.modes import VIM_HELP_COMMON, EditorMode, ModeController, parse_command
-from music_rig.tui.save_outcome import SaveOutcome
-from music_rig.tui.widgets import format_target, truncate
 from music_rig.tui.header import RigHeader
+from music_rig.tui.modes import VIM_HELP_COMMON, EditorMode, ModeController, parse_command
+from music_rig.tui.screen_results import AnswerNextAction, AnswerResult
+from music_rig.tui.widgets import format_target, truncate
 
 
 class QuestionsScreen(Screen):
@@ -292,26 +292,40 @@ class QuestionsScreen(Screen):
             return
         from music_rig.tui.screens.answer import AnswerScreen
 
-        def _done(result: tuple[SaveOutcome, str | None] | None) -> None:
-            if result is None:
-                return
-            outcome, qid = result
-            if outcome is SaveOutcome.SUCCESS and qid:
-                filter_was_open = self._filter == "OPEN"
-                self.reload(select_id=qid)
-                fresh = question_service.get_question(qid)
-                if (
-                    filter_was_open
-                    and fresh.status != QuestionStatus.OPEN
-                    and qid not in self._row_ids
-                ):
-                    self.notify(
-                        f"{qid} answered and resolved. "
-                        "It is hidden because this view shows OPEN Questions. "
-                        "Reconciliation remains pending."
-                    )
+        def _done(result: AnswerResult | None) -> None:
+            self._on_answer_result(result)
 
         self.app.push_screen(AnswerScreen(q.id, resolve_on_save=False), _done)
+
+    def _on_answer_result(self, result: AnswerResult | None) -> None:
+        """Handle AnswerScreen result: reload, then optional reconcile navigation."""
+        if result is None:
+            return
+        from music_rig.tui.save_outcome import SaveOutcome
+
+        if result.outcome is not SaveOutcome.SUCCESS or not result.question_id:
+            return
+        qid = result.question_id
+        filter_was_open = self._filter == "OPEN"
+        self.reload(select_id=qid)
+        fresh = question_service.get_question(qid)
+        if (
+            filter_was_open
+            and fresh.status != QuestionStatus.OPEN
+            and qid not in self._row_ids
+        ):
+            self.notify(
+                f"{qid} answered and resolved. "
+                "It is hidden because this view shows OPEN Questions. "
+                "Reconciliation remains pending."
+            )
+        if result.next_action is AnswerNextAction.RECONCILE:
+            try:
+                self.app.open_domain("reconcile", qid)  # type: ignore[attr-defined]
+            except Exception:
+                self.notify(
+                    f"Open reconcile: uv run rig reconcile plan question {qid}"
+                )
 
     def action_edit(self) -> None:
         q = self._selected()
@@ -391,19 +405,8 @@ class QuestionsScreen(Screen):
             return
         from music_rig.tui.screens.answer import AnswerScreen
 
-        def _done_screen(result: tuple[SaveOutcome, str | None] | None) -> None:
-            if result is None:
-                return
-            outcome, qid = result
-            if outcome is SaveOutcome.SUCCESS and qid:
-                filter_was_open = self._filter == "OPEN"
-                self.reload(select_id=qid)
-                if filter_was_open and qid not in self._row_ids:
-                    self.notify(
-                        f"{qid} answered and resolved. "
-                        "It is hidden because this view shows OPEN Questions. "
-                        "Reconciliation remains pending."
-                    )
+        def _done_screen(result: AnswerResult | None) -> None:
+            self._on_answer_result(result)
 
         self.app.push_screen(AnswerScreen(q.id, resolve_on_save=True), _done_screen)
 
