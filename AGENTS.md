@@ -384,8 +384,18 @@ A **proposed** or **experiment** route does not mean it is currently wired.
 
 ## Quality gates
 
+Before handing work back for human review:
+
+```bash
+uv run pre-commit run --all-files
+uv run pytest
+```
+
 - Install hooks once: `uv sync --extra dev` then `uv run pre-commit install`.
 - Local / CI lint: `uv run pre-commit run --all-files` (ruff check --fix, ruff format, ryl check via system hooks).
 - Ruff and ryl rule config live only in `pyproject.toml` — do not duplicate them in `.pre-commit-config.yaml`.
 - Full pytest suite enforces **80%** coverage (`addopts` includes `--cov-fail-under=80`).
-- Subset / debug runs: pass `--cov-fail-under=0` (and usually `-n0`), e.g. `uv run pytest path -n0 --cov-fail-under=0`.
+- Subset / debug runs: pass `--cov-fail-under=0` (and usually `-n0`), e.g.
+  `uv run pytest -m unit --cov-fail-under=0`,
+  `uv run pytest -m integration --cov-fail-under=0`,
+  `uv run pytest -m smoke --cov-fail-under=0`.

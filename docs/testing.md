@@ -68,6 +68,9 @@ uv run pytest -q
 Subset / debug without the gate:
 
 ```bash
+uv run pytest -m unit --cov-fail-under=0
+uv run pytest -m integration --cov-fail-under=0
+uv run pytest -m smoke --cov-fail-under=0
 uv run pytest path/to/tests -n0 --cov-fail-under=0
 ```
 
