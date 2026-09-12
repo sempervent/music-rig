@@ -4139,6 +4139,31 @@ def render_cmd(check: bool = typer.Option(False, "--check")) -> None:
         console.print("[dim]No changes.[/dim]")
 
 
+@app.command("tui")
+def tui_cmd(
+    domain: Optional[str] = typer.Argument(
+        None,
+        help="Optional domain route (question, patchbay, todo, …).",
+    ),
+    object_id: Optional[str] = typer.Argument(
+        None,
+        help="Optional object id (Q-008, PB-B, …).",
+    ),
+) -> None:
+    """Interactive Textual TUI (presentation only; mutations via shared services)."""
+    from music_rig.tui import run_tui
+    from music_rig.tui.navigation import normalize_route
+
+    if domain is not None and normalize_route(domain) is None:
+        _fail(
+            f"Unknown TUI domain {domain!r}. "
+            "Try: question, patchbay, todo, wish, inbox, changes, gear, midi, "
+            "controls, ableton, performance, snapshot, backup, session, "
+            "doctor, status, reconcile, automation"
+        )
+    run_tui(route=domain, object_id=object_id)
+
+
 @app.command("check")
 def check_cmd() -> None:
     result = run_checks()

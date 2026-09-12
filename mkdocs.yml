@@ -33,6 +33,7 @@ nav:
   - Reamp and DI: reamp-and-di.md
   - Troubleshooting: troubleshooting.md
   - Open Questions: open-questions.md
+  - Interactive TUI: tui.md
 markdown_extensions:
   - admonition
   - toc:
