@@ -26,7 +26,6 @@ Resolving a question records an answer. It does **not** automatically rewrite CU
 | Q-011 | Pedals / power | Do the physical DIRTY and SPACE boards match docs/pedal-chains.md? | RIG-001 | — |
 | Q-012 | Pedals / power | Where are Flamma Mod and PH-2 right now (disconnected, stored, elsewhere)? | RIG-011 | — |
 | Q-013 | Pedals / power | What is each CURRENT pedal’s voltage, current draw, and power-supply assignment? | RIG-047 | — |
-| Q-014 | MIDI | Is Ableton definitely the master clock in practice, or do KAOSS/SL-2 sometimes lead? | RIG-031 | — |
 | Q-015 | MIDI | What is the verified physical MIDI topology using U6MIDI Pro + Thru5 WC? | RIG-037 | — |
 | Q-016 | MIDI | What exact FCB1010 switch map is assigned in banks 00/01/02? | RIG-035 | — |
 | Q-017 | MIDI | Which ReMOTE ZeRO SL templates are actually loaded on the device? | RIG-036 | — |
@@ -50,6 +49,7 @@ Resolving a question records an answer. It does **not** automatically rewrite CU
 | Q-004 | Routing | Does physical KAOSS monitor/capture match documented Monitor Out → KAOSS → TASCAM 9/10? | RIG-010 | — |
 | Q-006 | Routing | Should LS-2 also remain a bass split/blend tool outside its CURRENT SPACE role? | RIG-025 | — |
 | Q-007 | Patchbay | Which physical unit is PB-A / PB-B / PB-C / PB-D (ART P48 vs Behringer PX3000)? | RIG-004 | — |
+| Q-014 | MIDI | Is Ableton definitely the master clock in practice, or do KAOSS/SL-2 sometimes lead? | RIG-031 | — |
 
 ## Answers and notes
 
@@ -130,6 +130,14 @@ Which physical unit is PB-A / PB-B / PB-C / PB-D (ART P48 vs Behringer PX3000)?
 What are the rear-panel assignments for PB-A, PB-C, and PB-D?
 
 **Notes:** Assignments remain UNKNOWN until inspected.
+
+### Q-014 — RESOLVED
+
+Is Ableton definitely the master clock in practice, or do KAOSS/SL-2 sometimes lead?
+
+**Answer:** Ableton is definitely the master clock; nothing else is master currently
+
+**Resolved at:** 2026-09-12T11:44:53.155699-04:00
 
 ### Q-020 — OPEN
 

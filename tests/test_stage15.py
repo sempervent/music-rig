@@ -535,14 +535,27 @@ def test_adapter_verify_only_guards(fx15):
     question_service.answer_question("Q-081", "ableton", clock=_clock, render=False)
     plan = reconcile_service.plan_question("Q-081")
     assert plan.capability == Capability.VERIFY_ONLY
-    # CURRENT already ableton INTENDED — may CURRENT_MATCHES or NEEDS_AGENT
-    assert plan.state in {
-        ReconciliationState.CURRENT_MATCHES,
-        ReconciliationState.NEEDS_AGENT_ACTION,
-    }
-    # apply must not silently promote — VERIFY_ONLY adapters typically refuse apply
-    with pytest.raises((StoreError, NotImplementedError)):
-        reconcile_service.apply_question("Q-081", dry_run=False, yes=True)
+    # HUMAN answer attestation (MIDI_CLOCK policy) → deterministic evidence apply
+    assert plan.state == ReconciliationState.READY_TO_APPLY
+    from music_rig.reconciliation.action_packet import has_apply_authority
+
+    assert has_apply_authority(question_service.get_question("Q-081"))
+    # Legacy / non-HUMAN answers still cannot escalate evidence
+    from music_rig.models import AnswerActor, OpenQuestion, OpenQuestionsDocument
+    from music_rig.store import load_questions, write_documents
+
+    qdoc = load_questions()
+    q = qdoc.question_map()["Q-081"]
+    legacy = OpenQuestion.model_validate(
+        {**q.model_dump(), "answer_actor": AnswerActor.LEGACY_UNKNOWN}
+    )
+    write_documents(
+        questions=OpenQuestionsDocument(
+            questions=[legacy if x.id == "Q-081" else x for x in qdoc.questions]
+        ),
+        questions_path=None,
+    )
+    assert not has_apply_authority(question_service.get_question("Q-081"))
 
     question_service.answer_question("Q-082", "ART P48", clock=_clock, render=False)
     plan_map = reconcile_service.plan_question("Q-082")

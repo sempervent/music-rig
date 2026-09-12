@@ -729,9 +729,31 @@ def test_production_verification_result_null():
 
 
 def test_answer_without_observation_does_not_apply_evidence(fx17):
+    """LEGACY answers (no HUMAN actor) cannot escalate INTENDED→VERIFIED alone."""
+    from music_rig.models import AnswerActor, OpenQuestion, OpenQuestionsDocument
+    from music_rig.store import load_questions, write_documents
+
     question_service.answer_question("Q-170", "ableton", clock=_clock, render=False)
+    qdoc = load_questions()
+    q = qdoc.question_map()["Q-170"]
+    legacy = OpenQuestion.model_validate(
+        {**q.model_dump(), "answer_actor": AnswerActor.LEGACY_UNKNOWN}
+    )
+    write_documents(
+        questions=OpenQuestionsDocument(
+            questions=[legacy if x.id == "Q-170" else x for x in qdoc.questions]
+        )
+    )
     with pytest.raises(StoreError):
         reconcile_service.apply_question("Q-170", dry_run=False, yes=True)
+    assert midi_state.load_raw()["clock"]["master"]["status"] == "INTENDED"
+
+
+def test_human_attestation_may_apply_clock_evidence(fx17):
+    """HUMAN answer under ANSWER_ATTESTATION_SUFFICIENT may dry-run evidence apply."""
+    question_service.answer_question("Q-170", "ableton", clock=_clock, render=False)
+    out = reconcile_service.apply_question("Q-170", dry_run=True, yes=True)
+    assert out.get("dry_run") is True
     assert midi_state.load_raw()["clock"]["master"]["status"] == "INTENDED"
 
 

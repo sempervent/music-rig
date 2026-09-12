@@ -418,7 +418,9 @@ def test_allowlisted_kinds_exclude_shell():
     assert "question.resolve" not in kinds
 
 
-def test_agent_capabilities_cli():
+def test_agent_capabilities_cli(tmp_path, monkeypatch):
+    monkeypatch.setattr("music_rig.store.ROOT", tmp_path)
+    monkeypatch.setattr("music_rig.local_config.ROOT", tmp_path)
     r = runner.invoke(app, ["agent", "capabilities", "--json"])
     assert r.exit_code == 0, r.output
     payload = json.loads(r.output)

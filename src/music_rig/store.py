@@ -400,7 +400,7 @@ def write_documents(
         payloads.append(
             (
                 questions_path or QUESTIONS_PATH,
-                _dump_yaml(questions.model_dump(mode="json")),
+                _dump_yaml(questions.model_dump(mode="json", exclude_none=True)),
             )
         )
     write_text_files(payloads)

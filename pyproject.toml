@@ -14,8 +14,11 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "coverage>=7.16,<8",
     "pytest>=8.3,<9",
     "pytest-asyncio>=1.4.0",
+    "pytest-cov>=7.1,<8",
+    "pytest-xdist>=3.6,<4",
 ]
 docs = [
     "mkdocs>=1.6,<1.7",
@@ -38,5 +41,37 @@ package = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+# pytest-asyncio: auto-detect `async def test_*` / async fixtures (no sync wrappers).
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+asyncio_default_test_loop_scope = "function"
+addopts = [
+    "-n",
+    "auto",
+    "--cov=music_rig",
+    "--cov-report=term-missing:skip-covered",
+]
+# -n auto → pytest_xdist_auto_num_workers in tests/conftest.py → max(1, cpu_count - 2)
+# Enforce --cov-fail-under=75 on the full suite (CI + local validation below).
+# Subset / debug: uv run pytest path -n0 --cov-fail-under=0
+filterwarnings = [
+    # Intentional Textual Header defect probe (tests/test_zzz_textual_header_defect.py)
+    "ignore:coroutine 'Header._on_mount.<locals>.set_title' was never awaited:RuntimeWarning",
+]
+
+[tool.coverage.run]
+source = ["music_rig"]
+# Thin Typer wiring + Textual UI are exercised separately; gate service/domain coverage.
+omit = [
+    "*/music_rig/cli.py",
+    "*/music_rig/tui/*",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]

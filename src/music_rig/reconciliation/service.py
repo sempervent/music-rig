@@ -31,6 +31,7 @@ from music_rig.reconcile import (
     format_reconcile_question,
 )
 from music_rig.reconciliation.adapters import get_adapter
+from music_rig.reconciliation.dispatch import classify_reconciliation_dispatch
 from music_rig.reconciliation.types import (
     Capability,
     Plan,
@@ -459,12 +460,13 @@ def apply_question(
         Capability.VERIFY_ONLY,
         Capability.HUMAN_VERIFY_THEN_APPLY,
     }:
-        from music_rig.reconciliation.action_packet import has_positive_observation
+        from music_rig.reconciliation.action_packet import has_apply_authority
 
-        if not has_positive_observation(q):
+        if not has_apply_authority(q):
             raise StoreError(
                 f"{q.id} capability is {adapter.capability.value}; "
-                "apply requires verification_result CONFIRMED or CORRECTED"
+                "apply requires HUMAN answer attestation or "
+                "verification_result CONFIRMED/CORRECTED"
             )
     else:
         raise StoreError(
@@ -537,6 +539,8 @@ def _complete_todo_in_doc(
     *,
     confirm_dod: bool,
 ) -> TodoDocument:
+    from music_rig.actor import is_bot
+
     task = todo_service.get_task(doc, todo_id)
     if task.status == TodoStatus.DONE:
         # still ensure removed from next_session
@@ -550,6 +554,12 @@ def _complete_todo_in_doc(
         raise StoreError(
             f"{todo_id} has a non-empty definition_of_done; pass --confirm-dod "
             "to complete during finalize/sweep"
+        )
+    if task.definition_of_done.strip() and confirm_dod and is_bot():
+        raise StoreError(
+            f"{todo_id}: BOT actor cannot satisfy human Definition-of-Done "
+            "acknowledgement (--confirm-dod). Run without --am-bot after a human "
+            "confirms DoD, or complete the TODO via the human CLI/TUI."
         )
     updated = TodoTask.model_validate(
         {**task.model_dump(), "status": TodoStatus.DONE.value}
@@ -769,6 +779,32 @@ def finalize_question(
     return result
 
 
+def _finding_is_agent_eligible(finding, *, paths: dict[str, Any]) -> bool:
+    """True only when central dispatch says AGENT (not human observation)."""
+    try:
+        kwargs = {
+            "questions_path": paths.get("questions"),
+            "changes_path": paths.get("changes"),
+            "todo_path": paths.get("todo"),
+            "patchbays_path": paths.get("patchbays"),
+            "routing_path": paths.get("routing"),
+            "midi_path": paths.get("midi"),
+            "controllers_path": paths.get("controllers"),
+            "ableton_path": paths.get("ableton"),
+            "docs_todo": paths.get("docs_todo"),
+            "docs_wishlist": paths.get("docs_wishlist"),
+            "docs_questions": paths.get("docs_questions"),
+        }
+        plan = plan_question(finding.artifact_id, **kwargs)
+    except Exception:
+        # Fall back: never treat observation wording as agent-eligible
+        summary = (finding.summary or "").casefold()
+        if "observation" in summary or "verif" in summary:
+            return False
+        return finding.state == ReconciliationState.NEEDS_AGENT_ACTION.value
+    return classify_reconciliation_dispatch(plan).provider_eligible
+
+
 def sweep(
     *,
     dry_run: bool = True,
@@ -913,8 +949,18 @@ def sweep(
         )
     if counts.get("draft_answer"):
         suggested_next.append("uv run rig question resolve Q-xxx")
+    agent_candidates = sorted(
+        {
+            f.artifact_id
+            for f in findings
+            if f.check_id == "question_convergence"
+            and f.status is FindingStatus.BLOCKED
+            and _finding_is_agent_eligible(f, paths=ctx.path_dict())
+        }
+    )
     if counts["needs_agent_action"]:
         suggested_next.append("uv run rig agent packet Q-xxx --json")
+        suggested_next.append("uv run rig agent reconcile Q-xxx")
         suggested_next.append(
             "uv run rig reconcile queue --state NEEDS_AGENT_ACTION --json"
         )
@@ -935,6 +981,7 @@ def sweep(
         "results": results,
         "skipped": skipped,
         "counts": counts,
+        "agent_candidates": agent_candidates,
         "checks": group_findings(findings),
         "plan": [op.to_dict() for op in plan_ops],
         "suggested_next_commands": suggested_next,

@@ -18,7 +18,6 @@ from music_rig.models import OpenQuestion, QuestionStatus
 from music_rig.reconciliation.context import ReconciliationContext
 from music_rig.reconciliation.operation_registry import (
     allowlisted_kinds,
-    dispatch_operation,
     get_spec,
     validate_operation_shape,
 )
@@ -29,6 +28,7 @@ from music_rig.store import StoreError, load_todo
 
 class ProposalStatus(str, Enum):
     READY = "READY"
+    NEEDS_MORE_CONTEXT = "NEEDS_MORE_CONTEXT"
     NEEDS_HUMAN_CLARIFICATION = "NEEDS_HUMAN_CLARIFICATION"
     NO_SAFE_PLAN = "NO_SAFE_PLAN"
     INVALID = "INVALID"
@@ -185,6 +185,7 @@ def build_agent_packet(
     q = question_service.get_question(question_id, questions_path=ctx.paths.questions)
     from music_rig.reconciliation.service import question_state
     from music_rig.reconciliation.adapters import get_adapter
+    from music_rig.verification_policy import evidence_basis_for, verification_policy_for
 
     paths = ctx.path_dict()
     adapter = get_adapter(q.target.domain if q.target else None)
@@ -223,8 +224,15 @@ def build_agent_packet(
         "artifact": {"type": "question", "id": q.id},
         "question": q.question,
         "final_human_answer": q.answer,
+        "answer_actor": (
+            q.answer_actor.value if q.answer_actor is not None else (
+                "LEGACY_UNKNOWN" if q.answer.strip() else None
+            )
+        ),
         "answer_state": question_service.derive_answer_state(q).value,
         "question_status": q.status.value,
+        "verification_policy": verification_policy_for(q).value,
+        "evidence_basis": evidence_basis_for(q).value,
         "verification_result": (
             {
                 "outcome": q.verification_result.outcome.value,
@@ -243,6 +251,7 @@ def build_agent_packet(
         "capability": plan.capability.value,
         "related_todos": list(q.related_todos),
         "related_changes": list(q.related_changes),
+        "clarifies_question": q.clarifies_question,
         "relevant_current_context": context,
         "allowed_operation_kinds": allowed,
         "candidate_operations": candidate_ops,
@@ -254,7 +263,7 @@ def build_agent_packet(
         "forbidden_claims": [
             "Do not invent unique inventory unit IDs from model-only answers.",
             "Do not invent verification_result.",
-            "Do not set evidence VERIFIED without Stage 17 observation.",
+            "Do not set evidence VERIFIED without Stage 17 observation OR HUMAN answer attestation when policy allows.",
         ],
         "truth_boundaries": TRUTH_BOUNDARIES,
         "plan_blockers": plan.blockers,
@@ -288,6 +297,13 @@ def validate_proposal(
             "warnings": ["proposal requests human clarification — no apply"],
             "clarification_questions": proposal.clarification_questions,
         }
+    if proposal.status is ProposalStatus.NEEDS_MORE_CONTEXT:
+        return {
+            "ok": True,
+            "status": proposal.status.value,
+            "errors": [],
+            "warnings": ["proposal needs more context — no apply"],
+        }
     if proposal.status in {ProposalStatus.NO_SAFE_PLAN, ProposalStatus.INVALID}:
         return {
             "ok": False,
@@ -315,20 +331,34 @@ def validate_proposal(
 
     domain = q.target.domain if q and q.target else None
     area = q.area if q else ""
-    allowed_domains = set()
+    # Expand only from the question's own target/area (no global allow-all).
+    _DOMAIN_EXPAND = {
+        "inventory.patchbay_mapping": {"Patchbay", "inventory.patchbay_mapping"},
+        "patchbay.mode": {"Patchbay", "patchbay.mode"},
+        "routing.verify": {"Routing", "Capture", "channels", "routing.verify"},
+        "Routing": {"Routing", "Capture", "channels", "routing.verify"},
+        "Capture": {"Routing", "Capture", "channels", "routing.verify"},
+        "Patchbay": {"Patchbay", "inventory.patchbay_mapping", "patchbay.mode"},
+        "Inventory": {"Inventory", "inventory.location"},
+        "inventory.location": {"Inventory", "inventory.location"},
+        "channels": {"Routing", "Capture", "channels", "routing.verify"},
+    }
+    seed: set[str] = set()
     if domain:
-        allowed_domains.add(domain)
+        seed.add(domain)
     if area:
-        allowed_domains.add(area)
-    allowed_domains.update({"inventory.patchbay_mapping", "Patchbay", "Routing", "Capture"})
+        seed.add(area)
+    allowed_domains: set[str] = set()
+    for d in seed:
+        allowed_domains.add(d)
+        allowed_domains.update(_DOMAIN_EXPAND.get(d, ()))
 
     for op in proposal.operations:
         try:
             validate_operation_shape(op, agent=True)
             spec = get_spec(op.kind)
-            if spec.domains and not (set(spec.domains) & allowed_domains) and domain:
-                # Domain relevance: operation domains must intersect target/area
-                if domain not in spec.domains and area not in spec.domains:
+            if spec.domains and allowed_domains:
+                if not (set(spec.domains) & allowed_domains):
                     errors.append(
                         f"{op.kind} not relevant to target domain {domain!r} / area {area!r}"
                     )
@@ -390,7 +420,10 @@ def apply_proposal(
     yes: bool = False,
     snapshot_before: bool = False,
 ) -> dict[str, Any]:
-    """Validate then dispatch operations via services (no subprocess)."""
+    """Validate then apply via one atomic AgentTransaction (prepare != commit)."""
+    from music_rig.agent.errors import AgentError, PlanConflictError
+    from music_rig.agent.transaction import commit_transaction, prepare_transaction
+
     ctx = ctx or ReconciliationContext.default()
     if not dry_run and not yes:
         raise StoreError("agent apply write requires --yes (default is dry-run)")
@@ -413,6 +446,15 @@ def apply_proposal(
             "message": "clarification required — no mutations",
         }
 
+    if proposal.status is ProposalStatus.NEEDS_MORE_CONTEXT:
+        return {
+            "ok": True,
+            "dry_run": dry_run,
+            "validation": validation,
+            "applied": [],
+            "message": "needs more context — no mutations",
+        }
+
     if snapshot_before and not dry_run:
         from music_rig import snapshot_service
 
@@ -420,35 +462,16 @@ def apply_proposal(
             note=f"agent apply {proposal.artifact_id}",
         )
 
-    # Dry-run all first
-    dry_results = []
-    for op in proposal.operations:
-        dry_results.append(dispatch_operation(op, ctx, dry_run=True, agent=True))
-
-    if dry_run:
-        return {
-            "ok": True,
-            "dry_run": True,
-            "validation": validation,
-            "plan": [operation_json_view(o) for o in proposal.operations],
-            "dry_run_results": dry_results,
-            "message": "No changes applied. Re-run with --yes to commit.",
-        }
-
-    # Apply sequentially — each op is its own transactional write via services.
-    # Cross-domain all-or-nothing is best-effort: validate all dry-runs succeeded first.
-    applied = []
-    for op in proposal.operations:
-        applied.append(dispatch_operation(op, ctx, dry_run=False, agent=True))
-
-    # Postconditions: reload question; ensure still RESOLVED; optional finalize flag
-    q = question_service.get_question(
-        proposal.artifact_id, questions_path=ctx.paths.questions
-    )
-    post_ok = q.status == QuestionStatus.RESOLVED and bool(q.answer.strip())
-    finalize_result = None
-    if proposal.finalize and post_ok:
-        finalize_op = RigOperation(
+    ops = [o for o in proposal.operations if o.kind != "question.finalize_manual"]
+    finalize_op = None
+    if proposal.finalize or any(
+        o.kind == "question.finalize_manual" for o in proposal.operations
+    ):
+        existing = next(
+            (o for o in proposal.operations if o.kind == "question.finalize_manual"),
+            None,
+        )
+        finalize_op = existing or RigOperation(
             namespace="question",
             action="finalize_manual",
             args={
@@ -459,37 +482,88 @@ def apply_proposal(
                 "confirm_dod": True,
             },
         )
-        # Avoid double finalize if already in ops
-        if not any(o.kind == "question.finalize_manual" for o in proposal.operations):
-            try:
-                finalize_result = dispatch_operation(
-                    finalize_op, ctx, dry_run=False, agent=True
-                )
-            except StoreError as exc:
-                post_ok = False
-                finalize_result = {"ok": False, "error": str(exc)}
+
+    try:
+        prepared = prepare_transaction(ops, ctx=ctx, finalize_op=finalize_op)
+    except PlanConflictError as exc:
+        return {
+            "ok": False,
+            "dry_run": dry_run,
+            "validation": validation,
+            "code": exc.code,
+            "error": str(exc),
+            "operation_ids": list(exc.operation_ids),
+            "conflict_key": exc.conflict_key,
+            "applied": [],
+        }
+    except StoreError as exc:
+        return {
+            "ok": False,
+            "dry_run": dry_run,
+            "validation": validation,
+            "error": str(exc),
+            "applied": [],
+        }
+
+    if dry_run:
+        return {
+            "ok": True,
+            "dry_run": True,
+            "validation": validation,
+            "plan": [operation_json_view(o) for o in proposal.operations],
+            "prepared_transaction": prepared.to_dict(),
+            "atomic": True,
+            "message": "No changes applied. Re-run with --yes to commit.",
+        }
+
+    try:
+        commit = commit_transaction(
+            prepared,
+            ctx=ctx,
+            artifact_id=proposal.artifact_id,
+            require_finalize=bool(prepared.finalize_plan),
+        )
+    except AgentError as exc:
+        return {
+            "ok": False,
+            "dry_run": False,
+            "validation": validation,
+            "code": exc.code,
+            "error": str(exc),
+            "applied": [],
+        }
 
     return {
-        "ok": post_ok,
+        "ok": commit.get("ok", False),
         "dry_run": False,
         "validation": validation,
-        "applied": applied,
-        "finalize": finalize_result,
-        "postconditions_passed": post_ok,
-        "message": (
-            "Applied and postconditions passed"
-            if post_ok
-            else "Apply finished but postconditions failed — not treating as reconciled"
-        ),
+        "prepared_transaction": prepared.to_dict(),
+        "transaction_result": commit,
+        "postconditions_passed": commit.get("postconditions", {}).get("ok"),
+        "atomic": True,
+        "message": commit.get("message"),
     }
 
 
 def capabilities() -> dict[str, Any]:
+    from music_rig.agent.provider import provider_status
+    from music_rig.reconciliation.operation_registry import list_operations
+
+    status = provider_status()
+    ops = [s.capability_row() for s in list_operations(agent_only=True)]
     return {
-        "provider": None,
-        "provider_configured": False,
+        "provider": status if status.get("configured") else None,
+        "provider_configured": bool(status.get("configured")),
+        "provider_status": status,
         "allowlisted_operations": allowlisted_kinds(agent_only=True),
+        "operations": ops,
+        "autonomy_levels": ["PLAN_ONLY", "APPLY_SAFE", "APPLY_AND_FINALIZE"],
         "workflow": [
+            "uv run rig agent provider setup",
+            "uv run rig reconcile run Q-xxx",
+            "uv run rig reconcile run Q-xxx --apply --yes",
+        ],
+        "advanced_workflow": [
             "uv run rig agent packet Q-xxx --json",
             "uv run rig agent validate proposal.json",
             "uv run rig agent apply proposal.json --dry-run",

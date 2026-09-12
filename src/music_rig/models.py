@@ -528,6 +528,14 @@ class InventoryDocument(BaseModel):
         return None
 
 
+class AnswerActor(str, Enum):
+    """Provenance of a Question's answer text."""
+
+    HUMAN = "HUMAN"
+    BOT = "BOT"
+    LEGACY_UNKNOWN = "LEGACY_UNKNOWN"
+
+
 class OpenQuestion(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -538,6 +546,8 @@ class OpenQuestion(BaseModel):
     related_todos: list[RigId] = Field(default_factory=list)
     related_changes: list[ChgId] = Field(default_factory=list)
     answer: str = ""
+    # Provenance of answer text. None + non-empty answer ⇒ treat as LEGACY_UNKNOWN.
+    answer_actor: AnswerActor | None = None
     notes: str = ""
     resolved_at: datetime | None = None
     reconciled_at: datetime | None = None
@@ -546,6 +556,8 @@ class OpenQuestion(BaseModel):
     verification: QuestionVerification | None = None
     verification_note: str = ""
     verification_result: VerificationResult | None = None
+    # Linked clarification Question created by an agent when answer is insufficient.
+    clarifies_question: QuestionId | None = None
 
     @field_validator("related_todos", "related_changes")
     @classmethod
@@ -574,6 +586,13 @@ class OpenQuestion(BaseModel):
                 raise ValueError(
                     f"{self.id} reconciled_at requires a non-empty answer"
                 )
+        if not self.answer.strip() and self.answer_actor is not None:
+            raise ValueError(f"{self.id} answer_actor requires non-empty answer")
+        if self.clarifies_question is not None:
+            parent = self.clarifies_question.strip().upper()
+            if parent == self.id:
+                raise ValueError(f"{self.id} cannot clarify itself")
+            object.__setattr__(self, "clarifies_question", parent)
         return self
 
 
@@ -1193,10 +1212,44 @@ class LocalPathsConfig(BaseModel):
     controller_mappings_export: str | None = None
 
 
+class CursorProviderLocalConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    executable: str | None = None
+    model: str | None = None
+
+
+class OllamaProviderLocalConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    base_url: str = "http://127.0.0.1:11434"
+    model: str | None = None
+    # When False/True, sent as Ollama `think` if the model accepts it.
+    # None omits the parameter (provider default).
+    think: bool | None = False
+
+
+class AgentLocalConfig(BaseModel):
+    """Machine-local agent provider settings (never committed secrets)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str | None = None  # cursor | ollama | command
+    fallback: str | None = None  # optional: ollama | cursor | command
+    argv: list[str] = Field(default_factory=list)  # command provider only
+    timeout_seconds: int = Field(default=120, ge=1, le=600)
+    env_forward: list[str] = Field(default_factory=list)
+    max_context_rounds: int = Field(default=5, ge=1, le=10)
+    max_stdout_bytes: int = Field(default=1_000_000, ge=1024, le=5_000_000)
+    cursor: CursorProviderLocalConfig = Field(default_factory=CursorProviderLocalConfig)
+    ollama: OllamaProviderLocalConfig = Field(default_factory=OllamaProviderLocalConfig)
+
+
 class LocalConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     paths: LocalPathsConfig = Field(default_factory=LocalPathsConfig)
+    agent: AgentLocalConfig = Field(default_factory=AgentLocalConfig)
 
 
 class MidiTransport(str, Enum):

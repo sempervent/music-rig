@@ -1,5 +1,33 @@
 # Music Rig Repository Skill Guide
 
+**IMPORTANT: You are a bot.**
+
+Every invocation of the music-rig CLI MUST include the global `--am-bot`
+flag immediately after `rig`.
+
+Correct:
+
+```bash
+uv run rig --am-bot question show Q-014 --json
+```
+
+Incorrect:
+
+```bash
+uv run rig question show Q-014 --json
+```
+
+Before running any `rig` command, verify it begins:
+
+```text
+rig --am-bot
+```
+
+If not, correct the command before execution.
+
+Bots cannot finalize HUMAN answers or create HUMAN observation evidence.
+Use `question draft` for suggestions; humans Answer & Resolve / verify in TUI/CLI without `--am-bot`.
+
 Operating guide for agentic coding agents working in this repository.
 
 ## Opening rule (CLI-first)
@@ -8,11 +36,11 @@ Operating guide for agentic coding agents working in this repository.
 direct YAML edits for day-to-day mutations. Prefer:
 
 ```bash
-uv run rig <domain> <verb> …
-uv run rig reconcile …
-uv run rig inspect …
-uv run rig question answer … --json
-uv run rig question target set … --yes --json
+uv run rig --am-bot <domain> <verb> …
+uv run rig --am-bot reconcile …
+uv run rig --am-bot inspect …
+uv run rig --am-bot question answer … --json
+uv run rig --am-bot question target set … --yes --json
 ```
 
 If a needed mutation has no service/CLI yet: **add the service + CLI first**, then
@@ -40,44 +68,44 @@ Evidence labels (`VERIFIED` | `INTENDED` | `UNKNOWN`) matter more than prose ton
 
 ```text
 1. Inspect repository truth
-     uv run rig status
-     uv run rig doctor
-     uv run rig reconcile queue --json
-     uv run rig inspect domains
-     uv run rig inspect cleanup --json
+     uv run rig --am-bot status
+     uv run rig --am-bot doctor
+     uv run rig --am-bot reconcile queue --json
+     uv run rig --am-bot inspect domains
+     uv run rig --am-bot inspect cleanup --json
 
 2. Work a factual uncertainty (human/observed answer — never invent)
      # Provisional:
-     uv run rig question draft Q-xxx --answer "<draft>" --json
+     uv run rig --am-bot question draft Q-xxx --answer "<draft>" --json
      # Final (RESOLVED; reconciled_at still null):
-     uv run rig question answer Q-xxx --answer "<answer>" --json
+     uv run rig --am-bot question answer Q-xxx --answer "<answer>" --json
      # Promote existing draft:
-     uv run rig question resolve Q-xxx
+     uv run rig --am-bot question resolve Q-xxx
      # optional dry-run:
-     uv run rig question answer Q-xxx --answer "<answer>" --dry-run --json
+     uv run rig --am-bot question answer Q-xxx --answer "<answer>" --dry-run --json
 
 3. Complete typed target if plan says NEEDS_AGENT_ACTION / missing_target_field
-     uv run rig question target show Q-xxx --json
-     uv run rig question target set Q-xxx --pair 1/25 --yes --json
+     uv run rig --am-bot question target show Q-xxx --json
+     uv run rig --am-bot question target set Q-xxx --pair 1/25 --yes --json
      # candidates come from canonical patchbay data only — no guessing
 
 4. Reconcile answer into CURRENT (separate from answer/resolve)
-     uv run rig reconcile plan question Q-xxx --json
-     uv run rig reconcile apply question Q-xxx --dry-run --json
-     uv run rig reconcile apply question Q-xxx --yes --json
-     uv run rig reconcile verify question Q-xxx --json
+     uv run rig --am-bot reconcile plan question Q-xxx --json
+     uv run rig --am-bot reconcile apply question Q-xxx --dry-run --json
+     uv run rig --am-bot reconcile apply question Q-xxx --yes --json
+     uv run rig --am-bot reconcile verify question Q-xxx --json
      # Adapter MATCH path:
-     uv run rig reconcile finalize question Q-xxx --yes \
+     uv run rig --am-bot reconcile finalize question Q-xxx --yes \
        --complete-linked-todos --apply-linked-changes --confirm-dod --json
      # Agent-interpreted / MANUAL path (after supported `rig current` updates):
-     uv run rig reconcile finalize question Q-xxx --yes \
+     uv run rig --am-bot reconcile finalize question Q-xxx --yes \
        --confirm-current-reconciled \
        --note "Updated CURRENT from final human answer via supported CLI" \
        --complete-linked-todos --confirm-dod --json
 
 5. Validate
-     uv run rig check
-     uv run rig render --check
+     uv run rig --am-bot check
+     uv run rig --am-bot render --check
 ```
 
 `draft` keeps status OPEN (`answer_state=DRAFT`). `answer` / `resolve` create
@@ -91,11 +119,11 @@ CURRENT. Do not invent `verification_result` from answering alone. Finalize sets
 Typed targets (`QuestionTarget`) drive adapters. Incomplete targets block apply:
 
 ```bash
-uv run rig question target show Q-008 --json
-uv run rig question target set Q-008 --domain patchbay.mode --bay PB-B --pair 1/25 --yes --json
-uv run rig question target set Q-008 --pair 1/25 --dry-run --json   # before/after
-uv run rig question target clear Q-008 --field pair --yes --json
-uv run rig question target clear Q-008 --yes --json                 # entire target
+uv run rig --am-bot question target show Q-008 --json
+uv run rig --am-bot question target set Q-008 --domain patchbay.mode --bay PB-B --pair 1/25 --yes --json
+uv run rig --am-bot question target set Q-008 --pair 1/25 --dry-run --json   # before/after
+uv run rig --am-bot question target clear Q-008 --field pair --yes --json
+uv run rig --am-bot question target clear Q-008 --yes --json                 # entire target
 ```
 
 Validation is exact (bay exists, pair exists in bay, gear/path IDs exist). No fuzzy match.
@@ -107,7 +135,7 @@ Structured NEEDS_AGENT_ACTION blockers look like:
   "code": "missing_target_field",
   "field": "pair",
   "candidates": ["1/25", "2/26"],
-  "suggested_commands": ["uv run rig question target set Q-xxx --pair 1/25 --yes"],
+  "suggested_commands": ["uv run rig --am-bot question target set Q-xxx --pair 1/25 --yes"],
   "message": "target.pair missing — set pair before apply"
 }
 ```
@@ -145,18 +173,18 @@ Complete YAML ≠ VERIFIED. Only explicit human observation may promote evidence
 
 ```bash
 # Answer without claiming physical verification (evidence stays INTENDED)
-uv run rig verify answer Q-014 --value ableton --yes --json
+uv run rig --am-bot verify answer Q-014 --value ableton --yes --json
 
 # Explicit human observation (sets verification_result)
-uv run rig verify record Q-014 --outcome confirmed --value ableton --yes --json
-uv run rig verify record Q-014 --outcome corrected --value kaoss --yes --json
-uv run rig verify record Q-016 --outcome failed_test --note "…" --create-change --yes --json
-uv run rig verify record Q-014 --outcome unknown --yes --json
+uv run rig --am-bot verify record Q-014 --outcome confirmed --value ableton --yes --json
+uv run rig --am-bot verify record Q-014 --outcome corrected --value kaoss --yes --json
+uv run rig --am-bot verify record Q-016 --outcome failed_test --note "…" --create-change --yes --json
+uv run rig --am-bot verify record Q-014 --outcome unknown --yes --json
 
 # Then reconcile evidence/value
-uv run rig reconcile plan question Q-014 --json
-uv run rig reconcile apply question Q-014 --dry-run --json
-uv run rig reconcile apply question Q-014 --yes --json
+uv run rig --am-bot reconcile plan question Q-014 --json
+uv run rig --am-bot reconcile apply question Q-014 --dry-run --json
+uv run rig --am-bot reconcile apply question Q-014 --yes --json
 ```
 
 **CONFIRMED flow:** observation matches documented → SET_EVIDENCE_VERIFIED (no value change if already correct) → verify MATCH → finalize.
@@ -190,17 +218,17 @@ They must not fuzzy-NLP guess answers.
 ## Reconcile CLI
 
 ```bash
-uv run rig reconcile                    # advisory summary
-uv run rig reconcile status
-uv run rig reconcile queue [--type] [--state] [--ready] [--json]
-uv run rig reconcile show question Q-008 [--json]
-uv run rig reconcile plan question Q-008 [--json]
-uv run rig reconcile apply question Q-008 [--dry-run] [--yes] [--snapshot-before] [--json]
-uv run rig reconcile verify question Q-008 [--json]
-uv run rig reconcile finalize question Q-008 [--dry-run] [--yes] [--json] \
+uv run rig --am-bot reconcile                    # advisory summary
+uv run rig --am-bot reconcile status
+uv run rig --am-bot reconcile queue [--type] [--state] [--ready] [--json]
+uv run rig --am-bot reconcile show question Q-008 [--json]
+uv run rig --am-bot reconcile plan question Q-008 [--json]
+uv run rig --am-bot reconcile apply question Q-008 [--dry-run] [--yes] [--snapshot-before] [--json]
+uv run rig --am-bot reconcile verify question Q-008 [--json]
+uv run rig --am-bot reconcile finalize question Q-008 [--dry-run] [--yes] [--json] \
   [--complete-linked-todos] [--apply-linked-changes] [--confirm-dod] \
   [--no-current-change] [--note "..."] [--snapshot-before]
-uv run rig reconcile sweep [--dry-run|--write] [--yes] [--confirm-dod] [--json]
+uv run rig --am-bot reconcile sweep [--dry-run|--write] [--yes] [--confirm-dod] [--json]
 ```
 
 Sweep `--dry-run --json` includes grouped counts:
@@ -224,16 +252,16 @@ Guides observation at the physical rig. The human supplies facts; **UNKNOWN is
 valid**. Manuals describe capabilities — they do not invent CURRENT state.
 
 ```bash
-uv run rig verify queue [--area] [--json]
-uv run rig verify next [--json]
-uv run rig verify show Q-008 [--json]
-uv run rig verify run Q-008 [--answer-only]     # interactive (+ observation prompt)
-uv run rig verify record Q-014 --outcome confirmed --value ableton [--dry-run] [--yes] [--json]
-uv run rig verify answer Q-008 --value half-normal [--dry-run] [--yes] [--json] [--note]
-uv run rig verify session [--area] [--todo RIG-002]
-uv run rig verify summary [--json]
-uv run rig verify area Patchbay
-uv run rig tui verify
+uv run rig --am-bot verify queue [--area] [--json]
+uv run rig --am-bot verify next [--json]
+uv run rig --am-bot verify show Q-008 [--json]
+uv run rig --am-bot verify run Q-008 [--answer-only]     # interactive (+ observation prompt)
+uv run rig --am-bot verify record Q-014 --outcome confirmed --value ableton [--dry-run] [--yes] [--json]
+uv run rig --am-bot verify answer Q-008 --value half-normal [--dry-run] [--yes] [--json] [--note]
+uv run rig --am-bot verify session [--area] [--todo RIG-002]
+uv run rig --am-bot verify summary [--json]
+uv run rig --am-bot verify area Patchbay
+uv run rig tui verify   # HUMAN only
 ```
 
 Workflow:
@@ -249,10 +277,10 @@ Enriching verification metadata (kind, prompt, answer schema, unambiguous target
 ## Question list flags
 
 ```bash
-uv run rig question list                 # ACTIVE = OPEN + RESOLVED-unreconciled
-uv run rig question list --open
-uv run rig question list --unreconciled
-uv run rig question list --all
+uv run rig --am-bot question list                 # ACTIVE = OPEN + RESOLVED-unreconciled
+uv run rig --am-bot question list --open
+uv run rig --am-bot question list --unreconciled
+uv run rig --am-bot question list --all
 ```
 
 TODO list hides terminal statuses (DONE / CANCELLED / DEFERRED) unless `--all`.
@@ -262,14 +290,14 @@ TODO list hides terminal statuses (DONE / CANCELLED / DEFERRED) unless `--all`.
 ### 1) Patchbay mode with incomplete target (fixture-style)
 
 ```bash
-uv run rig question answer Q-008 --answer "half-normal" --json
-uv run rig reconcile plan question Q-008 --json
+uv run rig --am-bot question answer Q-008 --answer "half-normal" --json
+uv run rig --am-bot reconcile plan question Q-008 --json
 # → NEEDS_AGENT_ACTION + missing_target_field pair + candidates
-uv run rig question target set Q-008 --pair 1/25 --yes --json
-uv run rig reconcile plan question Q-008 --json   # READY_TO_APPLY
-uv run rig reconcile apply question Q-008 --yes --json
-uv run rig reconcile verify question Q-008 --json
-uv run rig reconcile finalize question Q-008 --yes \
+uv run rig --am-bot question target set Q-008 --pair 1/25 --yes --json
+uv run rig --am-bot reconcile plan question Q-008 --json   # READY_TO_APPLY
+uv run rig --am-bot reconcile apply question Q-008 --yes --json
+uv run rig --am-bot reconcile verify question Q-008 --json
+uv run rig --am-bot reconcile finalize question Q-008 --yes \
   --complete-linked-todos --apply-linked-changes --confirm-dod --json
 ```
 
@@ -278,18 +306,18 @@ Production Q-008 has `bay: PB-B` and `pair: null` — do not invent the pair.
 ### 2) MANUAL inventory mapping
 
 ```bash
-uv run rig reconcile plan question Q-007 --json
+uv run rig --am-bot reconcile plan question Q-007 --json
 # MANUAL — set-model then finalize; no set-gear yet
 ```
 
 ## Inspection
 
 ```bash
-uv run rig inspect domains               # Rich table (no tabs)
-uv run rig inspect domains --json        # + mutable/derived/supports_reconcile
-uv run rig inspect schema question
-uv run rig inspect list question --json
-uv run rig inspect cleanup --json        # missing targets, CURRENT_MATCHES, …
+uv run rig --am-bot inspect domains               # Rich table (no tabs)
+uv run rig --am-bot inspect domains --json        # + mutable/derived/supports_reconcile
+uv run rig --am-bot inspect schema question
+uv run rig --am-bot inspect list question --json
+uv run rig --am-bot inspect cleanup --json        # missing targets, CURRENT_MATCHES, …
 ```
 
 Human list output uses the shared presentation layer (`music_rig.presentation`).
@@ -313,7 +341,7 @@ Textual widgets never write YAML.
 ## TUI
 
 The TUI is a **human editor** over the same services as the CLI. Agents should prefer
-`uv run rig …` (CLI-first) and must **not** automate the TUI.
+`uv run rig --am-bot …` (CLI-first) and must **not** automate the TUI.
 
 - `rig tui verify`: guided queue + structured answer pickers; Skip / Next /
   Open Target / Edit Target / Reconcile. After answer shows READY_TO_APPLY or
@@ -330,32 +358,103 @@ The TUI is a **human editor** over the same services as the CLI. Agents should p
   navigate (never push a sibling then dismiss the child). See `docs/tui.md`.
 - `rig tui --debug` / `RIG_DEBUG=1` for pipeline diagnostics only.
 
-## Agent-Assisted Reconciliation
+## Reconciliation (human)
 
-The agent does **not** mutate YAML. The agent proposes **RigOperations**.
-The rig validates and dispatches those operations through domain services.
+Humans omit `--am-bot` (default actor = HUMAN).
 
-```bash
-uv run rig reconcile queue --json
-uv run rig agent packet Q-xxx --json
-# external agent reasons over packet JSON → writes proposal.json
-uv run rig agent validate proposal.json
-uv run rig agent apply proposal.json --dry-run
-uv run rig agent apply proposal.json --yes
-# optional preview when no provider is configured:
-uv run rig agent reconcile Q-xxx
-uv run rig agent capabilities --json
+Terminology:
+
+```text
+HUMAN ANSWER
+    Human states the factual answer to a Question (TUI / `rig question answer`).
+    Under ANSWER_ATTESTATION_SUFFICIENT policy this is factual attestation —
+    do not demand a redundant HUMAN_OBSERVATION of the same fact.
+
+HUMAN CLARIFICATION
+    Human answer exists, but more specificity is required for safe CURRENT mutation.
+
+HUMAN OBSERVATION
+    A distinct physical/software test or post-change verification procedure
+    (EXPLICIT_OBSERVATION_REQUIRED kinds such as CONTROLLER_MAPPING behavior tests).
+
+AGENT
+    Interprets sufficient human facts into canonical rig operations (BOT planner).
 ```
 
-Policy:
+Actionable progress:
 
-- Do not invent human observations or reinterpret ambiguous answers.
-- If packet context is insufficient, request more structured inspection —
-  do not guess.
-- Do not set `evidence=VERIFIED` without a Stage 17 `verification_result`.
-- Model-level answers must not invent unique inventory unit IDs.
-- Sweep inspects via independent checks, freezes a plan, then applies —
-  it never answers OPEN questions.
+```text
+Need answer        → human answers (no --am-bot)
+Need clarification → human supplies missing specificity
+Need observation   → only when policy requires an explicit test
+Need agent         → Cursor/Ollama plans interpretation only
+Ready              → deterministic reconciliation / finalize
+```
+
+**Never invoke a provider to satisfy a blocker that requires a human fact,
+human observation, DoD acknowledgement, or other human authority.
+Provider use is for interpretation, not evidence creation.**
+
+`--yes` confirms writes. It does **not** mean “I physically checked the rig.”
+
+One-time provider setup (agent/local machine):
+
+```bash
+uv run rig --am-bot agent provider setup
+# or:
+uv run rig --am-bot agent provider use cursor
+uv run rig --am-bot agent provider use ollama --model <installed-model>
+uv run rig --am-bot agent provider benchmark --provider ollama
+```
+
+Normal human use:
+
+```bash
+uv run rig question answer Q-xxx --answer "…"
+uv run rig reconcile run Q-xxx
+uv run rig reconcile run Q-xxx --apply --yes
+```
+
+TUI (`rig tui`, never `--am-bot tui`): Answer & Resolve records `answer_actor=HUMAN`.
+Reconcile uses deterministic adapters when possible; explicit observation kinds
+open Verify. Otherwise the configured planner runs with visible progress.
+
+```text
+Human answers Question (HUMAN attestation)
+        ↓
+rig reconcile run
+        ↓
+deterministic adapter? → plan/apply/finalize
+else agent interpretation? → Cursor/Ollama planner → review → apply
+else clarification / explicit observation when policy requires
+```
+
+### Advanced integration / debugging
+
+External agents already working in the repo may still use:
+
+```bash
+uv run rig --am-bot agent packet Q-xxx --json
+uv run rig --am-bot agent validate proposal.json
+uv run rig --am-bot agent apply proposal.json --dry-run
+uv run rig --am-bot agent apply proposal.json --yes
+```
+
+### Trust rules
+
+- Provider output is **untrusted input**.
+- RigOperation validation is authoritative.
+- Successful provider execution does **not** mean successful reconciliation.
+- Successful atomic transaction + postconditions do.
+- **CursorProvider is a planner.** Do not allow Cursor's coding/file tools to
+  bypass RigOperation execution. Invoked with `--mode=ask` outside the repo.
+- **Ollama output is untrusted structured input.** JSON-schema compliance does
+  not make proposed operations authoritative.
+- Do not invent human observations or unit IDs from model-only answers.
+- Do not set `evidence=VERIFIED` without HUMAN answer attestation
+  (ANSWER_ATTESTATION_SUFFICIENT) or Stage 17 `verification_result`.
+- Sweep remains deterministic; it may list `agent_candidates[]` but never
+  launches a provider.
 
 ## Live Rig Data Changes During Development
 

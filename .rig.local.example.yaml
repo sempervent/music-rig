@@ -9,3 +9,19 @@ paths:
   stream_deck_export: null
   kaoss_backup: null
   controller_mappings_export: null
+
+# Prefer: `uv run rig agent provider setup`
+# agent:
+#   provider: cursor          # or ollama | command
+#   fallback: null            # optional: ollama
+#   timeout_seconds: 120
+#   cursor:
+#     executable: null        # default: agent
+#     model: null             # Cursor default when unset
+#   ollama:
+#     base_url: http://127.0.0.1:11434
+#     model: qwen3.5:latest
+#     think: false            # omit long hidden reasoning when API supports it
+#   # Advanced only:
+#   # provider: command
+#   # argv: [/path/to/wrapper]

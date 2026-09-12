@@ -24,7 +24,7 @@ class ReconcileScreen(Screen):
         Binding("a", "apply", "Apply"),
         Binding("v", "verify", "Verify"),
         Binding("f", "finalize", "Finalize"),
-        Binding("g", "agent_packet", "Agent"),
+        Binding("g", "agent_plan", "Reconcile"),
         Binding("o", "open_target", "Open Target"),
         Binding("e", "edit_target", "Edit Target"),
         Binding("l", "open_related", "Related"),
@@ -224,39 +224,34 @@ class ReconcileScreen(Screen):
             _done,
         )
 
-    def action_agent_packet(self) -> None:
-        """Show agent packet summary — no embedded chat; CLI remains canonical."""
-        from music_rig.tui.dialogs import HelpScreen
-
+    def action_agent_plan(self) -> None:
+        """Reconcile — deterministic or configured Cursor/Ollama planner."""
         item = self._selected()
         if item is None or item.artifact_type != "question":
-            self.notify("Select a question for agent packet", severity="warning")
+            self.notify("Select a question to Reconcile", severity="warning")
             return
-        try:
-            from music_rig.agent import build_agent_packet, capabilities
+        from music_rig.tui.screens.agent_plan import AgentPlanScreen
 
-            packet = build_agent_packet(item.artifact_id)
-            caps = capabilities()
-        except Exception as exc:  # noqa: BLE001
-            self.notify(f"Agent packet failed: {exc}", severity="error")
-            return
-        provider = (
-            "Provider configured."
-            if caps.get("provider_configured")
-            else "Agent provider not configured.\nPacket can be exported through CLI."
-        )
-        body = (
-            f"AGENT PACKET {packet['artifact']['id']}\n\n"
-            f"State: {packet.get('reconciliation_state')}\n"
-            f"Capability: {packet.get('capability')}\n"
-            f"Answer: {packet.get('final_human_answer') or '—'}\n\n"
-            f"{provider}\n\n"
-            f"CLI:\n"
-            f"  uv run rig agent packet {item.artifact_id} --json\n"
-            f"  uv run rig agent validate proposal.json\n"
-            f"  uv run rig agent apply proposal.json --dry-run\n"
-        )
-        self.app.push_screen(HelpScreen(body))
+        def _done(result: dict | None) -> None:
+            if result and result.get("redirect") == "verify":
+                from music_rig.tui.screens.verify import VerifyScreen
+
+                self.app.push_screen(VerifyScreen(initial_id=item.artifact_id))
+                return
+            if result and result.get("ok") and result.get("applied"):
+                self.notify(f"Applied reconciliation for {item.artifact_id}")
+                self.action_refresh()
+            elif result is not None:
+                self.notify(
+                    result.get("message") or "Reconcile finished",
+                    severity="information",
+                )
+
+        self.app.push_screen(AgentPlanScreen(item.artifact_id), _done)
+
+    def action_agent_packet(self) -> None:
+        """Back-compat alias."""
+        self.action_agent_plan()
 
     def action_open_target(self) -> None:
         item = self._selected()

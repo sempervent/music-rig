@@ -480,6 +480,9 @@ def record_observation(
     Observation ≠ answer. FAILED_TEST / UNKNOWN do not invent VERIFIED evidence.
     Value-bearing CONFIRMED/CORRECTED may resolve/update the Question answer.
     """
+    from music_rig.actor import require_human_observation
+
+    require_human_observation()
     _ = yes  # CLI confirm gate
     q = question_service.get_question(question_id, questions_path=questions_path)
     if isinstance(outcome, str):

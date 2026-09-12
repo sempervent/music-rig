@@ -88,9 +88,38 @@ err_console = Console(stderr=True)
 
 app = typer.Typer(
     name="rig",
-    help="Music-rig planning and studio-ops CLI. Canonical data lives in data/*.yaml.",
+    help=(
+        "Music-rig planning and studio-ops CLI. Canonical data lives in data/*.yaml.\n\n"
+        "Automated agents must always pass --am-bot immediately after `rig`."
+    ),
     no_args_is_help=True,
 )
+
+
+@app.callback()
+def _root_callback(
+    ctx: typer.Context,
+    am_bot: bool = typer.Option(
+        False,
+        "--am-bot",
+        help=(
+            "Mark this CLI invocation as originating from an automated agent. "
+            "Bots must always set this flag. Humans should omit it."
+        ),
+    ),
+) -> None:
+    """Global options for every `rig` invocation."""
+    from music_rig.actor import ActorKind, set_actor
+
+    set_actor(ActorKind.BOT if am_bot else ActorKind.HUMAN)
+    # Reject bot-driven TUI — answers would be mislabeled as HUMAN otherwise.
+    if am_bot and ctx.invoked_subcommand == "tui":
+        raise typer.BadParameter(
+            "rig --am-bot tui is not supported. "
+            "The TUI is a human interface; bots must use noninteractive CLI commands."
+        )
+
+
 todo_app = typer.Typer(help="Accepted work queue (data/todo.yaml).", no_args_is_help=True)
 wish_app = typer.Typer(
     help="Speculative wishlist (data/wishlist.yaml).", no_args_is_help=True
@@ -113,18 +142,19 @@ question_target_app = typer.Typer(
 )
 reconcile_app = typer.Typer(
     help=(
-        "Reconcile questions/changes into CURRENT via adapters (CLI-first). "
-        "VERIFY_ONLY domains never promote INTENDED→VERIFIED via apply. "
-        "Use plan → apply → verify → finalize; sweep never answers OPEN."
+        "Reconcile answered Questions into CURRENT. "
+        "Normal entrypoint: `rig reconcile run`. "
+        "Also: plan, apply, verify, finalize, sweep. "
+        "Sweep never answers OPEN questions."
     ),
     invoke_without_command=True,
     no_args_is_help=False,
 )
 agent_app = typer.Typer(
     help=(
-        "Agent-assisted reconciliation: packet → proposal → validate → apply. "
-        "Agents propose allowlisted RigOperations; the rig validates and dispatches. "
-        "No YAML edits, no shell, no invented VERIFIED evidence."
+        "Provider configuration and advanced packet/proposal tooling. "
+        "Ordinary reconciliation: `rig reconcile run`. "
+        "Advanced: packet → validate → apply for debugging/integrations."
     ),
     no_args_is_help=True,
 )
@@ -4108,6 +4138,119 @@ def reconcile_main(ctx: typer.Context) -> None:
         _fail(str(exc))
 
 
+@reconcile_app.command("run")
+def reconcile_run_cmd(
+    question_id: str,
+    apply: bool = typer.Option(False, "--apply"),
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(True, "--dry-run/--write"),
+    provider: str | None = typer.Option(None, "--provider", help="cursor|ollama|command"),
+    model: str | None = typer.Option(None, "--model", help="Ollama model override"),
+    quiet: bool = typer.Option(False, "--quiet", help="Suppress progress spinner"),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Normal end-to-end reconciliation (deterministic or configured agent). Preview by default."""
+    import sys
+
+    from music_rig.progress import cli_progress
+    from music_rig.reconciliation.run import reconcile_run
+
+    interactive_cb = None
+    if apply and not yes and sys.stdin.isatty() and sys.stdout.isatty() and not as_json:
+
+        def interactive_cb(info: dict) -> bool:
+            console.print("")
+            console.print("[bold]Human verification required.[/bold]")
+            console.print("")
+            console.print("CURRENT says:")
+            console.print(f"  {info.get('current')}")
+            console.print("")
+            console.print("Final answer says:")
+            console.print(f"  {info.get('desired')}")
+            console.print("")
+            return typer.confirm(
+                "Did you personally verify this on the actual rig?",
+                default=False,
+            )
+
+    with cli_progress(as_json=as_json, quiet=quiet) as prog:
+
+        def on_progress(ev) -> None:
+            prog.emit(ev)
+
+        try:
+            result = reconcile_run(
+                question_id,
+                apply=apply,
+                yes=yes,
+                dry_run=False if (apply and yes) else dry_run,
+                provider=provider,
+                ollama_model=model,
+                interactive_verify=interactive_cb,
+                on_progress=on_progress,
+            )
+        except StoreError as exc:
+            prog.stop()
+            if as_json:
+                console.print_json(data=err_payload("store_error", str(exc)))
+                raise typer.Exit(1)
+            _fail(str(exc))
+
+    # Interactive observation confirmed → offer to record verification
+    if (
+        result.get("interactive_observation_confirmed")
+        and apply
+        and not yes
+        and not as_json
+        and sys.stdin.isatty()
+    ):
+        if typer.confirm("Record verification_result = CONFIRMED?", default=True):
+            from music_rig import verification_service
+
+            current = result.get("plan", {}).get("current") or {}
+            value = None
+            if isinstance(current, dict):
+                value = current.get("master") or current.get("endpoint_ref")
+            try:
+                verification_service.record_observation(
+                    question_id.upper(),
+                    outcome="confirmed",
+                    value=str(value or ""),
+                    yes=True,
+                )
+            except Exception as exc:  # noqa: BLE001
+                _fail(f"Could not record verification: {exc}")
+            # Re-run after observation (deterministic path)
+            result = reconcile_run(
+                question_id,
+                apply=True,
+                yes=True,
+                dry_run=False,
+                provider=provider,
+                ollama_model=model,
+            )
+
+    if as_json:
+        console.print_json(data=ok_payload("reconcile.run", result))
+        raise typer.Exit(0 if result.get("ok") else 1)
+
+    console.print("[bold]RECONCILE RUN[/bold]")
+    console.print(f"Question: {result.get('artifact_id')}")
+    console.print(f"Mode: {result.get('mode')}")
+    if result.get("provider_label") or result.get("provider"):
+        console.print(f"Planner: {result.get('provider_label') or result.get('provider')}")
+    if result.get("timing_summary"):
+        console.print("")
+        console.print(result["timing_summary"])
+    if result.get("plan_review"):
+        console.print("")
+        console.print(result["plan_review"])
+    else:
+        console.print(result.get("message") or "")
+    if not result.get("ok"):
+        raise typer.Exit(1)
+
+
 def _reconcile_emit(payload: dict, *, as_json: bool, exit_code: int = 0) -> None:
     if as_json:
         # Plain JSON only — no Rich markup / ANSI.
@@ -4403,7 +4546,9 @@ def reconcile_sweep_cmd(
 def agent_capabilities_cmd(
     as_json: bool = typer.Option(False, "--json"),
 ) -> None:
-    """Show allowlisted agent operations and no-provider workflow."""
+    """Show allowlisted agent operations and provider workflow."""
+    from rich.table import Table
+
     from music_rig import agent as agent_mod
 
     result = agent_mod.capabilities()
@@ -4412,12 +4557,220 @@ def agent_capabilities_cmd(
         return
     console.print("[bold]AGENT CAPABILITIES[/bold]")
     console.print(f"Provider configured: {result['provider_configured']}")
-    console.print("Allowlisted operations:")
-    for kind in result["allowlisted_operations"]:
-        console.print(f"  - {kind}")
+    table = Table(title="Operations")
+    table.add_column("Operation")
+    table.add_column("Domain")
+    table.add_column("R/W")
+    table.add_column("Autonomous Safe")
+    table.add_column("Requires Verification")
+    table.add_column("Transaction Support")
+    for row in result.get("operations") or []:
+        domains = ", ".join(row.get("domain") or [])
+        table.add_row(
+            str(row.get("operation")),
+            domains,
+            str(row.get("read_write")),
+            "yes" if row.get("autonomous_safe") else "no",
+            "yes" if row.get("requires_verification") else "no",
+            "yes" if row.get("transaction_support") else "no",
+        )
+    console.print(table)
     console.print("Workflow:")
     for step in result["workflow"]:
         console.print(f"  {step}")
+
+
+provider_app = typer.Typer(help="Agent provider configuration and handshake.")
+agent_app.add_typer(provider_app, name="provider")
+
+
+@provider_app.command("status")
+def agent_provider_status_cmd(
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    from music_rig.agent.provider import provider_status
+
+    result = provider_status()
+    if as_json:
+        console.print_json(data=ok_payload("agent.provider.status", result))
+        return
+    console.print("[bold]AGENT RECONCILIATION[/bold]")
+    console.print(f"Provider: {result.get('provider_type') or '(none)'}")
+    console.print(f"Status: {result.get('status')}")
+    detail = result.get("detail") or {}
+    for key, value in detail.items():
+        if key == "models" and isinstance(value, list):
+            console.print(f"Models: {len(value)}")
+            continue
+        console.print(f"{key.replace('_', ' ').title()}: {value}")
+    console.print(f"Timeout: {result['timeout_seconds']}s")
+    if result.get("fallback"):
+        console.print(f"Fallback: {result['fallback']}")
+    detected = result.get("detected") or {}
+    ollama = detected.get("ollama") or {}
+    if result.get("provider_type") != "ollama" and ollama.get("available"):
+        console.print(
+            f"Ollama available ({ollama.get('model_count', 0)} models) — optional fallback"
+        )
+    if not result.get("configured"):
+        console.print(result.get("message") or "")
+
+
+@provider_app.command("test")
+def agent_provider_test_cmd(
+    provider: str | None = typer.Option(None, "--provider"),
+    model: str | None = typer.Option(None, "--model", help="Ollama model override"),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    from music_rig.agent.errors import AgentError
+    from music_rig.agent.provider import provider_test
+
+    try:
+        result = provider_test(provider=provider, ollama_model=model)
+    except AgentError as exc:
+        if as_json:
+            console.print_json(data=err_payload(exc.code, str(exc)))
+            raise typer.Exit(1)
+        _fail(str(exc))
+    if as_json:
+        console.print_json(data=ok_payload("agent.provider.test", result))
+        return
+    console.print("[bold]AGENT PROVIDER TEST[/bold]")
+    console.print(f"Provider: {result.get('provider')}")
+    console.print(f"Turn: {(result.get('turn') or {}).get('kind')}")
+    console.print("No repository mutations.")
+
+
+@provider_app.command("benchmark")
+def agent_provider_benchmark_cmd(
+    provider: str = typer.Option("ollama", "--provider"),
+    model: list[str] = typer.Option(
+        None,
+        "--model",
+        help="Model tag to benchmark (repeatable). Default: installed models (capped).",
+    ),
+    timeout: int = typer.Option(180, "--timeout", help="Per-call timeout seconds"),
+    no_warm: bool = typer.Option(False, "--no-warm", help="Skip warm repeat"),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Benchmark reconciliation planning against Ollama (fixture; no writes)."""
+    if provider.strip().lower() != "ollama":
+        _fail("Only --provider ollama is supported for benchmark currently.")
+    from music_rig.agent.benchmark import format_benchmark_table, run_ollama_benchmark
+
+    report = run_ollama_benchmark(
+        models=list(model) if model else None,
+        timeout_seconds=timeout,
+        warm=not no_warm,
+        think=False,
+    )
+    if as_json:
+        console.print_json(data=ok_payload("agent.provider.benchmark", report))
+        raise typer.Exit(0 if report.get("ok") else 1)
+    if not report.get("ok"):
+        _fail(report.get("error") or "benchmark failed")
+    console.print(format_benchmark_table(report))
+
+
+@provider_app.command("use")
+def agent_provider_use_cmd(
+    provider: str = typer.Argument(..., help="cursor | ollama | command"),
+    model: str | None = typer.Option(None, "--model", help="Ollama model"),
+    executable: str | None = typer.Option(None, "--executable", help="Cursor executable"),
+    base_url: str | None = typer.Option(None, "--base-url", help="Ollama base URL"),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Set the default reconciliation provider in .rig.local.yaml."""
+    from music_rig.local_config import update_agent_config
+
+    name = provider.strip().lower()
+    if name not in {"cursor", "ollama", "command"}:
+        _fail("provider must be cursor, ollama, or command")
+    if name == "ollama" and not model:
+        _fail("ollama requires --model <installed-model>")
+    try:
+        cfg = update_agent_config(
+            provider=name,
+            cursor_executable=executable,
+            ollama_model=model if name == "ollama" else None,
+            ollama_base_url=base_url,
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+    payload = {"provider": cfg.agent.provider, "ollama": cfg.agent.ollama.model_dump()}
+    if as_json:
+        console.print_json(data=ok_payload("agent.provider.use", payload))
+        return
+    console.print(f"Provider set to {name}")
+    if name == "ollama":
+        console.print(f"Model: {model}")
+
+
+@provider_app.command("setup")
+def agent_provider_setup_cmd(
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Interactive provider detection and selection (writes .rig.local.yaml only)."""
+    from music_rig.agent.provider import detect_providers
+    from music_rig.local_config import update_agent_config
+
+    detected = detect_providers()
+    if as_json:
+        console.print_json(data=ok_payload("agent.provider.setup", detected))
+        return
+    console.print("[bold]AGENT PROVIDERS[/bold]")
+    console.print("")
+    console.print("1. Cursor")
+    c = detected["cursor"]
+    console.print(
+        f"   {'✓' if c['available'] else '✗'} agent CLI "
+        f"{'found' if c['available'] else 'not found'}"
+    )
+    if c.get("version"):
+        console.print(f"   version: {c['version']}")
+    console.print("")
+    console.print("2. Ollama")
+    o = detected["ollama"]
+    console.print(
+        f"   {'✓' if o['available'] else '✗'} {o['base_url']} "
+        f"{'reachable' if o['available'] else 'not reachable'}"
+    )
+    if o.get("models"):
+        console.print("   models:")
+        for name in o["models"]:
+            console.print(f"     {name}")
+    console.print("")
+    choice = typer.prompt("Choose reconciliation provider", default="cursor").strip().lower()
+    if choice in {"1", "cursor"}:
+        if not c["available"]:
+            _fail("Cursor agent CLI not found")
+        update_agent_config(provider="cursor")
+        console.print("Provider set to cursor")
+        return
+    if choice in {"2", "ollama"}:
+        if not o["available"]:
+            _fail("Ollama is not reachable")
+        models = o.get("models") or []
+        if not models:
+            _fail("No Ollama models installed")
+        if len(models) == 1:
+            model = models[0]
+            console.print(f"Using only installed model: {model}")
+        else:
+            console.print("Select a model:")
+            for i, name in enumerate(models, 1):
+                console.print(f"  {i}. {name}")
+            pick = typer.prompt("Model number or name")
+            if pick.isdigit() and 1 <= int(pick) <= len(models):
+                model = models[int(pick) - 1]
+            else:
+                model = pick.strip()
+            if model not in models:
+                _fail(f"Unknown model {model!r}")
+        update_agent_config(provider="ollama", ollama_model=model)
+        console.print(f"Provider set to ollama / {model}")
+        return
+    _fail("Choose cursor or ollama")
 
 
 @agent_app.command("packet")
@@ -4477,7 +4830,7 @@ def agent_apply_cmd(
     snapshot_before: bool = typer.Option(False, "--snapshot-before"),
     as_json: bool = typer.Option(False, "--json"),
 ) -> None:
-    """Dry-run or apply a validated proposal via domain services (no subprocess)."""
+    """Dry-run or apply a validated proposal via atomic transaction."""
     from music_rig import agent as agent_mod
 
     try:
@@ -4507,42 +4860,23 @@ def agent_apply_cmd(
 def agent_reconcile_cmd(
     question_id: str,
     as_json: bool = typer.Option(False, "--json"),
+    dry_run: bool = typer.Option(True, "--dry-run/--write"),
+    apply: bool = typer.Option(False, "--apply"),
+    yes: bool = typer.Option(False, "--yes"),
+    provider: str | None = typer.Option(None, "--provider"),
+    model: str | None = typer.Option(None, "--model"),
 ) -> None:
-    """Preview-first agent reconcile (no provider configured in Stage 20)."""
-    from music_rig import agent as agent_mod
-
-    try:
-        packet = agent_mod.build_agent_packet(question_id)
-    except StoreError as exc:
-        if as_json:
-            console.print_json(data=err_payload("store_error", str(exc)))
-            raise typer.Exit(1)
-        _fail(str(exc))
-    result = {
-        "artifact_id": question_id.upper(),
-        "provider_configured": False,
-        "packet_hash": packet.get("packet_hash"),
-        "final_human_answer": packet.get("final_human_answer"),
-        "reconciliation_state": packet.get("reconciliation_state"),
-        "message": (
-            "No agent provider configured.\n"
-            f"Packet available via: uv run rig agent packet {question_id.upper()} --json\n"
-            "Validate an external proposal with: uv run rig agent validate proposal.json\n"
-            "Apply with: uv run rig agent apply proposal.json --dry-run"
-        ),
-        "next_commands": [
-            f"uv run rig agent packet {question_id.upper()} --json",
-            "uv run rig agent validate proposal.json",
-            "uv run rig agent apply proposal.json --dry-run",
-        ],
-    }
-    if as_json:
-        console.print_json(data=ok_payload("agent.reconcile", result))
-        return
-    console.print("[bold]AGENT RECONCILIATION[/bold]")
-    console.print(f"Artifact: {result['artifact_id']}")
-    console.print(f"Answer: {result['final_human_answer']!r}")
-    console.print(result["message"])
+    """Advanced alias for `rig reconcile run` (same orchestration)."""
+    # Delegate to the unified entrypoint — do not diverge.
+    reconcile_run_cmd(
+        question_id,
+        apply=apply,
+        yes=yes,
+        dry_run=dry_run,
+        provider=provider,
+        model=model,
+        as_json=as_json,
+    )
 
 
 @reconcile_app.command("change")
@@ -5374,6 +5708,8 @@ def question_show_cmd(
     console.print(f"Area: {q.area}")
     console.print(f"Status: {q.status.value}")
     console.print(f"Answer state: {fields['answer_state']}")
+    if fields.get("answer_source"):
+        console.print(f"Answer source: {fields['answer_source']}")
     console.print(f"Lifecycle: {fields['lifecycle_label']}")
     console.print("")
     console.print("Related TODOs:")

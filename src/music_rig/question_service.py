@@ -60,11 +60,23 @@ def lifecycle_label(question: OpenQuestion) -> str:
 
 def question_json_fields(question: OpenQuestion) -> dict:
     """Stable agent-facing fields including derived answer_state."""
+    from music_rig.verification_policy import (
+        effective_answer_actor,
+        evidence_basis_for,
+        verification_policy_for,
+    )
+
+    actor = effective_answer_actor(question)
     return {
         "id": question.id,
         "question_status": question.status.value,
         "answer_state": derive_answer_state(question).value,
         "answer": question.answer,
+        "answer_actor": actor.value if actor is not None else None,
+        "answer_source": actor.value if actor is not None else None,
+        "clarifies_question": question.clarifies_question,
+        "verification_policy": verification_policy_for(question).value,
+        "evidence_basis": evidence_basis_for(question).value,
         "resolved_at": (
             question.resolved_at.isoformat() if question.resolved_at else None
         ),
@@ -178,12 +190,91 @@ def add_question(
     return item
 
 
+def open_clarification_question(
+    parent_id: str,
+    clarification: str,
+    *,
+    area: str | None = None,
+    dry_run: bool = False,
+    render: bool = True,
+    questions_path: Path | None = None,
+    docs_todo=None,
+    docs_wishlist=None,
+    docs_questions=None,
+) -> dict:
+    """Create an OPEN child Question that clarifies a parent.
+
+    Does not alter CURRENT. Safe for agent use (creates human work only).
+    """
+    parent = get_question(parent_id, questions_path=questions_path)
+    text = clarification.strip()
+    if not text:
+        raise StoreError("Clarification question text cannot be empty.")
+    qdoc = load_questions(questions_path)
+    for q in qdoc.questions:
+        if (
+            q.clarifies_question == parent.id
+            and q.status == QuestionStatus.OPEN
+            and q.question.strip() == text
+            and not q.answer.strip()
+        ):
+            raise StoreError(
+                f"Open clarification already exists as {q.id} for {parent.id}"
+            )
+    area_clean = (area or parent.area).strip() or parent.area
+    if dry_run:
+        return {
+            "dry_run": True,
+            "parent_id": parent.id,
+            "would_create": {
+                "id": qdoc.next_id(),
+                "question": text,
+                "area": area_clean,
+                "clarifies_question": parent.id,
+                "status": QuestionStatus.OPEN.value,
+            },
+        }
+    child = OpenQuestion(
+        id=qdoc.next_id(),
+        question=text,
+        area=area_clean,
+        status=QuestionStatus.OPEN,
+        related_todos=list(parent.related_todos),
+        related_changes=[],
+        answer="",
+        notes=f"Clarifies {parent.id}",
+        clarifies_question=parent.id,
+        resolved_at=None,
+    )
+    new_doc = OpenQuestionsDocument(questions=[*qdoc.questions, child])
+    write_documents(questions=new_doc, questions_path=questions_path)
+    if render:
+        render_docs(
+            docs_todo=docs_todo,
+            docs_wishlist=docs_wishlist,
+            questions_path=questions_path,
+            docs_questions=docs_questions,
+            write=True,
+        )
+    return {
+        "dry_run": False,
+        "parent_id": parent.id,
+        "question_id": child.id,
+        "question": child,
+        "message": (
+            f"Opened clarification {child.id} for {parent.id}. "
+            "No CURRENT changes."
+        ),
+    }
+
+
 def resolve_question(
     question_id: str,
     answer: str | None = None,
     *,
     related_change: str | None = None,
     verification_note: str | None = None,
+    answer_actor=None,
     clock: Clock = default_clock,
     render: bool = True,
     questions_path: Path | None = None,
@@ -195,7 +286,12 @@ def resolve_question(
     """Promote to FINAL: RESOLVED + non-empty answer + resolved_at; reconciled_at null.
 
     If ``answer`` is None/blank, uses the existing question answer (draft → resolve).
+    ``answer_actor`` defaults from CLI actor context (HUMAN vs BOT).
+    BOT cannot supply final human authority for attestation/observation policies.
     """
+    from music_rig.actor import AnswerActor, ActorKind, get_actor, require_human
+    from music_rig.verification_policy import VerificationPolicy, verification_policy_for
+
     qdoc = load_questions(questions_path)
     key = question_id.strip().upper()
     current = qdoc.question_map().get(key)
@@ -207,6 +303,26 @@ def resolve_question(
         cleaned = current.answer.strip()
     if not cleaned:
         raise StoreError("Resolved questions require a non-empty answer.")
+
+    actor = answer_actor
+    if actor is None:
+        actor = (
+            AnswerActor.BOT
+            if get_actor() is ActorKind.BOT
+            else AnswerActor.HUMAN
+        )
+    if isinstance(actor, str):
+        actor = AnswerActor(actor)
+
+    # Bots may not finalize as HUMAN authority.
+    if actor is AnswerActor.BOT or get_actor() is ActorKind.BOT:
+        policy = verification_policy_for(current)
+        if policy is not VerificationPolicy.NO_VERIFICATION_REQUIRED:
+            raise StoreError(
+                "Bots cannot supply the required HUMAN answer.\n"
+                "Use a draft/suggestion (rig --am-bot question draft …) or open a "
+                "clarification Question; a human must Answer & Resolve."
+            )
 
     changes_doc = None
     change_ids = list(current.related_changes)
@@ -239,6 +355,7 @@ def resolve_question(
             "status": QuestionStatus.RESOLVED,
             "related_changes": change_ids,
             "answer": cleaned,
+            "answer_actor": actor,
             "resolved_at": clock(),
             "reconciled_at": None,
             "reconciliation_note": "",
@@ -282,13 +399,19 @@ def draft_question(
     """Save a draft answer: status OPEN, resolved_at/reconciled_at null.
 
     Does not invent verification_result. Does not reconcile.
+    BOT drafts remain answer_actor=BOT and do not clear NEEDS_HUMAN_ANSWER.
     """
+    from music_rig.actor import AnswerActor, ActorKind, get_actor
+
     _ = clock  # reserved for future audit timestamps
     cleaned = answer.strip()
     if not cleaned:
         raise StoreError("Draft answer cannot be empty.")
     current = get_question(question_id, questions_path=questions_path)
     before = question_json_fields(current)
+    actor = (
+        AnswerActor.BOT if get_actor() is ActorKind.BOT else AnswerActor.HUMAN
+    )
     if dry_run:
         return {
             "dry_run": True,
@@ -299,6 +422,7 @@ def draft_question(
                 "question_status": QuestionStatus.OPEN.value,
                 "answer_state": AnswerState.DRAFT.value,
                 "answer": cleaned,
+                "answer_actor": actor.value,
                 "resolved_at": None,
                 "reconciled_at": None,
             },
@@ -321,6 +445,7 @@ def draft_question(
         {
             "status": QuestionStatus.OPEN,
             "answer": cleaned,
+            "answer_actor": actor,
             "resolved_at": None,
             "reconciled_at": None,
             "reconciliation_note": "",
