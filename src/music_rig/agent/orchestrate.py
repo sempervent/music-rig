@@ -32,6 +32,51 @@ from music_rig.reconciliation.operations import RigOperation
 from music_rig.store import StoreError
 
 
+def _timing_from_turns(turns: list | None) -> dict[str, Any]:
+    """Summarize non-sensitive provider timings from turn diagnostics."""
+    out: dict[str, Any] = {
+        "provider_total_ms": None,
+        "context_round_count": len(turns or []),
+        "ollama_metrics": None,
+    }
+    if not turns:
+        return out
+    total_ms = 0
+    last_metrics = None
+    for item in turns:
+        diag = (item or {}).get("diagnostics") or {}
+        if isinstance(diag.get("provider_wall_ms"), int):
+            total_ms += diag["provider_wall_ms"]
+        if diag.get("ollama_metrics"):
+            last_metrics = diag["ollama_metrics"]
+    out["provider_total_ms"] = total_ms or None
+    out["ollama_metrics"] = last_metrics
+    return out
+
+
+def format_timing_summary(timing: dict[str, Any] | None, *, provider_label: str) -> str:
+    if not timing:
+        return ""
+    metrics = timing.get("ollama_metrics") or {}
+    lines = [provider_label]
+    wall = timing.get("provider_total_ms")
+    if wall is not None:
+        lines.append(f"Plan generated in {wall / 1000:.1f}s")
+    elif metrics.get("total_s") is not None:
+        lines.append(f"Plan generated in {metrics['total_s']:.1f}s")
+    if metrics.get("prompt_eval_count") is not None:
+        lines.append(f"Prompt: {metrics['prompt_eval_count']:,} tokens")
+    if metrics.get("eval_count") is not None:
+        lines.append(f"Output: {metrics['eval_count']:,} tokens")
+    if metrics.get("load_s") is not None:
+        lines.append(f"Load: {metrics['load_s']:.1f}s")
+    if metrics.get("prompt_eval_s") is not None:
+        lines.append(f"Prompt eval: {metrics['prompt_eval_s']:.1f}s")
+    if metrics.get("eval_s") is not None:
+        lines.append(f"Generation: {metrics['eval_s']:.1f}s")
+    return "\n".join(lines) if len(lines) > 1 else ""
+
+
 class AutonomyLevel(str, Enum):
     PLAN_ONLY = "PLAN_ONLY"
     APPLY_SAFE = "APPLY_SAFE"
@@ -277,15 +322,20 @@ def autonomous_reconcile(
     provider_name: str | None = None,
     ollama_model: str | None = None,
     root=None,
+    on_progress=None,
 ) -> dict[str, Any]:
     """Provider loop → validate → prepare transaction → optional apply."""
     from music_rig.agent import (
         build_agent_packet,
         validate_proposal,
     )
+    from music_rig.progress import ProgressPhase, ProgressTracker, CallbackProgress, NullProgress
 
     ctx = ctx or ReconciliationContext.default()
     qid = question_id.upper()
+    sink = CallbackProgress(on_progress) if on_progress else NullProgress()
+    tracker = ProgressTracker(sink=sink)
+    tracker.emit(ProgressPhase.BUILDING_PACKET, f"building packet for {qid}")
     packet = build_agent_packet(qid, ctx=ctx)
     run_id = audit.new_run_id()
 
@@ -295,6 +345,7 @@ def autonomous_reconcile(
             provider=provider_name,
             ollama_model=ollama_model,
             allow_fallback=provider_name is None,
+            on_progress=on_progress,
         )
     except ProviderNotConfiguredError as exc:
         return {
@@ -309,11 +360,19 @@ def autonomous_reconcile(
         }
 
     provider_label = getattr(prov, "provider_type", provider_name or "provider")
-    if provider_label == "ollama" and hasattr(prov, "model"):
-        provider_label = f"ollama / {prov.model}"
+    model_name = getattr(prov, "model", None)
+    if provider_label == "ollama" and model_name:
+        provider_label = f"ollama / {model_name}"
+        tracker.provider = "Ollama"
+        tracker.model = str(model_name)
     elif provider_label == "cursor":
         provider_label = "Cursor"
+        tracker.provider = "Cursor"
+    tracker.timeout_s = float(getattr(prov, "timeout_seconds", 120) or 120)
+    if on_progress and hasattr(prov, "on_progress"):
+        prov.on_progress = on_progress
 
+    tracker.emit(ProgressPhase.CONTACTING_PROVIDER, f"planning with {provider_label}")
     try:
         loop = run_provider_loop(packet, ctx=ctx, provider=prov)
     except (ProviderTimeoutError, ProviderInvalidResponseError, AgentError) as exc:
@@ -334,8 +393,10 @@ def autonomous_reconcile(
             "artifact_id": qid,
             "packet_hash": packet.get("packet_hash"),
             "provider": getattr(prov, "provider_type", None),
+            "provider_label": provider_label,
             "code": getattr(exc, "code", "PROVIDER_ERROR"),
             "error": str(exc),
+            "message": str(exc),
             "run_id": run_id,
         }
 
@@ -364,6 +425,8 @@ def autonomous_reconcile(
             "turns": loop.get("turns"),
             "writes": False,
             "run_id": run_id,
+            "provider_label": provider_label,
+            "timing": _timing_from_turns(loop.get("turns")),
             "message": "Human clarification required — no writes",
         }
 
@@ -390,8 +453,11 @@ def autonomous_reconcile(
             "reason": loop.get("reason"),
             "turns": loop.get("turns"),
             "run_id": run_id,
+            "provider_label": provider_label,
+            "timing": _timing_from_turns(loop.get("turns")),
         }
 
+    tracker.emit(ProgressPhase.VALIDATING_PROPOSAL, "validating proposed operations")
     proposal = loop["proposal"]
     validation = validate_proposal(proposal, ctx=ctx, packet=packet)
     if not validation.get("ok"):
@@ -417,8 +483,9 @@ def autonomous_reconcile(
             "proposal": proposal.to_dict(),
             "turns": loop.get("turns"),
             "run_id": run_id,
+            "provider_label": provider_label,
+            "timing": _timing_from_turns(loop.get("turns")),
         }
-
     # Autonomy filter for apply
     ops = list(proposal.operations)
     finalize_requested = bool(proposal.finalize) or any(
@@ -511,8 +578,12 @@ def autonomous_reconcile(
         "dry_run": True,
         "applied": False,
         "run_id": run_id,
+        "timing": _timing_from_turns(loop.get("turns")),
         "message": "Plan prepared. No changes have been written.",
     }
+    timing_text = format_timing_summary(result["timing"], provider_label=provider_label)
+    if timing_text:
+        result["timing_summary"] = timing_text
 
     # Default PLAN_ONLY / dry-run: stop before commit
     do_apply = apply and yes and not dry_run and autonomy in {

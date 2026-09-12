@@ -1205,6 +1205,9 @@ class OllamaProviderLocalConfig(BaseModel):
 
     base_url: str = "http://127.0.0.1:11434"
     model: str | None = None
+    # When False/True, sent as Ollama `think` if the model accepts it.
+    # None omits the parameter (provider default).
+    think: bool | None = False
 
 
 class AgentLocalConfig(BaseModel):

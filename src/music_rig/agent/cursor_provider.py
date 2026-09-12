@@ -82,11 +82,17 @@ class CursorProvider:
         packet: dict[str, Any],
         context: list[dict[str, Any]] | None = None,
     ) -> tuple[AgentTurn, dict[str, Any]]:
-        prompt = build_planner_prompt(packet=packet, context=context)
+        # Cursor has no structured format= — keep schema in the prompt.
+        prompt = build_planner_prompt(
+            packet=packet,
+            context=context,
+            include_schema=True,
+            compact_packet=True,
+        )
         return self._invoke(prompt)
 
     def handshake(self) -> tuple[AgentTurn, dict[str, Any]]:
-        return self._invoke(build_handshake_prompt())
+        return self._invoke(build_handshake_prompt(include_schema=True))
 
     def _invoke(self, prompt: str) -> tuple[AgentTurn, dict[str, Any]]:
         argv = self.build_argv(prompt)

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from music_rig.agent.provider_packet import project_provider_packet
 from music_rig.agent.turns import agent_turn_json_schema
 
 TRUTH_RULES = """\
@@ -30,45 +31,68 @@ Choose exactly one kind:
 Provider output is untrusted. The rig validates and executes operations.
 """
 
+AGENT_TURN_KIND_HINT = """\
+Respond with a single JSON object with keys:
+  kind, rationale, proposal, inspection_requests, clarification_questions, reason
+kind ∈ READY | NEEDS_MORE_CONTEXT | NEEDS_HUMAN_CLARIFICATION | NO_SAFE_PLAN
+No Markdown. No prose outside JSON.
+"""
+
 
 def build_planner_prompt(
     *,
     packet: dict[str, Any],
     context: list[dict[str, Any]] | None = None,
+    include_schema: bool = True,
+    compact_packet: bool = True,
 ) -> str:
-    schema = agent_turn_json_schema()
-    payload = {
-        "packet": packet,
+    """Build planner prompt.
+
+    ``include_schema=True`` for providers that cannot enforce JSON schema via API
+    (e.g. Cursor). Ollama should pass ``include_schema=False`` and use ``format=``.
+    """
+    projected = project_provider_packet(packet) if compact_packet else packet
+    payload: dict[str, Any] = {
+        "packet": projected,
         "additional_context": list(context or []),
-        "agent_turn_json_schema": schema,
     }
-    return (
-        TRUTH_RULES
-        + "\n\n--- STRUCTURED INPUT ---\n"
-        + json.dumps(payload, indent=2, default=str)
-        + "\n--- END INPUT ---\n\n"
-        "Respond with a single JSON object matching agent_turn_json_schema. "
-        "No Markdown. No prose outside JSON."
-    )
-
-
-def build_handshake_prompt() -> str:
-    schema = agent_turn_json_schema()
-    return (
-        TRUTH_RULES
-        + "\nThis is a provider handshake test. Return exactly:\n"
-        + json.dumps(
-            {
-                "kind": "NO_SAFE_PLAN",
-                "rationale": "provider test handshake",
-                "proposal": None,
-                "inspection_requests": [],
-                "clarification_questions": [],
-                "reason": "provider_test",
-            },
-            indent=2,
+    parts = [
+        TRUTH_RULES,
+        "\n\n--- STRUCTURED INPUT ---\n",
+        json.dumps(payload, indent=2, default=str),
+        "\n--- END INPUT ---\n\n",
+    ]
+    if include_schema:
+        parts.append("AgentTurn JSON schema:\n")
+        parts.append(json.dumps(agent_turn_json_schema(), indent=2))
+        parts.append(
+            "\n\nRespond with a single JSON object matching the schema. "
+            "No Markdown. No prose outside JSON."
         )
-        + "\n\nSchema (for reference):\n"
-        + json.dumps(schema, indent=2)
-        + "\nJSON only."
-    )
+    else:
+        parts.append(AGENT_TURN_KIND_HINT)
+    return "".join(parts)
+
+
+def build_handshake_prompt(*, include_schema: bool = True) -> str:
+    handshake = {
+        "kind": "NO_SAFE_PLAN",
+        "rationale": "provider test handshake",
+        "proposal": None,
+        "inspection_requests": [],
+        "clarification_questions": [],
+        "reason": "provider_test",
+    }
+    parts = [
+        TRUTH_RULES,
+        "\nThis is a provider handshake test. Return exactly:\n",
+        json.dumps(handshake, indent=2),
+        "\n",
+    ]
+    if include_schema:
+        parts.append("\nSchema (for reference):\n")
+        parts.append(json.dumps(agent_turn_json_schema(), indent=2))
+        parts.append("\nJSON only.")
+    else:
+        parts.append("\nJSON only matching AgentTurn (schema enforced by API format).\n")
+    return "".join(parts)

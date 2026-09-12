@@ -184,6 +184,7 @@ def resolve_provider(
     provider: str | None = None,
     ollama_model: str | None = None,
     allow_fallback: bool = True,
+    on_progress=None,
 ) -> TurnProvider:
     """Resolve configured (or overridden) provider instance."""
     agent = load_agent_local_config(root=root)
@@ -202,7 +203,7 @@ def resolve_provider(
             if ollama_model:
                 cfg = agent.model_copy(deep=True)
                 cfg.ollama.model = ollama_model
-            return ollama_provider_from_config(cfg)
+            return ollama_provider_from_config(cfg, on_progress=on_progress)
         if which == "command":
             return CommandProvider.from_local_config(root=root)
         raise ProviderNotConfiguredError(

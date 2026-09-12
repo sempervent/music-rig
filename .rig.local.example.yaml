@@ -21,6 +21,7 @@ paths:
 #   ollama:
 #     base_url: http://127.0.0.1:11434
 #     model: qwen3.5:latest
+#     think: false            # omit long hidden reasoning when API supports it
 #   # Advanced only:
 #   # provider: command
 #   # argv: [/path/to/wrapper]

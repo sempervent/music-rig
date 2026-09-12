@@ -4117,25 +4117,89 @@ def reconcile_run_cmd(
     dry_run: bool = typer.Option(True, "--dry-run/--write"),
     provider: str | None = typer.Option(None, "--provider", help="cursor|ollama|command"),
     model: str | None = typer.Option(None, "--model", help="Ollama model override"),
+    quiet: bool = typer.Option(False, "--quiet", help="Suppress progress spinner"),
     as_json: bool = typer.Option(False, "--json"),
 ) -> None:
     """Normal end-to-end reconciliation (deterministic or configured agent). Preview by default."""
+    import sys
+
+    from music_rig.progress import cli_progress
     from music_rig.reconciliation.run import reconcile_run
 
-    try:
-        result = reconcile_run(
-            question_id,
-            apply=apply,
-            yes=yes,
-            dry_run=False if (apply and yes) else dry_run,
-            provider=provider,
-            ollama_model=model,
-        )
-    except StoreError as exc:
-        if as_json:
-            console.print_json(data=err_payload("store_error", str(exc)))
-            raise typer.Exit(1)
-        _fail(str(exc))
+    interactive_cb = None
+    if apply and not yes and sys.stdin.isatty() and sys.stdout.isatty() and not as_json:
+
+        def interactive_cb(info: dict) -> bool:
+            console.print("")
+            console.print("[bold]Human verification required.[/bold]")
+            console.print("")
+            console.print("CURRENT says:")
+            console.print(f"  {info.get('current')}")
+            console.print("")
+            console.print("Final answer says:")
+            console.print(f"  {info.get('desired')}")
+            console.print("")
+            return typer.confirm(
+                "Did you personally verify this on the actual rig?",
+                default=False,
+            )
+
+    with cli_progress(as_json=as_json, quiet=quiet) as prog:
+
+        def on_progress(ev) -> None:
+            prog.emit(ev)
+
+        try:
+            result = reconcile_run(
+                question_id,
+                apply=apply,
+                yes=yes,
+                dry_run=False if (apply and yes) else dry_run,
+                provider=provider,
+                ollama_model=model,
+                interactive_verify=interactive_cb,
+                on_progress=on_progress,
+            )
+        except StoreError as exc:
+            prog.stop()
+            if as_json:
+                console.print_json(data=err_payload("store_error", str(exc)))
+                raise typer.Exit(1)
+            _fail(str(exc))
+
+    # Interactive observation confirmed → offer to record verification
+    if (
+        result.get("interactive_observation_confirmed")
+        and apply
+        and not yes
+        and not as_json
+        and sys.stdin.isatty()
+    ):
+        if typer.confirm("Record verification_result = CONFIRMED?", default=True):
+            from music_rig import verification_service
+
+            current = result.get("plan", {}).get("current") or {}
+            value = None
+            if isinstance(current, dict):
+                value = current.get("master") or current.get("endpoint_ref")
+            try:
+                verification_service.record_observation(
+                    question_id.upper(),
+                    outcome="confirmed",
+                    value=str(value or ""),
+                    yes=True,
+                )
+            except Exception as exc:  # noqa: BLE001
+                _fail(f"Could not record verification: {exc}")
+            # Re-run after observation (deterministic path)
+            result = reconcile_run(
+                question_id,
+                apply=True,
+                yes=True,
+                dry_run=False,
+                provider=provider,
+                ollama_model=model,
+            )
 
     if as_json:
         console.print_json(data=ok_payload("reconcile.run", result))
@@ -4146,6 +4210,9 @@ def reconcile_run_cmd(
     console.print(f"Mode: {result.get('mode')}")
     if result.get("provider_label") or result.get("provider"):
         console.print(f"Planner: {result.get('provider_label') or result.get('provider')}")
+    if result.get("timing_summary"):
+        console.print("")
+        console.print(result["timing_summary"])
     if result.get("plan_review"):
         console.print("")
         console.print(result["plan_review"])
@@ -4543,6 +4610,37 @@ def agent_provider_test_cmd(
     console.print(f"Provider: {result.get('provider')}")
     console.print(f"Turn: {(result.get('turn') or {}).get('kind')}")
     console.print("No repository mutations.")
+
+
+@provider_app.command("benchmark")
+def agent_provider_benchmark_cmd(
+    provider: str = typer.Option("ollama", "--provider"),
+    model: list[str] = typer.Option(
+        None,
+        "--model",
+        help="Model tag to benchmark (repeatable). Default: installed models (capped).",
+    ),
+    timeout: int = typer.Option(180, "--timeout", help="Per-call timeout seconds"),
+    no_warm: bool = typer.Option(False, "--no-warm", help="Skip warm repeat"),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Benchmark reconciliation planning against Ollama (fixture; no writes)."""
+    if provider.strip().lower() != "ollama":
+        _fail("Only --provider ollama is supported for benchmark currently.")
+    from music_rig.agent.benchmark import format_benchmark_table, run_ollama_benchmark
+
+    report = run_ollama_benchmark(
+        models=list(model) if model else None,
+        timeout_seconds=timeout,
+        warm=not no_warm,
+        think=False,
+    )
+    if as_json:
+        console.print_json(data=ok_payload("agent.provider.benchmark", report))
+        raise typer.Exit(0 if report.get("ok") else 1)
+    if not report.get("ok"):
+        _fail(report.get("error") or "benchmark failed")
+    console.print(format_benchmark_table(report))
 
 
 @provider_app.command("use")
