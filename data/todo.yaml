@@ -1,6 +1,6 @@
 next_session:
-- RIG-001
-- RIG-002
+- RIG-046
+- RIG-038
 tasks:
 - id: RIG-001
   task: Physically verify DIRTY chain order and SPACE topology (SY-1 SEND PH-3→TR-2; LS-2
@@ -14,19 +14,20 @@ tasks:
     in pedal docs, diagrams, and inventory active lists'
   notes: Do not invent fixes; document what is actually wired
   waiting_on: null
-  next_session_why: Unlocks confident playing; catches doc drift immediately
+  next_session_why: null
 - id: RIG-002
   task: Inspect and record normal / half-normal / thru for every populated PB-B pair
   area: Patchbay
   priority: P0
-  status: READY
+  status: DONE
   depends_on: []
   depends_hint: null
   definition_of_done: Every populated pair in `data/patchbays.yaml` and `docs/patchbays.md`
     has `mode` set to normal, half-normal, or thru
-  notes: Upper 9–12 / lower 33–36 included if physically checkable
+  notes: Upper 9–12 / lower 33–36 included if physically checkable Closed via Q-008 HUMAN
+    answer + CURRENT all-normal reconcile (Stage 27).
   waiting_on: null
-  next_session_why: Highest-value patchbay unknown; quick rack check
+  next_session_why: null
 - id: RIG-003
   task: Trace and document non-clean A/B/Y destinations for acoustic, bass, electric
   area: Routing
@@ -174,14 +175,14 @@ tasks:
 - id: RIG-015
   task: Define and run known-good baseline smoke test
   area: Studio ops
-  priority: P0
+  priority: P1
   status: READY
   depends_on:
   - RIG-001
   depends_hint: helpful
   definition_of_done: Checklist + dated pass/fail proving clean captures, AUX loop, and KAOSS
     path; distinguishes “broken” from “booted differently”
-  notes: ''
+  notes: Optional verification — PLAYABLE without re-running smoke campaign.
   waiting_on: null
   next_session_why: null
 - id: RIG-016
@@ -324,7 +325,7 @@ tasks:
   task: Confirm Ableton as default master clock in practice
   area: MIDI
   priority: P2
-  status: READY
+  status: DONE
   depends_on: []
   depends_hint: null
   definition_of_done: midi-clock.md states verified CURRENT behavior, not only intent
@@ -403,17 +404,16 @@ tasks:
   task: Document and verify final physical MIDI topology
   area: MIDI
   priority: P0
-  status: READY
+  status: DONE
   depends_on:
   - RIG-031
   depends_hint: helpful
-  definition_of_done: Physical USB + DIN paths; U6MIDI Pro routes/filters; Thru5 WC role;
-    clock master + destinations; channels (Privia 1, padKONTROL 10, ZeRO 15, FCB 16); Ableton
-    Track/Sync/Remote settings; feedback prevention; All Notes Off path; MIDI-monitor tested
-  notes: >-
-    Owned CME gear — operate, don’t repurchase.
-    Stage 25 HUMAN: Thru5 OUT destinations = SL-2, SR-18, miniKORG, KAOSS;
-    OUT number→device map still UNKNOWN. U6MIDI OUT1→Thru5 IN1 VERIFIED.
+  definition_of_done: Spine FCB→U6MIDI→Thru5 VERIFIED; Thru5 device-level THRU fanout to SL-2,
+    SR-18, miniKORG, KAOSS documented (individual THRU sockets intentionally not tracked);
+    Ableton clock master VERIFIED; intended channels recorded.
+  notes: 'Owned CME gear — operate, don’t repurchase. Stage 27: device-level fanout accepted;
+    Ableton Track/Sync/Remote per-port, U6MIDI filter programming, feedback/All Notes Off,
+    MIDI-monitor remain optional later.'
   waiting_on: null
   next_session_why: null
 - id: RIG-038
@@ -428,7 +428,7 @@ tasks:
     layout, record-ready, panic/recovery; can record a rough jam immediately'
   notes: Finished music outranks rig redesign
   waiting_on: null
-  next_session_why: null
+  next_session_why: Turn-on-and-play set supports jamming with less friction
 - id: RIG-039
   task: Normalize padKONTROL footswitch clip-record toggle to single predictable action
   area: Ableton / M4L
@@ -540,7 +540,7 @@ tasks:
     reviewed; discrepancies logged
   notes: Proves the rig makes music
   waiting_on: null
-  next_session_why: null
+  next_session_why: Make music — reference jam is the point of the rig
 - id: RIG-047
   task: Audit pedal power supplies vs CURRENT pedal load
   area: Pedals / power

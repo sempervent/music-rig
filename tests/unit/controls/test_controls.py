@@ -177,11 +177,15 @@ def test_q016_q017_targets_and_reconcile_commands():
     # Q-016 HUMAN bank-00 answer reconciled; banks 01/02 still incomplete in CURRENT.
     assert questions["Q-016"].reconciled_at is not None
     assert "bank 00" in (questions["Q-016"].answer or "").casefold()
-    # Q-017 remains OPEN — reconcile text still points at controls verify.
-    assert questions["Q-017"].status.value == "OPEN"
-    assert "rig current controls verify novation-remote-zero-sl" in format_reconcile_question(
-        "Q-017"
-    )
+    # Q-017 HUMAN FINAL UNKNOWN — templates unnamed; do not invent CURRENT mappings.
+    assert questions["Q-017"].status.value == "RESOLVED"
+    assert questions["Q-017"].answer_actor.value == "HUMAN"
+    assert "UNKNOWN" in (questions["Q-017"].answer or "")
+    assert questions["Q-017"].verification_result is not None
+    assert questions["Q-017"].verification_result.outcome.value == "UNKNOWN"
+    text = format_reconcile_question("Q-017")
+    assert "RESOLVED" in text
+    assert "UNKNOWN" in text
 
 
 def test_midi_topology_clock_channels_and_statuses_remain_unchanged(control_files):

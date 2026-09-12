@@ -160,14 +160,17 @@ questions:
   question: What normalization mode (normal / half-normal / thru) is each populated PB-B pair
     set to?
   area: Patchbay
-  status: OPEN
+  status: RESOLVED
   related_todos:
   - RIG-002
   related_changes: []
-  answer: All represented PB-B pairs are normal (HUMAN Stage 25 live validation).
-  answer_actor: BOT
+  answer: All represented PB-B pairs are normal
+  answer_actor: HUMAN
   notes: ''
-  reconciliation_note: ''
+  resolved_at: '2026-09-12T17:50:45.972922-04:00'
+  reconciled_at: '2026-09-12T17:54:57.803257-04:00'
+  reconciliation_note: '[agent-interpreted / manually reconciled] HUMAN bay-wide attestation:
+    all represented PB-B pairs normal; CURRENT already normal for all listed pairs'
   target:
     domain: patchbay.mode
     bay: PB-B
@@ -355,14 +358,17 @@ questions:
 - id: Q-017
   question: Which ReMOTE ZeRO SL templates are actually loaded on the device?
   area: MIDI
-  status: OPEN
+  status: RESOLVED
   related_todos:
   - RIG-036
   related_changes: []
-  answer: UNKNOWN — device templates have no names visible (HUMAN Stage 25 live validation).
-  answer_actor: BOT
+  answer: UNKNOWN — templates have no names
+  answer_actor: HUMAN
   notes: ''
-  reconciliation_note: ''
+  resolved_at: '2026-09-12T17:51:04.980790-04:00'
+  reconciled_at: '2026-09-12T17:55:09.666013-04:00'
+  reconciliation_note: HUMAN answer+observation UNKNOWN — no named templates loaded; do not
+    invent controller CURRENT mappings
   target:
     domain: controls.verify
     gear: novation-remote-zero-sl
@@ -372,7 +378,13 @@ questions:
       UNKNOWN.
     answer_type: TEXT
     choices: []
-  verification_note: ''
+  verification_note: no named templates loaded
+  verification_result:
+    outcome: UNKNOWN
+    observed_at: '2026-09-12T17:51:21.430503-04:00'
+    observed_value: no named templates loaded
+    note: no named templates loaded
+    source: HUMAN
 - id: Q-018
   question: What are the exact active tracks in the current PFL jam Ableton set?
   area: Performance / video

@@ -32,13 +32,18 @@ def test_manual_classification_complete():
 
 
 def test_production_verification_result_null():
-    """Production questions must not have fabricated observations."""
-    # Load real production path (not monkeypatched) — skip if fixture polluted
+    """Production questions must not have fabricated BOT observations.
 
-    # Use repo data path explicitly (not relative to this test file's depth)
+    HUMAN UNKNOWN for Q-017 is an honest recorded observation, not invention.
+    """
     from music_rig.store import ROOT
 
+    allowed_human_obs = frozenset({"Q-017"})
     repo = ROOT / "data" / "open-questions.yaml"
     doc = load_questions(repo)
     for q in doc.questions:
-        assert q.verification_result is None, f"{q.id} has fabricated observation"
+        if q.verification_result is None:
+            continue
+        assert q.id in allowed_human_obs, f"{q.id} has unexpected observation"
+        assert q.verification_result.source == "HUMAN"
+        assert q.verification_result.outcome == VerificationOutcome.UNKNOWN

@@ -112,7 +112,7 @@ def test_repo_todo_no_next_status():
     doc = load_todo()
     assert all(t.status != "NEXT" for t in doc.tasks)  # type: ignore[comparison-overlap]
     assert {t.id for t in doc.tasks if t.id in doc.next_session} == set(doc.next_session)
-    assert doc.next_session == ["RIG-001", "RIG-002"]
+    assert doc.next_session == ["RIG-046", "RIG-038"]
     assert all(doc.task_map()[i].status == TodoStatus.READY for i in doc.next_session)
     assert len(doc.tasks) == 44
     assert load_wishlist() and len(load_wishlist().items) == 16
@@ -415,7 +415,8 @@ def test_cli_todo_list_and_unknown():
 def test_cli_next_list():
     result = runner.invoke(app, ["todo", "next", "list"])
     assert result.exit_code == 0
-    assert "RIG-001" in result.stdout
+    assert "RIG-046" in result.stdout
+    assert "RIG-038" in result.stdout
 
 
 def test_render_check_repo():

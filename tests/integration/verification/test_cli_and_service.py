@@ -386,10 +386,12 @@ _RECONCILED_PROD = frozenset(
         "Q-004",
         "Q-006",
         "Q-007",
+        "Q-008",
         "Q-011",
         "Q-014",
         "Q-015",
         "Q-016",
+        "Q-017",
         "Q-018",
         "Q-020",
     }
@@ -397,9 +399,11 @@ _RECONCILED_PROD = frozenset(
 # Reserved for FINAL answers still awaiting CURRENT reconciliation.
 _FINAL_UNRECONCILED_PROD = frozenset()
 
-
 # OPEN Questions that may carry BOT draft answers (not HUMAN FINAL authority).
-_BOT_DRAFT_PROD = frozenset({"Q-008", "Q-017"})
+_BOT_DRAFT_PROD = frozenset()
+
+# Questions allowed to carry HUMAN verification_result in production.
+_OBS_RECORDED_PROD = frozenset({"Q-017"})
 
 
 def test_production_questions_have_verification_metadata_answers_untouched():
@@ -411,7 +415,12 @@ def test_production_questions_have_verification_metadata_answers_untouched():
         assert q.verification is not None, q.id
         assert q.verification.kind
         assert q.verification.answer_type in {"ENUM", "BOOL", "REF", "TEXT"}
-        assert q.verification_result is None  # never invent observations
+        if q.id in _OBS_RECORDED_PROD:
+            assert q.verification_result is not None
+            assert q.verification_result.source == "HUMAN"
+            assert q.verification_result.outcome.value == "UNKNOWN"
+        else:
+            assert q.verification_result is None  # never invent observations
         if q.id in _RECONCILED_PROD:
             assert q.status == QuestionStatus.RESOLVED
             assert q.answer.strip()
@@ -439,11 +448,12 @@ def test_production_questions_have_verification_metadata_answers_untouched():
             assert q.verification.choices
     assert "PATCHBAY_MODE" in kinds
     assert "PATCHBAY_UNIT" in kinds
-    # Q-008 pair stays null
+    # Q-008 pair stays null (bay-wide attestation)
     q8 = doc.question_map()["Q-008"]
     assert q8.target is not None
     assert q8.target.bay == "PB-B"
     assert q8.target.pair is None
+    assert q8.answer_actor == AnswerActor.HUMAN
     q7 = doc.question_map()["Q-007"]
     assert q7.target is not None
     assert q7.target.domain == "inventory.patchbay_mapping"

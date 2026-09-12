@@ -903,7 +903,7 @@ def human_show(action_id: str) -> None:
 def human_review() -> None:
     """Interactive one-at-a-time HUMAN review (accept / edit / reject / skip)."""
     from music_rig import human_action_service
-    from music_rig.models import HumanActionStatus
+    from music_rig.models import HumanActionStatus, HumanActionType
 
     try:
         items = human_action_service.list_actions(pending_only=True)
@@ -914,7 +914,6 @@ def human_review() -> None:
         return
     console.print(f"[bold]{len(items)} human review(s) waiting[/bold]\n")
     for item in items:
-        # May have been superseded mid-loop
         try:
             fresh = human_action_service.get_action(item.id)
         except StoreError:
@@ -923,20 +922,20 @@ def human_review() -> None:
             continue
         console.print(human_action_service.format_review(fresh))
         console.print()
-        choice = (
-            typer.prompt(
-                "Accept / Edit / Reject / Skip / Quit",
-                default="Skip",
-            )
-            .strip()
-            .lower()
+        choice_raw = typer.prompt(
+            "Accept / Edit / Reject / Skip / Quit  (or type your answer)",
+            default="Skip",
         )
-        if choice in {"q", "quit"}:
+        parsed = human_action_service.interpret_review_input(
+            choice_raw, action_type=fresh.action_type
+        )
+        decision = parsed["decision"]
+        if decision == "quit":
             break
-        if choice in {"s", "skip", ""}:
+        if decision == "skip":
             console.print("[dim]Skipped (still pending).[/dim]\n")
             continue
-        if choice in {"r", "reject"}:
+        if decision == "reject":
             try:
                 human_action_service.reject(fresh.id)
             except StoreError as exc:
@@ -944,10 +943,32 @@ def human_review() -> None:
             console.print(f"[yellow]{fresh.id} rejected.[/yellow]\n")
             continue
         edited: str | None = None
-        if choice in {"e", "edit"}:
+        if decision == "edit":
             edited = typer.prompt("Edited value", default=fresh.proposed_value)
-            choice = "accept"
-        if choice in {"a", "accept", "y", "yes"}:
+            decision = "accept"
+        if decision == "freeform":
+            edited = parsed["value"]
+            console.print(f"Use this as your answer?\n  {edited}")
+            if not typer.confirm("Accept this value?", default=True):
+                console.print("[dim]Left pending.[/dim]\n")
+                continue
+            decision = "accept"
+        if decision == "freeform_note":
+            console.print(
+                "[yellow]Verification needs an explicit outcome "
+                "(confirmed/corrected/unknown/failed_test).[/yellow]"
+            )
+            console.print(f"Kept as note material: {parsed['value']}")
+            console.print("[dim]Left pending — accept/edit with a valid outcome.[/dim]\n")
+            continue
+        if decision == "need_explicit_dod":
+            console.print(
+                "[yellow]DoD confirmation must be explicit Accept (or Edit to YES).[/yellow]"
+            )
+            console.print(f"Noted: {parsed['value']}")
+            console.print("[dim]Left pending.[/dim]\n")
+            continue
+        if decision == "accept":
             try:
                 result = human_action_service.accept(fresh.id, edited_value=edited, render=True)
             except StoreError as exc:
@@ -955,21 +976,28 @@ def human_review() -> None:
             console.print(f"[green]{result['message']}[/green]")
             if result.get("reconcile_prompt"):
                 console.print(result["reconcile_prompt"])
-                if typer.confirm("Reconcile now?", default=True):
-                    qid = fresh.artifact_id
-                    console.print(f"Next: uv run rig reconcile plan question {qid}")
-                    try:
-                        from music_rig.reconciliation import service as reconcile_service
+                # Only offer reconcile when the artifact is a real Question.
+                if fresh.artifact_id.startswith("Q-") and fresh.action_type in {
+                    HumanActionType.QUESTION_ANSWER,
+                    HumanActionType.VERIFICATION_RESULT,
+                    HumanActionType.HUMAN_CLARIFICATION,
+                }:
+                    if typer.confirm("Reconcile now?", default=True):
+                        qid = fresh.artifact_id
+                        console.print(f"Next: uv run rig reconcile plan question {qid}")
+                        try:
+                            from music_rig.reconciliation import service as reconcile_service
 
-                        plan = reconcile_service.plan_question(qid)
-                        console.print(
-                            f"Plan state: {plan.state.value} / capability={plan.capability.value}"
-                        )
-                    except Exception as exc:  # noqa: BLE001 — show plan failure, stay in review
-                        console.print(f"[yellow]Reconcile plan: {exc}[/yellow]")
+                            plan = reconcile_service.plan_question(qid)
+                            console.print(
+                                f"Plan state: {plan.state.value} / "
+                                f"capability={plan.capability.value}"
+                            )
+                        except Exception as exc:  # noqa: BLE001
+                            console.print(f"[yellow]Reconcile plan: {exc}[/yellow]")
             console.print()
             continue
-        console.print("[dim]Unrecognized choice — skipped.[/dim]\n")
+        console.print("[dim]Left pending.[/dim]\n")
 
 
 @human_app.command("accept")
