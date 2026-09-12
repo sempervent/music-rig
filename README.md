@@ -378,7 +378,7 @@ More detail: [docs/tui.md](docs/tui.md) and [SKILLS.md](SKILLS.md).
 
 ## Documentation CI/CD
 
-- CI runs pytest (with coverage, fail under 75%), `rig check`, `rig render --check`, channel-map print, and `mkdocs build --strict`.
+- CI runs pytest (xdist on `cpu_count - 2` workers, asyncio auto mode, coverage fail under 75%), `rig check`, `rig render --check`, channel-map print, and `mkdocs build --strict`.
 - Pushes to `main` also deploy the MkDocs site to GitHub Pages.
 - Local validation:
 
@@ -391,7 +391,7 @@ uv run python scripts/print_channel_map.py
 uv run mkdocs build --strict
 ```
 
-Coverage measures `music_rig` excluding thin `cli.py` wiring and the Textual `tui/` package (logic lives in services; TUI has dedicated pilot tests). CI fails under 75%.
+Coverage measures `music_rig` excluding thin `cli.py` wiring and the Textual `tui/` package (logic lives in services; TUI has dedicated pilot tests). CI fails under 75%. Parallelism is `-n auto` → `max(1, cpu_count - 2)`; use `-n0` to debug. Async tests are plain `async def test_*` via pytest-asyncio `asyncio_mode = auto`.
 
 - Local preview:
 

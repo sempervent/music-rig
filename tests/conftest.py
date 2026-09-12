@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -30,6 +31,12 @@ if tuple(int(p) for p in pydantic.__version__.split(".")[:2]) < (2, 0):
     )
 
 from music_rig import store
+
+
+def pytest_xdist_auto_num_workers(config: pytest.Config) -> int:
+    """Run the suite on (logical CPUs - 2), floored at 1 worker."""
+    n_cores = os.cpu_count() or 1
+    return max(1, n_cores - 2)
 
 
 def _write_docs(tmp_path: Path) -> dict[str, Path]:
