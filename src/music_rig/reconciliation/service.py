@@ -787,22 +787,51 @@ def sweep(
     docs_wishlist=None,
     docs_questions=None,
 ) -> dict[str, Any]:
-    """Finalize CURRENT_MATCHES / READY_TO_FINALIZE only. Never answers OPEN."""
+    """Aggregate independent reconciliation checks, then apply a frozen plan.
+
+    Inspect is read-only. Apply only executes precomputed finalize operations —
+    it does not rediscover mutations mid-loop.
+    """
     if not dry_run and not yes:
         raise StoreError("sweep write requires --yes (default is dry-run)")
-    paths = _paths(
-        questions=questions_path,
-        changes=changes_path,
-        todo=todo_path,
-        patchbays=patchbays_path,
-        routing=routing_path,
-        midi=midi_path,
-        controllers=controllers_path,
-        ableton=ableton_path,
+
+    from music_rig.reconciliation.checks import (
+        FindingStatus,
+        build_finalize_plan,
+        group_findings,
+        run_checks,
     )
-    qdoc = load_questions(questions_path)
-    eligible: list[str] = []
-    skipped: list[dict[str, str]] = []
+    from music_rig.reconciliation.context import ReconciliationContext
+
+    ctx = ReconciliationContext.from_overrides(
+        {
+            "questions": questions_path,
+            "changes": changes_path,
+            "todo": todo_path,
+            "patchbays": patchbays_path,
+            "routing": routing_path,
+            "midi": midi_path,
+            "controllers": controllers_path,
+            "ableton": ableton_path,
+            "docs_todo": docs_todo,
+            "docs_wishlist": docs_wishlist,
+            "docs_questions": docs_questions,
+        }
+    )
+    findings = run_checks(ctx)
+    plan_ops = build_finalize_plan(findings)
+    # Respect confirm_dod flag on finalize ops
+    if confirm_dod:
+        for op in plan_ops:
+            if op.kind == "question.finalize_manual":
+                op.args["confirm_dod"] = True  # type: ignore[index]
+    else:
+        # Keep prior behavior: finalize may fail without --confirm-dod for DoD todos
+        for op in plan_ops:
+            if op.kind == "question.finalize_manual":
+                op.args["confirm_dod"] = False  # type: ignore[index]
+
+    eligible = [op.args["question_id"] for op in plan_ops if "question_id" in op.args]
     counts = {
         "ready_to_finalize": 0,
         "needs_answer": 0,
@@ -811,97 +840,40 @@ def sweep(
         "needs_agent_action": 0,
         "blocked_by_dod": 0,
         "already_reconciled": 0,
+        "errors": 0,
     }
-    for q in qdoc.questions:
-        if q.reconciled_at is not None:
+    skipped: list[dict[str, str]] = []
+    for f in findings:
+        if f.check_id != "question_convergence":
+            if f.status is FindingStatus.ERROR:
+                counts["errors"] += 1
+                skipped.append({"id": f.artifact_id, "reason": f.summary})
+            continue
+        if f.status is FindingStatus.ERROR:
+            counts["errors"] += 1
+            skipped.append({"id": f.artifact_id, "reason": f.summary})
+            continue
+        if f.status is FindingStatus.OK:
             counts["already_reconciled"] += 1
             continue
-        if q.status == QuestionStatus.OPEN:
-            if q.answer.strip():
-                skipped.append(
-                    {
-                        "id": q.id,
-                        "reason": "OPEN draft — resolve before reconcile "
-                        f"(uv run rig question resolve {q.id})",
-                    }
-                )
-                counts["draft_answer"] += 1
-            else:
-                skipped.append({"id": q.id, "reason": "OPEN — sweep never answers"})
-                counts["needs_answer"] += 1
+        if f.status is FindingStatus.READY:
+            counts["ready_to_finalize"] += 1
             continue
-        if q.status != QuestionStatus.RESOLVED:
-            continue
-        from music_rig.reconciliation.action_packet import observation_blocks_success
-
-        if observation_blocks_success(q):
-            skipped.append(
-                {
-                    "id": q.id,
-                    "reason": "FAILED_TEST — sweep must not finalize as success",
-                }
-            )
-            counts["needs_agent_action"] += 1
-            continue
-        st = question_state(q, paths=paths)
-        adapter = _adapter_for(q)
-        verify = adapter.verify(q, paths=paths)
-        plan = adapter.plan(q, paths=paths)
-        if st == ReconciliationState.NEEDS_ANSWER:
+        # BLOCKED
+        st = f.state or ""
+        if st == ReconciliationState.NEEDS_ANSWER.value or "needs human answer" in f.summary:
             counts["needs_answer"] += 1
-            skipped.append({"id": q.id, "reason": f"state {st.value}"})
-            continue
-        if st == ReconciliationState.DRAFT_ANSWER:
+        elif st == ReconciliationState.DRAFT_ANSWER.value or "draft" in f.summary.lower():
             counts["draft_answer"] += 1
-            skipped.append({"id": q.id, "reason": f"state {st.value}"})
-            continue
-        if st == ReconciliationState.NEEDS_AGENT_ACTION:
-            missing_target = False
-            for b in plan.blockers:
-                if isinstance(b, dict) and b.get("code") == "missing_target_field":
-                    missing_target = True
-                    break
-                if isinstance(b, str) and "target." in b and "missing" in b.lower():
-                    missing_target = True
-                    break
-            if missing_target:
-                counts["needs_target_metadata"] += 1
-            else:
-                counts["needs_agent_action"] += 1
-            skipped.append({"id": q.id, "reason": f"state {st.value}"})
-            continue
-        if st in {
-            ReconciliationState.CURRENT_MATCHES,
-            ReconciliationState.READY_TO_FINALIZE,
-        } or (
-            verify.status == VerificationStatus.MATCH
-            and st
-            in {
-                ReconciliationState.READY_TO_FINALIZE,
-                ReconciliationState.CURRENT_MATCHES,
-                ReconciliationState.READY_TO_APPLY,
-            }
-        ):
-            if st == ReconciliationState.READY_TO_APPLY and verify.status != VerificationStatus.MATCH:
-                skipped.append({"id": q.id, "reason": f"state {st.value}"})
-                continue
-            if st not in {
-                ReconciliationState.CURRENT_MATCHES,
-                ReconciliationState.READY_TO_FINALIZE,
-            } and verify.status != VerificationStatus.MATCH:
-                skipped.append({"id": q.id, "reason": f"state {st.value}"})
-                continue
-            if st == ReconciliationState.CURRENT_MATCHES or verify.status == VerificationStatus.MATCH:
-                counts["ready_to_finalize"] += 1
-                eligible.append(q.id)
-            else:
-                skipped.append({"id": q.id, "reason": f"state {st.value}"})
-        else:
-            skipped.append({"id": q.id, "reason": f"state {st.value}"})
+        elif st == ReconciliationState.NEEDS_AGENT_ACTION.value:
+            counts["needs_agent_action"] += 1
+        skipped.append({"id": f.artifact_id, "reason": f.summary})
 
     results = []
-    for qid in eligible:
+    for op in plan_ops:
         try:
+            # Prefer existing finalize_question for identical semantics/tests
+            qid = str(op.args["question_id"])
             results.append(
                 finalize_question(
                     qid,
@@ -927,6 +899,7 @@ def sweep(
                 )
             )
         except StoreError as exc:
+            qid = str(op.args.get("question_id") or "?")
             skipped.append({"id": qid, "reason": str(exc)})
             if "confirm-dod" in str(exc).lower() or "definition of done" in str(exc).lower():
                 counts["blocked_by_dod"] += 1
@@ -936,29 +909,22 @@ def sweep(
     if counts["needs_answer"]:
         suggested_next.append("uv run rig question list --open")
         suggested_next.append(
-            "uv run rig question answer Q-xxx --answer \"...\" --json"
+            'uv run rig question answer Q-xxx --answer "..." --json'
         )
     if counts.get("draft_answer"):
         suggested_next.append("uv run rig question resolve Q-xxx")
-        suggested_next.append(
-            "uv run rig question answer Q-xxx --answer \"...\" --json"
-        )
-    if counts["needs_target_metadata"]:
-        suggested_next.append(
-            "uv run rig question target set Q-xxx --pair <pair> --yes --json"
-        )
-        suggested_next.append("uv run rig reconcile plan question Q-xxx --json")
-    if counts["ready_to_finalize"]:
-        suggested_next.append(
-            "uv run rig reconcile sweep --write --yes --confirm-dod --json"
-        )
     if counts["needs_agent_action"]:
+        suggested_next.append("uv run rig agent packet Q-xxx --json")
         suggested_next.append(
             "uv run rig reconcile queue --state NEEDS_AGENT_ACTION --json"
         )
         suggested_next.append(
             "uv run rig reconcile finalize question Q-xxx "
-            "--confirm-current-reconciled --note \"…\" --yes --json"
+            '--confirm-current-reconciled --note "…" --yes --json'
+        )
+    if counts["ready_to_finalize"]:
+        suggested_next.append(
+            "uv run rig reconcile sweep --write --yes --confirm-dod --json"
         )
 
     return {
@@ -969,6 +935,8 @@ def sweep(
         "results": results,
         "skipped": skipped,
         "counts": counts,
+        "checks": group_findings(findings),
+        "plan": [op.to_dict() for op in plan_ops],
         "suggested_next_commands": suggested_next,
     }
 

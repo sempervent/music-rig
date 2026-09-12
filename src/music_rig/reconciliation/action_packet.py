@@ -17,8 +17,12 @@ def build_action_packet(
     missing_capability: str | None = None,
     requires_agent_interpretation: bool = True,
     manual_finalize_allowed: bool = True,
+    candidate_operations: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Enrich plan JSON for agent handoff after human observation/answer."""
+    from music_rig.reconciliation.operation_renderer import render_cli
+    from music_rig.reconciliation.operations import RigOperation
+
     vr = question.verification_result
     observation = None
     if vr is not None:
@@ -36,11 +40,18 @@ def build_action_packet(
             for k, v in question.target.model_dump().items()
             if v is not None
         }
-    finalize_template = (
-        f"uv run rig reconcile finalize question {question.id} "
-        f"--confirm-current-reconciled "
-        f'--note "…" --complete-linked-todos --confirm-dod --yes --json'
+    finalize_op = RigOperation(
+        namespace="question",
+        action="finalize_manual",
+        args={
+            "question_id": question.id,
+            "note": "…",
+            "complete_linked_todos": True,
+            "confirm_dod": True,
+        },
+        description="Manual/agent-interpreted finalize",
     )
+    finalize_template = render_cli(finalize_op)
     packet: dict[str, Any] = {
         "artifact": {"type": "question", "id": question.id},
         "human_answer": question.answer,
@@ -56,6 +67,8 @@ def build_action_packet(
         },
         "suggested_command_families": suggested_command_families,
         "suggested_current_commands": list(suggested_command_families),
+        "candidate_operations": candidate_operations or [],
+        "finalize_operation": finalize_op.to_dict(),
         "postcondition": postcondition,
         "linked_todos": list(question.related_todos),
         "linked_changes": list(question.related_changes),
