@@ -43,7 +43,7 @@ tasks:
   task: Map ART P48 / Behringer PX3000 units to PB-A/B/C/D letters
   area: Patchbay
   priority: P1
-  status: READY
+  status: DONE
   depends_on: []
   depends_hint: null
   definition_of_done: '`data/patchbays.yaml` and `docs/patchbays.md` list hardware_model per
