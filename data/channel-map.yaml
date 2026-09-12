@@ -1,24 +1,109 @@
+# Interface and mixer channel assignments (CURRENT).
+# Prefer `uv run rig current channels ...` for source updates.
+
 tascam:
-  1: { name: MIXER_L, source: Alesis main out L, type: clean_stereo_bus, status: CURRENT }
-  2: { name: MIXER_R, source: Alesis main out R, type: clean_stereo_bus, status: CURRENT }
-  3: { name: miniKORG_L, source: miniKORG L, type: synth, status: CURRENT }
-  4: { name: miniKORG_R, source: miniKORG R, type: synth, status: CURRENT }
-  5: { name: ACOUSTIC_CLEAN, source: Acoustic after BOSS acoustic preamp, type: clean_mono, status: CURRENT }
-  6: { name: BASS_CLEAN, source: Bass after BBox preamp, type: clean_mono, status: CURRENT }
-  7: { name: GUITAR_CLEAN, source: Electric after Flamma preamp, type: clean_mono, status: CURRENT }
-  8: { name: UNASSIGNED, source: null, type: unassigned, status: UNASSIGNED }
-  9: { name: KAOSS_L, source: KAOSS Replay L, type: wet_stereo, status: CURRENT }
-  10: { name: KAOSS_R, source: KAOSS Replay R, type: wet_stereo, status: CURRENT }
-  11: { name: SR18_L, source: Alesis SR-18 MAIN L, type: rhythm, status: CURRENT }
-  12: { name: SR18_R, source: Alesis SR-18 MAIN R, type: rhythm, status: CURRENT }
-  13: { name: UNASSIGNED, source: null, type: unassigned, status: UNASSIGNED }
-  14: { name: UNASSIGNED, source: null, type: unassigned, status: UNASSIGNED }
-  15: { name: UNASSIGNED, source: null, type: unassigned, status: UNASSIGNED }
-  16: { name: UNASSIGNED, source: null, type: unassigned, status: UNASSIGNED }
+  1:
+    name: MIXER_L
+    source: Alesis main out L
+    type: clean_stereo_bus
+    status: CURRENT
+  2:
+    name: MIXER_R
+    source: Alesis main out R
+    type: clean_stereo_bus
+    status: CURRENT
+  3:
+    name: miniKORG_L
+    source: miniKORG L
+    type: synth
+    status: CURRENT
+  4:
+    name: miniKORG_R
+    source: miniKORG R
+    type: synth
+    status: CURRENT
+  5:
+    name: ACOUSTIC_CLEAN
+    source: Acoustic after BOSS acoustic preamp
+    type: clean_mono
+    status: CURRENT
+  6:
+    name: BASS_CLEAN
+    source: Bass after BBox preamp
+    type: clean_mono
+    status: CURRENT
+  7:
+    name: GUITAR_CLEAN
+    source: Electric after Flamma preamp
+    type: clean_mono
+    status: CURRENT
+  8:
+    name: UNASSIGNED
+    source: null
+    type: unassigned
+    status: UNASSIGNED
+  9:
+    name: UNASSIGNED
+    source: null
+    type: unassigned
+    status: UNASSIGNED
+  10:
+    name: UNASSIGNED
+    source: null
+    type: unassigned
+    status: UNASSIGNED
+  11:
+    name: SR18_L
+    source: Alesis SR-18 MAIN L
+    type: rhythm
+    status: CURRENT
+  12:
+    name: SR18_R
+    source: Alesis SR-18 MAIN R
+    type: rhythm
+    status: CURRENT
+  13:
+    name: UNASSIGNED
+    source: null
+    type: unassigned
+    status: UNASSIGNED
+  14:
+    name: UNASSIGNED
+    source: null
+    type: unassigned
+    status: UNASSIGNED
+  15:
+    name: KAOSS_L
+    source: KAOSS Replay L
+    type: wet_stereo
+    status: CURRENT
+  16:
+    name: KAOSS_R
+    source: KAOSS Replay R
+    type: wet_stereo
+    status: CURRENT
 alesis:
-  1: { source: Bass, aux_send: true, status: CURRENT }
-  2: { source: Guitar, aux_send: true, status: CURRENT }
-  3: { source: null, aux_send: false, status: UNASSIGNED }
-  4: { source: Electric kazoo, aux_send: true, status: CURRENT }
-  "5_6": { source: Privia, aux_send: true, status: CURRENT }
-  "7_8": { source: null, aux_send: false, status: UNASSIGNED }
+  1:
+    source: Bass
+    aux_send: true
+    status: CURRENT
+  2:
+    source: Acoustic
+    aux_send: true
+    status: CURRENT
+  3:
+    source: Electric
+    aux_send: false
+    status: CURRENT
+  4:
+    source: Electric kazoo
+    aux_send: true
+    status: CURRENT
+  '5_6':
+    source: Privia
+    aux_send: true
+    status: CURRENT
+  '7_8':
+    source: null
+    aux_send: false
+    status: UNASSIGNED

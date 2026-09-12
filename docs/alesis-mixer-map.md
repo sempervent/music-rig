@@ -10,8 +10,8 @@ Edit with `uv run rig current channels set-source alesis …`.
 | Channel | Source | AUX SEND | Status |
 |---|---|---|---|
 | 1 | Bass | Yes | CURRENT |
-| 2 | Guitar | Yes | CURRENT |
-| 3 | UNASSIGNED | No | UNASSIGNED |
+| 2 | Acoustic | Yes | CURRENT |
+| 3 | Electric | No | CURRENT |
 | 4 | Electric kazoo | Yes | CURRENT |
 | 5_6 | Privia | Yes | CURRENT |
 | 7_8 | UNASSIGNED | No | UNASSIGNED |

@@ -7,22 +7,23 @@ Authoritative end-to-end overview of the **CURRENT** physical studio. For jack-l
 | TASCAM Input | Source | Notes |
 |---:|---|---|
 | 1/2 | Alesis mixer MAIN OUT L/R | Clean stereo mixer capture |
-| 3/4 | miniKORG L/R | Direct stereo synth capture (also documented on PB-B) |
+| 3/4 | miniKORG L/R | Direct stereo synth capture (also documented on PB-B). Q-004 also labels KAOSS feed as TASCAM 3/4 — dual-use clarification open if needed. |
 | 5 | Acoustic instrument clean | After BOSS acoustic preamp → A/B/Y clean leg |
 | 6 | Bass clean | After BBox preamp → A/B/Y clean leg |
 | 7 | Electric guitar clean | After Flamma preamp → A/B/Y clean leg |
 | 8 | UNASSIGNED | — |
-| 9/10 | KAOSS Replay L/R | Stereo KAOSS capture |
+| 9/10 | UNASSIGNED | Formerly KAOSS; moved per Q-004 |
 | 11/12 | Alesis SR-18 MAIN L/R | Drum machine direct (also documented on PB-B) |
-| 13–16 | UNASSIGNED | — |
+| 13/14 | UNASSIGNED | — |
+| 15/16 | KAOSS Replay L/R | Stereo KAOSS capture (corrected Q-004) |
 
 ## Alesis mixer inputs
 
 | Alesis Channel | Source | Status | Notes |
 |---:|---|---|---|
-| 1 | Bass | CURRENT (prior docs) | Can feed AUX SEND wet loop |
-| 2 | Guitar | CURRENT (prior docs) | Can feed AUX SEND wet loop |
-| 3 | — | UNASSIGNED | — |
+| 1 | Bass | CURRENT | Non-clean A/B/Y leg (Q-001); can feed AUX SEND wet loop |
+| 2 | Acoustic | CURRENT | Non-clean A/B/Y leg (Q-001); can feed AUX SEND wet loop |
+| 3 | Electric | CURRENT | Non-clean A/B/Y leg (Q-001) |
 | 4 | Electric kazoo | CURRENT (prior docs) | Can feed AUX SEND wet loop |
 | 5/6 | Privia piano | CURRENT | Stereo; rear patch documented on PB-B 7/8 → 31/32 |
 | 7/8 | — | UNASSIGNED sources | PB-B lower 33/34 connect to these channels; no upper-row sources documented |
@@ -53,7 +54,7 @@ Acoustic instrument
   -> A/B/Y clean leg
   -> TASCAM 5
   other A/B/Y leg
-    -> other A/B/Y leg: UNKNOWN
+    -> Alesis 2
 ```
 
 **Bass clean capture** (`bass`)
@@ -64,7 +65,7 @@ Bass
   -> A/B/Y clean leg
   -> TASCAM 6
   other A/B/Y leg
-    -> other A/B/Y leg: UNKNOWN
+    -> Alesis 1
 ```
 
 **Electric guitar clean capture** (`electric`)
@@ -75,7 +76,7 @@ Electric guitar
   -> A/B/Y clean leg
   -> TASCAM 7
   other A/B/Y leg
-    -> other A/B/Y leg: UNKNOWN
+    -> Alesis 3
 ```
 
 **miniKORG direct capture** (`minikorg`)
@@ -104,7 +105,7 @@ Alesis AUX SEND
   A = DIRTY (see: rig path show dirty)
   B = SPACE (see: rig path show space)
   -> BOSS CH-1 stereo out
-  -> Alesis return / line return
+  -> Alesis Return 1 and 2
 ```
 
 Exact DIRTY and SPACE topologies: [Pedal Chains](pedal-chains.md) or `rig path show dirty` / `rig path show space`.
@@ -112,9 +113,9 @@ Exact DIRTY and SPACE topologies: [Pedal Chains](pedal-chains.md) or `rig path s
 ### KAOSS Replay path
 
 ```text
-Alesis Monitor Out
+TASCAM 3/4
 -> KAOSS Replay
--> TASCAM 9/10
+-> TASCAM 15/16
 ```
 <!-- rig:routing:end -->
 

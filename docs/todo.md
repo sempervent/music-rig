@@ -45,7 +45,6 @@ At most three tasks. Prefer resolving physical uncertainty, reproducibility, and
 |---|---|---|
 | RIG-001 | Physically verify DIRTY chain order and SPACE topology (SY-1 SEND PH-3→TR-2; LS-2 loops; A+B MIX↔BYPASS) | Unlocks confident playing; catches doc drift immediately |
 | RIG-002 | Inspect and record normal / half-normal / thru for every populated PB-B pair | Highest-value patchbay unknown; quick rack check |
-| RIG-003 | Trace and document non-clean A/B/Y destinations for acoustic, bass, electric | Completes clean-path story without buying anything |
 
 ## Waiting / External
 
@@ -63,14 +62,10 @@ At most three tasks. Prefer resolving physical uncertainty, reproducibility, and
 |---|---|---|---|---|---|---|---|
 | RIG-001 | Physically verify DIRTY chain order and SPACE topology (SY-1 SEND PH-3→TR-2; LS-2 loops; A+B MIX↔BYPASS) | Pedals | P0 | READY | — | `docs/pedal-chains.md` matches the physical board; any mismatch updated in pedal docs, diagrams, and inventory active lists | Do not invent fixes; document what is actually wired |
 | RIG-002 | Inspect and record normal / half-normal / thru for every populated PB-B pair | Patchbay | P0 | READY | — | Every populated pair in `data/patchbays.yaml` and `docs/patchbays.md` has `mode` set to normal, half-normal, or thru | Upper 9–12 / lower 33–36 included if physically checkable |
-| RIG-003 | Trace and document non-clean A/B/Y destinations for acoustic, bass, electric | Routing | P0 | READY | — | Each instrument’s other splitter leg is recorded in `docs/current-routing.md` + `data/routing.yaml`, or explicitly marked UNKNOWN with reason | Resolves open-questions routing fact |
 | RIG-004 | Map ART P48 / Behringer PX3000 units to PB-A/B/C/D letters | Patchbay | P1 | READY | — | `data/patchbays.yaml` and `docs/patchbays.md` list hardware_model per bay | Visual/serial inspection at rack |
 | RIG-005 | Decide roles for PB-A, PB-C, PB-D (remain open vs assigned roles) | Patchbay | P1 | READY | RIG-004 helpful | Each bay has a documented role or explicit “leave undocumented/open for now” decision in `docs/patchbays.md` | Decision, not speculative wiring |
 | RIG-006 | Identify intended sources for PB-B lower 33–36 (or confirm intentionally unused) | Patchbay | P1 | READY | — | Upper 9–12 plan or “intentionally unassigned” recorded in patchbay docs/YAML | Do not invent sources |
 | RIG-007 | Verify `assets/pedal-flow.jpeg` against CURRENT topology; update, archive, or remove | Docs | P2 | READY | RIG-001 | Image matches CURRENT or is moved/labeled HISTORICAL/removed with a note in docs | Untracked asset; treat carefully |
-| RIG-008 | Determine acoustic instrument Alesis mixer assignment if any | Routing | P1 | READY | RIG-003 helpful | Alesis map + channel-map YAML updated, or documented as TASCAM-only | Open question fact |
-| RIG-009 | Verify physical CH-1 stereo return jack(s) into Alesis | Routing | P1 | READY | — | Exact return path recorded in `docs/current-routing.md` and `docs/alesis-mixer-map.md` | Stereo return vs specific line channel |
-| RIG-010 | Physically verify KAOSS Replay monitor/capture path vs docs | Routing | P1 | READY | — | Monitor Out → KAOSS → TASCAM 9/10 confirmed or docs corrected | Separate from AUX SEND |
 | RIG-011 | Confirm Flamma Mod and PH-2 physical location (disconnected / stored / elsewhere) | Pedals | P2 | READY | RIG-001 | Inventory notes state location; still not listed as CURRENT path unless rewired and documented | Owned ≠ in chain |
 | RIG-012 | Label major cables (clean legs, AUX SEND loop, KAOSS, PB-B critical pairs) | Studio ops | P1 | READY | — | Critical paths have readable labels; optional legend added under docs or patchbays | Prefer heat-shrink / tape that survives |
 | RIG-013 | Label patchbay front rows for populated PB-B jacks | Patchbay | P1 | READY | RIG-002 helpful | Front labels match `docs/patchbays.md` jack map | — |
@@ -81,7 +76,6 @@ At most three tasks. Prefer resolving physical uncertainty, reproducibility, and
 | RIG-018 | Back up Ableton PFL jam template / set | Studio ops | P1 | READY | RIG-038 helpful | Template location + version/date documented; restore tested once | — |
 | RIG-019 | Document recovery from a bad live-looping state | Studio ops | P1 | READY | — | Short recovery steps: clear RC-1, wrong clip, runaway feedback, stuck MIDI, KAOSS mistake, wrong scene, mute/solo accidents, pedal noise, emergency stop — prefer without keyboard/mouse | Expanded by RIG-044 |
 | RIG-024 | Test PYLE-PRO PDC22 placement options (Privia / JOYO / clean taps) | Routing | P2 | READY | — | Recommendation written in reamp-and-di.md; open question updated | Not a purchase |
-| RIG-025 | Decide whether LS-2 has any bass split/blend role outside SPACE | Pedals | P2 | DEFERRED | RIG-001 | Decision recorded: SPACE-only vs additional bass role | Currently CURRENT in SPACE |
 | RIG-030 | Write a minimal MIDI mapping plan (Ableton + foot control targets) | MIDI | P2 | READY | — | One-page mapping plan in midi-clock.md or linked doc | Feeds RIG-035 / RIG-036 / RIG-037 |
 | RIG-031 | Confirm Ableton as default master clock in practice | MIDI | P2 | READY | — | midi-clock.md states verified CURRENT behavior, not only intent | — |
 | RIG-033 | Define PFL Eurorack v1 requirements and integration boundary | Modular | P1 | READY | — | Written brief answers: what Eurorack adds vs Ableton/Reason/pedals; MIDI/CV; audio I/O; rack size; performance vs generative roles; sync; recording path; budget boundary; MVP first case; what NOT to duplicate | Research/design only — not purchase authorization |
@@ -105,7 +99,11 @@ At most three tasks. Prefer resolving physical uncertainty, reproducibility, and
 
 | ID | Task | Completed | Notes |
 |---|---|---|---|
-| — | — | — | No TODO items marked done yet |
+| RIG-003 | Trace and document non-clean A/B/Y destinations for acoustic, bass, electric | — | Resolves open-questions routing fact |
+| RIG-008 | Determine acoustic instrument Alesis mixer assignment if any | — | Open question fact |
+| RIG-009 | Verify physical CH-1 stereo return jack(s) into Alesis | — | Stereo return vs specific line channel |
+| RIG-010 | Physically verify KAOSS Replay monitor/capture path vs docs | — | Separate from AUX SEND |
+| RIG-025 | Decide whether LS-2 has any bass split/blend role outside SPACE | — | Currently CURRENT in SPACE |
 
 ## ID allocation
 

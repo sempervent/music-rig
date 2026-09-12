@@ -19,12 +19,7 @@ Resolving a question records an answer. It does **not** automatically rewrite CU
 
 | ID | Area | Question | Related TODOs | Related Changes |
 |---|---|---|---|---|
-| Q-001 | Routing | Where does the non-clean leg of each A/B/Y splitter go (acoustic, bass, electric)? | RIG-003 | — |
-| Q-002 | Routing | Does acoustic have an Alesis channel assignment, or only the TASCAM 5 clean path? | RIG-008 | — |
-| Q-003 | Routing | What exact jack(s) receive CH-1 stereo back into the Alesis? | RIG-009 | — |
-| Q-004 | Routing | Does physical KAOSS monitor/capture match documented Monitor Out → KAOSS → TASCAM 9/10? | RIG-010 | — |
 | Q-005 | Routing | Should the PYLE-PRO dual DI live near the Privia, near the JOYO output, or near clean instrument taps? | RIG-024 | — |
-| Q-006 | Routing | Should LS-2 also remain a bass split/blend tool outside its CURRENT SPACE role? | RIG-025 | — |
 | Q-007 | Patchbay | Which physical unit is PB-A / PB-B / PB-C / PB-D (ART P48 vs Behringer PX3000)? | RIG-004 | — |
 | Q-008 | Patchbay | What normalization mode (normal / half-normal / thru) is each populated PB-B pair set to? | RIG-002 | — |
 | Q-009 | Patchbay | What are the rear-panel assignments for PB-A, PB-C, and PB-D? | RIG-005, RIG-040 | — |
@@ -50,9 +45,73 @@ Resolving a question records an answer. It does **not** automatically rewrite CU
 
 | ID | Area | Question | Related TODOs | Related Changes |
 |---|---|---|---|---|
-| — | — | — | — | — |
+| Q-001 | Routing | Where does the non-clean leg of each A/B/Y splitter go (acoustic, bass, electric)? | RIG-003 | — |
+| Q-002 | Routing | Does acoustic have an Alesis channel assignment, or only the TASCAM 5 clean path? | RIG-008 | — |
+| Q-003 | Routing | What exact jack(s) receive CH-1 stereo back into the Alesis? | RIG-009 | — |
+| Q-004 | Routing | Does physical KAOSS monitor/capture match documented Monitor Out → KAOSS → TASCAM 9/10? | RIG-010 | — |
+| Q-006 | Routing | Should LS-2 also remain a bass split/blend tool outside its CURRENT SPACE role? | RIG-025 | — |
 
 ## Answers and notes
+
+### Q-001 — RESOLVED
+
+Where does the non-clean leg of each A/B/Y splitter go (acoustic, bass, electric)?
+
+**Answer:** Acoustic: Alesis 2, bass: Alesis 1, electric: Alesis 3
+
+**Resolved at:** 2026-09-11T23:39:04.262510-04:00
+
+**Reconciled at:** 2026-09-11T23:39:32.754470-04:00
+
+**Reconciliation note:** Agent applied answer via CURRENT CLI: path aby-other → Alesis 2/1/3 (acoustic/bass/electric); alesis channels 2→Acoustic, 3→Electric (1 already Bass). No verification_result invented.
+
+### Q-002 — RESOLVED
+
+Does acoustic have an Alesis channel assignment, or only the TASCAM 5 clean path?
+
+**Answer:** Alesis 2
+
+**Resolved at:** 2026-09-11T23:48:43.027898-04:00
+
+**Reconciled at:** 2026-09-11T23:49:40.822430-04:00
+
+**Reconciliation note:** Answer Alesis 2 already CURRENT from Q-001 (acoustic aby-other + alesis ch2). No verification_result invented.
+
+### Q-003 — RESOLVED
+
+What exact jack(s) receive CH-1 stereo back into the Alesis?
+
+**Answer:** Alesis Return 1 and 2
+
+**Resolved at:** 2026-09-11T23:48:43.924532-04:00
+
+**Reconciled at:** 2026-09-11T23:49:41.313290-04:00
+
+**Reconciliation note:** Updated aux path return endpoint to Alesis Return 1 and 2 via current path CLI.
+
+### Q-004 — RESOLVED
+
+Does physical KAOSS monitor/capture match documented Monitor Out → KAOSS → TASCAM 9/10?
+
+**Answer:** TASCAM 3/4 -> KAOSS -> TASCAM 15/16
+
+**Resolved at:** 2026-09-11T23:48:44.805664-04:00
+
+**Reconciled at:** 2026-09-11T23:49:41.804328-04:00
+
+**Reconciliation note:** Corrected KAOSS path to TASCAM 3/4 -> KAOSS -> TASCAM 15/16; channels 9/10 cleared, 15/16 KAOSS. Evidence not VERIFIED (no verification_result). miniKORG still on TASCAM 3/4 inputs — dual-use noted.
+
+### Q-006 — RESOLVED
+
+Should LS-2 also remain a bass split/blend tool outside its CURRENT SPACE role?
+
+**Answer:** no, it is only in SPACE
+
+**Resolved at:** 2026-09-11T23:48:45.715212-04:00
+
+**Reconciled at:** 2026-09-11T23:49:42.282222-04:00
+
+**Reconciliation note:** Descriptive decision: LS-2 SPACE-only; no CURRENT topology change.
 
 ### Q-009 — OPEN
 

@@ -64,7 +64,6 @@ Intent: synth voice (SY-1), phase + tremolo in the SY-1 loop, then parallel text
 ```text
 JOYO OUT
 -> BOSS CH-1 stereo out
--> Alesis return / line return
 ```
 
 Path is mono through JOYO; CH-1 is the stereo stage.
