@@ -100,6 +100,14 @@ def tui_fx(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
                             "bay": "PB-B",
                             "pair": "1/25",
                         },
+                        "verification": {
+                            "kind": "PATCHBAY_MODE",
+                            "prompt": "Inspect switch",
+                            "answer_type": "ENUM",
+                            "choices": ["normal", "half-normal", "thru", "UNKNOWN"],
+                            "ref_domain": None,
+                        },
+                        "verification_note": "",
                     },
                     {
                         "id": "Q-002",
@@ -849,3 +857,35 @@ def test_production_data_untouched_by_tui_fx(tui_fx):
     assert tui_fx["questions"] != PROD or True
     # Ensure fixture content is what services see
     assert load_questions().question_map()["Q-001"].status.value == "OPEN"
+
+
+@pytest.mark.asyncio
+async def test_verify_screen_pilot_answer(tui_fx):
+    """Stage 16 — verify TUI: queue loads; Verify records via service; CURRENT untouched."""
+    from music_rig.tui.screens.verify import VerifyScreen
+    from music_rig.tui.dialogs import ConfirmModal
+
+    app = RigApp(route="verify", object_id="Q-001")
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        assert isinstance(app.screen, VerifyScreen)
+        detail = str(app.screen.query_one("#detail").content)
+        assert "Q-001" in detail or "PATCHBAY" in detail or "mode" in detail.lower()
+        # Drive commit path directly (picker focus is flaky under Pilot)
+        app.screen._commit_answer("Q-001", "half-normal")
+        await pilot.pause()
+        assert isinstance(app.screen, ConfirmModal)
+        await pilot.press("enter")
+        await pilot.pause()
+        assert isinstance(app.screen, VerifyScreen)
+        await pilot.press("s")  # skip remaining for session
+        await pilot.pause()
+        await pilot.press("q")
+
+    q = load_questions(tui_fx["questions"]).question_map()["Q-001"]
+    assert q.status.value == "RESOLVED"
+    assert q.answer == "half-normal"
+    assert q.reconciled_at is None
+    data = load_raw(tui_fx["patchbays"])
+    pairs = {f"{p['upper_n']}/{p['lower_n']}": p for p in list_pairs("PB-B", data)}
+    assert pairs["1/25"]["mode"] == "unknown"

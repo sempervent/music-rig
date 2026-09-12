@@ -99,20 +99,18 @@ def _with_resolved_question(
     change_ids = list(current.related_changes)
     if change_id and change_id not in change_ids:
         change_ids.append(change_id)
-    updated = OpenQuestion(
-        id=current.id,
-        question=current.question,
-        area=current.area,
-        status=QuestionStatus.RESOLVED,
-        related_todos=list(current.related_todos),
-        related_changes=change_ids,
-        answer=answer.strip(),
-        notes=current.notes,
-        resolved_at=clock(),
-        reconciled_at=None,
-        reconciliation_note="",
-        target=current.target,
+    data = current.model_dump()
+    data.update(
+        {
+            "status": QuestionStatus.RESOLVED,
+            "related_changes": change_ids,
+            "answer": answer.strip(),
+            "resolved_at": clock(),
+            "reconciled_at": None,
+            "reconciliation_note": "",
+        }
     )
+    updated = OpenQuestion.model_validate(data)
     return OpenQuestionsDocument(
         questions=[updated if q.id == q_key else q for q in qdoc.questions]
     )

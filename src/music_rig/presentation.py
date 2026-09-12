@@ -188,5 +188,89 @@ def blocker_message(blocker: Any) -> str:
     return str(blocker)
 
 
+def format_verify_queue_table(
+    items: Sequence[Any],
+    *,
+    width: int | None = None,
+) -> str:
+    """Human `rig verify queue` — ID / Area / Kind / Target / Question / Next."""
+    rows: list[list[str]] = []
+    for item in items:
+        if hasattr(item, "to_dict"):
+            d = item.to_dict()
+        elif isinstance(item, dict):
+            d = item
+        else:
+            d = {
+                "question_id": getattr(item, "question_id", ""),
+                "area": getattr(item, "area", ""),
+                "kind": getattr(item, "kind", ""),
+                "target_label": getattr(item, "target_label", ""),
+                "question": getattr(item, "question", ""),
+                "next_hint": getattr(item, "next_hint", ""),
+            }
+        rows.append(
+            [
+                str(d.get("question_id") or ""),
+                str(d.get("area") or ""),
+                str(d.get("kind") or ""),
+                str(d.get("target_label") or "—"),
+                str(d.get("question") or "")[:56],
+                str(d.get("next_hint") or ""),
+            ]
+        )
+    return render_table(
+        ["ID", "Area", "Kind", "Target", "Question", "Next"],
+        rows,
+        title="VERIFY QUEUE",
+        width=width,
+    )
+
+
+def format_verify_summary_table(
+    summary: dict[str, Any],
+    *,
+    width: int | None = None,
+) -> str:
+    """Human `rig verify summary` — grouped counts."""
+    sections: list[str] = []
+    total = summary.get("total_open_guided", 0)
+    sections.append(f"Guided OPEN questions: {total}")
+
+    by_area = summary.get("by_area") or {}
+    if by_area:
+        rows = [[k, str(v)] for k, v in by_area.items()]
+        sections.append(
+            render_table(["Area", "Count"], rows, title="BY AREA", width=width)
+        )
+
+    by_cap = summary.get("after_answer_capability") or {}
+    if by_cap:
+        rows = [[k, str(v)] for k, v in by_cap.items()]
+        sections.append(
+            render_table(
+                ["After-answer capability", "Count"],
+                rows,
+                title="AFTER ANSWER",
+                width=width,
+            )
+        )
+
+    by_kind = summary.get("by_kind") or {}
+    if by_kind:
+        rows = [[k, str(v)] for k, v in by_kind.items()]
+        sections.append(
+            render_table(["Kind", "Count"], rows, title="BY KIND", width=width)
+        )
+
+    top = summary.get("top") or []
+    if top:
+        sections.append("Top of queue: " + ", ".join(top))
+
+    text = "\n\n".join(sections)
+    assert "\t" not in text
+    return text
+
+
 def plain_text(message: str) -> Text:
     return Text(message.replace("\t", " "))

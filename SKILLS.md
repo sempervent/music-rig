@@ -169,6 +169,33 @@ No Rich/ANSI in `--json` mode. Exit 0 for successful inspect including
 `NEEDS_AGENT_ACTION`. Verify returns `ok:true` with `verification=MISMATCH` and
 **exit 1** on mismatch.
 
+## Human verification (Stage 16)
+
+Guides observation at the physical rig. The human supplies facts; **UNKNOWN is
+valid**. Manuals describe capabilities — they do not invent CURRENT state.
+
+```bash
+uv run rig verify queue [--area] [--json]
+uv run rig verify next [--json]
+uv run rig verify show Q-008 [--json]
+uv run rig verify run Q-008 [--answer-only]     # interactive
+uv run rig verify answer Q-008 --value half-normal [--dry-run] [--yes] [--json] [--note]
+uv run rig verify session [--area] [--todo RIG-002]
+uv run rig verify summary [--json]
+uv run rig verify area Patchbay
+uv run rig tui verify
+```
+
+Workflow:
+
+1. `verify queue` / `verify show` — see CURRENT hint + how to check
+2. Ask the human / inspect the rig (do not invent from manuals)
+3. `verify answer` or `verify run` — records via `question answer` only
+4. `reconcile plan` → apply / verify / finalize as capability allows
+
+Never invent answers to production OPEN questions during tests. Enriching
+verification metadata (kind, prompt, answer schema, unambiguous targets) is OK.
+
 ## Question list flags
 
 ```bash
@@ -235,6 +262,9 @@ Textual widgets never write YAML.
 
 ## TUI
 
+- `rig tui verify`: guided queue + structured answer pickers; Skip / Next /
+  Open Target / Edit Target / Reconcile. After answer shows READY_TO_APPLY or
+  blockers.
 - `rig tui reconcile`: plan/apply/verify/finalize; **e** Edit Target opens pair
   picker when `patchbay.mode` is missing `pair`.
 - Questions: **t** Target — pair picker when pair missing; **r** Resolve.
@@ -253,6 +283,7 @@ Textual widgets never write YAML.
 
 ## Stage Boundaries / External Automation
 
-Through Stage 15: documentation + local services + TUI editing + reconciliation
-polish (presentation, answer/target CLI, structured blockers). External live
-automation remains `NOT_IMPLEMENTED` / capability only.
+Through Stage 16: documentation + local services + TUI editing + reconciliation
++ guided human verification (`rig verify`). External live automation remains
+`NOT_IMPLEMENTED` / capability only. No OBS / Ableton / MIDI TX / Stream Deck
+automation from verify flows.
