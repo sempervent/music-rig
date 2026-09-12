@@ -122,6 +122,14 @@ backup_app = typer.Typer(
 automation_app = typer.Typer(
     help="Automation capability registry.", no_args_is_help=True
 )
+inspect_app = typer.Typer(
+    help="Structured inspection for agents and humans.",
+    no_args_is_help=True,
+)
+rename_app = typer.Typer(
+    help="Safe stable-ID rename (preview + apply).",
+    no_args_is_help=True,
+)
 current_app = typer.Typer(
     help="Modify authoritative CURRENT state (typed, previewed).",
     no_args_is_help=True,
@@ -170,6 +178,8 @@ app.add_typer(performance_app, name="performance")
 app.add_typer(snapshot_app, name="snapshot")
 app.add_typer(backup_app, name="backup")
 app.add_typer(automation_app, name="automation")
+app.add_typer(inspect_app, name="inspect")
+app.add_typer(rename_app, name="rename")
 app.add_typer(current_app, name="current")
 current_app.add_typer(current_pb_app, name="patchbay")
 current_app.add_typer(current_ch_app, name="channels")
@@ -2130,6 +2140,48 @@ def current_pb_set_mode(
             resolve_q=resolve_q,
             apply_chg=apply_chg,
             answer=answer,
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(f"[green]Applied:[/green] {result.message}")
+
+
+@current_pb_app.command("set-connection")
+def current_pb_set_connection(
+    bay_id: str,
+    jack: str = typer.Argument(..., help="Upper jack N or pair N/M"),
+    upper: Optional[str] = typer.Option(None, "--upper", help="Upper connection label"),
+    lower: Optional[str] = typer.Option(None, "--lower", help="Lower connection label"),
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    no_render: bool = typer.Option(False, "--no-render"),
+) -> None:
+    """Set patchbay pair upper/lower endpoint connection labels."""
+    if upper is None and lower is None:
+        _fail("Provide --upper and/or --lower")
+    try:
+        preview, data = patchbay_state.propose_set_connection(
+            bay_id,
+            jack,
+            upper_connection=upper,
+            lower_connection=lower,
+        )
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(format_current_preview(preview).rstrip())
+    if dry_run:
+        console.print("[dim]Dry-run: nothing written.[/dim]")
+        raise typer.Exit(0)
+    if not preview.changed:
+        console.print(preview.message)
+        raise typer.Exit(0)
+    if not yes and not typer.confirm("Apply?", default=False):
+        raise typer.Abort()
+    try:
+        result = current_service.commit_patchbay(
+            data,
+            preview,
+            render=not no_render,
         )
     except StoreError as exc:
         _fail(str(exc))
@@ -4157,11 +4209,132 @@ def tui_cmd(
     if domain is not None and normalize_route(domain) is None:
         _fail(
             f"Unknown TUI domain {domain!r}. "
-            "Try: question, patchbay, todo, wish, inbox, changes, gear, midi, "
-            "controls, ableton, performance, snapshot, backup, session, "
+            "Try: question, patchbay, todo, wish, inbox, changes, gear, channels, "
+            "routing, midi, controls, ableton, performance, snapshot, backup, session, "
             "doctor, status, reconcile, automation"
         )
     run_tui(route=domain, object_id=object_id)
+
+
+@inspect_app.command("domains")
+def inspect_domains(
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    from music_rig import inspect_service
+
+    payload = inspect_service.list_domains()
+    console.print(inspect_service.dumps(payload, as_json=as_json))
+
+
+@inspect_app.command("schema")
+def inspect_schema(
+    domain: str,
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    from music_rig import inspect_service
+
+    try:
+        payload = inspect_service.schema_for(domain)
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(inspect_service.dumps(payload, as_json=True if as_json else True))
+
+
+@inspect_app.command("list")
+def inspect_list(
+    domain: str,
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    from music_rig import inspect_service
+
+    try:
+        payload = inspect_service.list_records(domain)
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(inspect_service.dumps(payload, as_json=as_json))
+
+
+@inspect_app.command("show")
+def inspect_show(
+    domain: str,
+    record_id: str,
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    from music_rig import inspect_service
+
+    try:
+        payload = inspect_service.show_record(domain, record_id)
+    except StoreError as exc:
+        _fail(str(exc))
+    console.print(inspect_service.dumps(payload, as_json=True if as_json else True))
+
+
+@inspect_app.command("refs")
+def inspect_refs(
+    record_id: str,
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    from music_rig import inspect_service
+
+    payload = inspect_service.find_refs(record_id)
+    console.print(inspect_service.dumps(payload, as_json=as_json or True))
+
+
+@inspect_app.command("cleanup")
+def inspect_cleanup(
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Scan for dangling refs / BROKEN+mapped. No --fix-all."""
+    from music_rig import inspect_service
+
+    payload = inspect_service.cleanup_scan()
+    console.print(inspect_service.dumps(payload, as_json=as_json or True))
+    if payload.get("count"):
+        raise typer.Exit(1)
+
+
+@rename_app.command("preview")
+def rename_preview(domain: str, old_id: str, new_id: str) -> None:
+    from music_rig import rename_service
+
+    preview = rename_service.analyze_rename(domain, old_id, new_id)
+    console.print(f"Domain: {preview.domain}")
+    console.print(f"{preview.old_id} -> {preview.new_id}")
+    for line in preview.replacements:
+        console.print(f"  - {line}")
+    for path in preview.affected_files:
+        console.print(f"  file: {path}")
+    for err in preview.errors:
+        err_console.print(f"[red]{err}[/red]")
+    if not preview.ok:
+        raise typer.Exit(1)
+
+
+@rename_app.command("apply")
+def rename_apply(
+    domain: str,
+    old_id: str,
+    new_id: str,
+    yes: bool = typer.Option(False, "--yes"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+) -> None:
+    from music_rig import rename_service
+
+    preview = rename_service.analyze_rename(domain, old_id, new_id)
+    for err in preview.errors:
+        err_console.print(f"[red]{err}[/red]")
+    if not preview.ok:
+        raise typer.Exit(1)
+    console.print(f"Will rename {preview.old_id} -> {preview.new_id}")
+    for line in preview.replacements:
+        console.print(f"  - {line}")
+    if dry_run:
+        console.print("[dim]Dry-run: nothing written.[/dim]")
+        raise typer.Exit(0)
+    if not yes and not typer.confirm("Apply all-or-nothing rename?", default=False):
+        raise typer.Abort()
+    rename_service.apply_rename(domain, old_id, new_id)
+    console.print("[green]Rename applied.[/green]")
 
 
 @app.command("check")

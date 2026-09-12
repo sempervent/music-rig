@@ -6,7 +6,9 @@ from textual.app import App
 from textual.binding import Binding
 
 from music_rig.tui.adapters import get_adapter
+from music_rig.tui.editable_domains import registry as editable_registry
 from music_rig.tui.navigation import normalize_route
+from music_rig.tui.screens.editable import EditableListScreen
 from music_rig.tui.screens.generic import ListDetailScreen
 from music_rig.tui.screens.home import HomeScreen
 from music_rig.tui.screens.patchbays import PatchbayEditorScreen, PatchbayListScreen
@@ -126,6 +128,10 @@ class RigApp(App[None]):
                 )
             else:
                 self.push_screen(PatchbayListScreen())
+            return
+        editable = editable_registry.get_adapter(key)
+        if editable is not None:
+            self.push_screen(EditableListScreen(editable, initial_id=object_id))
             return
         adapter = get_adapter(key)
         if adapter is None:

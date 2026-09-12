@@ -30,11 +30,12 @@ class QuestionsScreen(Screen):
         Binding("f", "cycle_filter", "Filter"),
         Binding("slash", "search", "Search"),
         Binding("a", "add", "Add"),
-        Binding("R", "resolve", "Resolve"),
+        Binding("e", "edit", "Edit"),
+        Binding("r", "resolve", "Resolve"),
         Binding("d", "defer", "Defer"),
         Binding("o", "reopen", "Reopen"),
         Binding("t", "open_target", "Target"),
-        Binding("r", "refresh", "Refresh"),
+        Binding("ctrl+r", "refresh", "Refresh"),
         Binding("escape", "back", "Back"),
         Binding("q", "back", "Back"),
         Binding("question_mark", "help", "Help"),
@@ -151,17 +152,43 @@ class QuestionsScreen(Screen):
         self.app.push_screen(
             HelpScreen(
                 "Questions\n\n"
-                "f     cycle filter OPEN/RESOLVED/DEFERRED/ALL\n"
-                "/     search\n"
-                "a     add question\n"
-                "R     resolve (answer + confirm)\n"
-                "d     defer\n"
-                "o     reopen\n"
-                "t     open typed target\n"
-                "r     refresh\n"
-                "Esc/q back\n\n"
-                "Resolving does not automatically rewrite CURRENT."
+                "f       cycle filter OPEN/RESOLVED/DEFERRED/ALL\n"
+                "/       search\n"
+                "a       add question\n"
+                "e       edit fields (Ctrl+S apply)\n"
+                "r       resolve (answer + confirm)\n"
+                "d       defer\n"
+                "o       reopen\n"
+                "t       open typed target\n"
+                "Ctrl+r  refresh\n"
+                "Esc/q   back\n\n"
+                "Resolving does not automatically rewrite CURRENT.\n"
+                "Under filter=OPEN, a resolved question disappears from the list."
             )
+        )
+
+    def action_edit(self) -> None:
+        q = self._selected()
+        if q is None:
+            return
+        from music_rig.tui.forms import RecordEditScreen
+        from music_rig.tui.editable_domains.questions import QuestionsEditableAdapter
+
+        def _done(saved: bool | None) -> None:
+            if saved:
+                self.reload(select_id=q.id)
+                # May have vanished under OPEN filter after status change via form.
+                if self._filter == "OPEN":
+                    still = self._selected_id()
+                    if still != q.id:
+                        self.notify(
+                            f"{q.id} updated. Hidden because filter=OPEN. "
+                            "Press f for RESOLVED/ALL."
+                        )
+
+        self.app.push_screen(
+            RecordEditScreen(QuestionsEditableAdapter(), q.id),
+            _done,
         )
 
     def action_add(self) -> None:
@@ -205,14 +232,22 @@ class QuestionsScreen(Screen):
                 except StoreError as exc:
                     self.notify(str(exc), severity="error")
                     return
-                self.notify(f"{updated.id} -> RESOLVED")
+                filter_was_open = self._filter == "OPEN"
                 self.reload(select_id=updated.id)
+                if filter_was_open:
+                    self.notify(
+                        f"{updated.id} resolved. Hidden because filter=OPEN. "
+                        "Press f for RESOLVED/ALL."
+                    )
+                else:
+                    self.notify(f"{updated.id} -> RESOLVED")
 
             self.app.push_screen(
                 ConfirmModal(
                     f"Resolve {q.id}?",
                     "Recording an answer does not automatically rewrite CURRENT.\n"
-                    "Reconcile separately if the answer changes physical truth.",
+                    "Reconcile separately if the answer changes physical truth.\n"
+                    "Enter confirms · Esc cancels.",
                     confirm_label="Resolve",
                 ),
                 _after_confirm,
@@ -271,21 +306,40 @@ class QuestionsScreen(Screen):
         if target is None:
             self.notify("No typed target on this question", severity="warning")
             return
-        if target.domain in {"patchbay.mode", "patchbay.model"} and target.bay:
+        if target.domain in {"patchbay.mode", "patchbay.model", "patchbay.connection"} and target.bay:
             self.app.open_domain(  # type: ignore[attr-defined]
                 "patchbay",
                 target.bay,
                 pair=target.pair,
             )
             return
-        # Target editor not available in Stage 12
+        domain_map = {
+            "routing": "routing",
+            "routing.path": "routing",
+            "midi": "midi",
+            "midi.channel": "midi",
+            "midi.link": "midi",
+            "controls": "controls",
+            "controls.mapping": "controls",
+            "ableton": "ableton",
+            "performance": "performance",
+            "channel": "channels",
+            "channel.source": "channels",
+            "inventory": "gear",
+            "inventory.gear": "gear",
+        }
+        route = domain_map.get(target.domain)
+        if route:
+            oid = target.gear or target.path or target.device or target.context
+            self.app.open_domain(route, oid)  # type: ignore[attr-defined]
+            return
         try:
             suggestion = format_reconcile_question(q.id)
         except StoreError as exc:
             suggestion = str(exc)
         self.app.push_screen(
             ConfirmModal(
-                "Target editor not available in Stage 12",
+                "No dedicated target editor for this domain",
                 f"Typed target: {format_target(target)}\n\n"
                 "Use CLI to reconcile:\n"
                 f"{suggestion[:1200]}",

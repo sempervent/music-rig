@@ -417,6 +417,107 @@ def link_change(
     return updated_q
 
 
+def update_question_fields(
+    question_id: str,
+    *,
+    question: str | None = None,
+    area: str | None = None,
+    notes: str | None = None,
+    answer: str | None = None,
+    related_todos: list[str] | None = None,
+    related_changes: list[str] | None = None,
+    target: dict | None | object = ...,  # type: ignore[assignment]
+    clear_target: bool = False,
+    render: bool = True,
+    questions_path: Path | None = None,
+    todo_path: Path | None = None,
+    changes_path: Path | None = None,
+    docs_todo=None,
+    docs_wishlist=None,
+    docs_questions=None,
+) -> OpenQuestion:
+    """Patch mutable fields on a question. Does not change status/resolved_at alone.
+
+    Pass target=None with clear_target=True to remove typed target.
+    Pass a QuestionTarget or dict to set target.
+    """
+    from music_rig.models import QuestionTarget
+
+    qdoc = load_questions(questions_path)
+    key = question_id.strip().upper()
+    current = qdoc.question_map().get(key)
+    if current is None:
+        raise StoreError(f"Question {key} does not exist.")
+
+    data = current.model_dump()
+    if question is not None:
+        cleaned = question.strip()
+        if not cleaned:
+            raise StoreError("Question text cannot be empty.")
+        data["question"] = cleaned
+    if area is not None:
+        cleaned_area = area.strip()
+        if not cleaned_area:
+            raise StoreError("Area cannot be empty.")
+        data["area"] = cleaned_area
+    if notes is not None:
+        data["notes"] = notes
+    if answer is not None:
+        data["answer"] = answer
+    if related_todos is not None:
+        todo_ids = [t.strip().upper() for t in related_todos if t.strip()]
+        known = load_todo(todo_path).task_map()
+        for tid in todo_ids:
+            if tid not in known:
+                raise StoreError(f"Related TODO {tid} does not exist.")
+        if len(todo_ids) != len(set(todo_ids)):
+            raise StoreError("related_todos must not contain duplicates")
+        data["related_todos"] = todo_ids
+    if related_changes is not None:
+        change_ids = [c.strip().upper() for c in related_changes if c.strip()]
+        known_c = load_changes(changes_path).item_map()
+        for cid in change_ids:
+            if cid not in known_c:
+                raise StoreError(f"Related change {cid} does not exist.")
+        if len(change_ids) != len(set(change_ids)):
+            raise StoreError("related_changes must not contain duplicates")
+        data["related_changes"] = change_ids
+    if clear_target:
+        data["target"] = None
+    elif target is not ...:
+        if target is None:
+            data["target"] = None
+        elif isinstance(target, QuestionTarget):
+            data["target"] = target.model_dump()
+        elif isinstance(target, dict):
+            cleaned_t = {k: v for k, v in target.items() if v not in (None, "", [])}
+            if "domain" not in cleaned_t or not str(cleaned_t["domain"]).strip():
+                raise StoreError("Typed target requires a domain.")
+            data["target"] = QuestionTarget.model_validate(cleaned_t).model_dump()
+        else:
+            raise StoreError("Invalid target value.")
+
+    # Preserve RESOLVED invariants when editing answer
+    if data["status"] == QuestionStatus.RESOLVED and not str(data.get("answer") or "").strip():
+        raise StoreError(f"{key} RESOLVED requires a non-empty answer.")
+
+    updated = OpenQuestion.model_validate(data)
+    new_qdoc = OpenQuestionsDocument(
+        questions=[updated if q.id == key else q for q in qdoc.questions]
+    )
+    write_documents(questions=new_qdoc, questions_path=questions_path)
+    if render:
+        render_docs(
+            todo_path=todo_path,
+            docs_todo=docs_todo,
+            docs_wishlist=docs_wishlist,
+            questions_path=questions_path,
+            docs_questions=docs_questions,
+            write=True,
+        )
+    return updated
+
+
 def open_question_count(*, questions_path: Path | None = None) -> int:
     return sum(
         1

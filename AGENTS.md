@@ -64,6 +64,11 @@ uv run rig tui
 uv run rig tui question Q-008
 uv run rig tui patchbay PB-B
 
+# Inspection (agents)
+uv run rig inspect domains
+uv run rig inspect schema question
+uv run rig inspect cleanup --json
+
 # Work
 uv run rig todo start RIG-001
 uv run rig todo done RIG-001
@@ -174,17 +179,20 @@ uv run rig check
 - No CLI mutation command commits or pushes Git.
 - Prefer the CLI/service layer for planning mutations when practical.
 
-### Interactive TUI (Stage 12)
+### Interactive TUI (Stage 13)
 
 - `uv run rig tui` is a Textual presentation layer over the same services as the CLI.
 - TUI widgets must not parse CLI output and must not write YAML directly.
-- Editable domains today: **Questions** (`question_service`) and **Patchbays**
-  (`propose_set_modes_batch` / `propose_set_model` + `commit_patchbay`, optional
-  `snapshot_service.create_snapshot` before apply).
-- Patchbay endpoint (upper/lower connection) editing is deferred; mode +
-  `hardware_model` only.
-- Staged editors use `WorkingDocument` with source SHA-256 concurrency checks.
+- Editable domains use FieldSpecs (`tui/fields.py`) + adapters under
+  `tui/editable_domains/`; apply via Ctrl+S review → service commit.
+- Questions: **`r` = Resolve**, **`Ctrl+r` = Refresh**. Confirm Enter confirms.
+- Patchbays: mode, upper/lower connections, hardware_model; staged apply + optional snapshot.
+- Also editable: TODO, wishlist, inbox, changes, gear, channels, routing, MIDI,
+  controllers, Ableton metadata, performance evidence, backup plan fields.
+- Snapshots / doctor / status / reconcile / automation remain non-mutating views.
+- Staged editors use source SHA-256 concurrency checks (no blind overwrite).
 - Resolving a question still does **not** rewrite CURRENT.
+- Agent guide: root `SKILLS.md`. Discovery: `uv run rig inspect …`.
 - Do not implement OBS/Ableton/MIDI/Stream Deck/macOS automation from the TUI;
   those families remain `NOT_IMPLEMENTED`.
 

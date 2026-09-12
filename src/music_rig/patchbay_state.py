@@ -438,6 +438,66 @@ def propose_set_model(
     return preview, doc
 
 
+def propose_set_connection(
+    bay_id: str,
+    jack_spec: str,
+    *,
+    upper_connection: str | None = None,
+    lower_connection: str | None = None,
+    data: dict[str, Any] | None = None,
+    path: Path | None = None,
+) -> tuple[CurrentPreview, dict[str, Any]]:
+    """Set upper and/or lower endpoint connection labels for a pair.
+
+    Pass the empty string to clear a connection. Omit a side (None) to leave it unchanged.
+    """
+    if upper_connection is None and lower_connection is None:
+        raise StoreError("Provide upper_connection and/or lower_connection.")
+    doc = copy.deepcopy(data if data is not None else load_raw(path))
+    bay_key = bay_id.strip().upper()
+    upper_n, lower_n, upper, lower = resolve_pair(bay_key, jack_spec, doc)
+    before = _pair_snapshot(upper_n, lower_n, upper, lower)
+
+    bay = _bay(doc, bay_key)
+    jacks = _jacks_map(bay)
+    if upper_connection is not None:
+        _set_jack_field(jacks, upper_n, "connection", upper_connection.strip())
+    if lower_connection is not None:
+        if lower_n is None:
+            raise StoreError(f"{bay_key} jack {jack_spec} has no lower pair for connection.")
+        _set_jack_field(jacks, lower_n, "connection", lower_connection.strip())
+
+    upper_after = _get_jack(jacks, upper_n)
+    lower_after = _get_jack(jacks, lower_n) if lower_n is not None else None
+    assert upper_after is not None
+    after = _pair_snapshot(upper_n, lower_n, upper_after, lower_after)
+
+    errors = validate_patchbays_doc(doc)
+    if errors:
+        raise StoreError("Patchbay validation failed: " + "; ".join(errors))
+
+    pair_label = f"{upper_n}/{lower_n}" if lower_n is not None else str(upper_n)
+    changed = (
+        before["upper_connection"] != after["upper_connection"]
+        or before["lower_connection"] != after["lower_connection"]
+    )
+    rel = "data/patchbays.yaml"
+    if changed:
+        message = f"Set {bay_key} {pair_label} connections"
+    else:
+        message = f"No change: {bay_key} {pair_label} connections unchanged"
+    preview = CurrentPreview(
+        domain="patchbay.connection",
+        target=f"{bay_key} {pair_label}",
+        before=before,
+        after=after,
+        changed=changed,
+        affected_files=[rel] if changed else [],
+        message=message,
+    )
+    return preview, doc
+
+
 def propose_set_modes_batch(
     bay_id: str,
     updates: list[tuple[str, str]],
