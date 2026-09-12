@@ -22,7 +22,7 @@ Edit with `uv run rig current channels set-source alesis …`.
 | Path | Role |
 |---|---|
 | Main Out | Clean stereo capture → TASCAM 1/2 |
-| Monitor Out | KAOSS Replay feed → TASCAM 9/10 |
+| Monitor Out | Not the KAOSS feed (obsolete). KAOSS is fed from TASCAM OUT 3/4 → return TASCAM IN 15/16 |
 | AUX SEND | Wet loop input → RC-1 → Cry Baby → JOYO → CH-1 |
 | Stereo Return / Line Return | Wet loop return from CH-1 stereo out |
 

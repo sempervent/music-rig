@@ -2,7 +2,7 @@
 
 This is the living map for the studio: instruments, mixer, interface, pedals, loopers, patchbays, MIDI, Ableton tracks, and known failure modes.
 
-The design goal is not purity. It is controllable chaos: clean captures available at all times, wet loops available on demand, KAOSS sampling fed from the mixer monitor path, patchbay connectivity documented where known, and enough documentation that future changes do not turn the room into a copper snake nest.
+The design goal is not purity. It is controllable chaos: clean captures available at all times, wet loops available on demand, KAOSS sampling fed from TASCAM OUT 3/4 with return on TASCAM IN 15/16, patchbay connectivity documented where known, and enough documentation that future changes do not turn the room into a copper snake nest.
 
 ## Core principles
 
@@ -13,7 +13,7 @@ The design goal is not purity. It is controllable chaos: clean captures availabl
    Instruments can be sent into the RC-1 (then wah / JOYO pedal chains) and stereo return without destroying the clean path.
 
 3. **Keep KAOSS Replay as its own captured instrument.**
-   KAOSS output lands on TASCAM 9/10.
+   TASCAM OUT 3/4 feeds KAOSS Replay; KAOSS returns to TASCAM IN 15/16 (not the old 9/10 mapping).
 
 4. **Keep patchbay facts separate from high-level routing.**
    See [Patchbays](patchbays.md). Owned gear is not automatically in the current chain.

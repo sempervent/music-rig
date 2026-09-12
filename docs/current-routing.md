@@ -7,15 +7,15 @@ Authoritative end-to-end overview of the **CURRENT** physical studio. For jack-l
 | TASCAM Input | Source | Notes |
 |---:|---|---|
 | 1/2 | Alesis mixer MAIN OUT L/R | Clean stereo mixer capture |
-| 3/4 | miniKORG L/R | Direct stereo synth capture (also documented on PB-B). Q-004 also labels KAOSS feed as TASCAM 3/4 — dual-use clarification open if needed. |
+| 3/4 | miniKORG L/R | Direct stereo **input** capture (PB-B). Distinct from **TASCAM OUT 3/4**, which feeds KAOSS Replay. |
 | 5 | Acoustic instrument clean | After BOSS acoustic preamp → A/B/Y clean leg |
 | 6 | Bass clean | After BBox preamp → A/B/Y clean leg |
 | 7 | Electric guitar clean | After Flamma preamp → A/B/Y clean leg |
 | 8 | UNASSIGNED | — |
-| 9/10 | UNASSIGNED | Formerly KAOSS; moved per Q-004 |
+| 9/10 | UNASSIGNED | Formerly stale KAOSS return; cleared — KAOSS returns on 15/16 |
 | 11/12 | Alesis SR-18 MAIN L/R | Drum machine direct (also documented on PB-B) |
 | 13/14 | UNASSIGNED | — |
-| 15/16 | KAOSS Replay L/R | Stereo KAOSS capture (corrected Q-004) |
+| 15/16 | KAOSS Replay L/R | Stereo KAOSS return (**TASCAM IN 15/16**), fed from **TASCAM OUT 3/4** |
 
 ## Alesis mixer inputs
 
@@ -113,9 +113,9 @@ Exact DIRTY and SPACE topologies: [Pedal Chains](pedal-chains.md) or `rig path s
 ### KAOSS Replay path
 
 ```text
-TASCAM 3/4
+TASCAM OUT 3/4
 -> KAOSS Replay
--> TASCAM 15/16
+-> TASCAM IN 15/16
 ```
 <!-- rig:routing:end -->
 

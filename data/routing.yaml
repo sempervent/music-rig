@@ -8,11 +8,12 @@ routes:
     to: TASCAM 1/2
   kaoss_capture:
     status: CURRENT
-    from: TASCAM 3/4
+    from: TASCAM OUT 3/4
     through: KAOSS Replay
-    to: TASCAM 15/16
-    notes: Corrected from Q-004 (was Alesis Monitor Out → TASCAM 9/10). TASCAM 3/4
-      inputs remain miniKORG capture; KAOSS feed label is TASCAM 3/4 per human answer.
+    to: TASCAM IN 15/16
+    notes: 'HUMAN Stage 23 correction: TASCAM OUT 3/4 feeds KAOSS Replay; KAOSS returns to
+      TASCAM IN 15/16. TASCAM IN 3/4 remain miniKORG capture (do not confuse OUT vs IN). Supersedes
+      Monitor Out → TASCAM 9/10.'
   aux_send_loop:
     status: CURRENT
     from: Alesis AUX SEND
@@ -209,14 +210,14 @@ named_paths:
       main:
         label: Main path
         nodes:
-        - id: tascam-3-4
-          label: TASCAM 3/4
+        - id: tascam-out-3-4
+          label: TASCAM OUT 3/4
         - id: kaoss-replay
           label: KAOSS Replay
           gear_ref: kaoss-replay
           kind: device
-        - id: tascam-15-16
-          label: TASCAM 15/16
+        - id: tascam-in-15-16
+          label: TASCAM IN 15/16
         position: before
   clean_mixer:
     label: Clean mixer capture
