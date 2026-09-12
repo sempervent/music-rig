@@ -193,18 +193,24 @@ uv run rig check
 - `uv run rig tui` is a Textual presentation layer over the same services as the CLI.
 - TUI widgets must not parse CLI output and must not write YAML directly.
 - Editable domains use FieldSpecs (`tui/fields.py`) + adapters under
-  `tui/editable_domains/`; apply via Ctrl+S review → service commit.
-- Questions: **`r` = Resolve**, **`Ctrl+r` = Refresh**. Confirm Enter confirms.
-  After resolve, CURRENT reconciliation is still required (`rig reconcile …`).
+  `tui/editable_domains/`; apply via Ctrl+S / :w review → service commit.
+- Vim-like modes: NORMAL / INSERT / COMMAND (see [docs/tui.md](docs/tui.md)).
+- Questions: **`a` = Answer**, **`A` = Add**, **`r`/`R` = Resolve**,
+  **`V` = Verify**, **`C` = Reconcile**, **`Ctrl+r` = Refresh**.
+  Answer may keep OPEN; Resolve requires answer. Neither invents
+  `verification_result`.
+- After resolve, CURRENT reconciliation is still required (`rig reconcile …`).
 - Reconcile screen (`rig tui reconcile`): queue + plan/apply/verify/finalize via
   `music_rig.reconciliation.service` (same as CLI).
-- Patchbays: mode, upper/lower connections, hardware_model; staged apply + optional snapshot.
+- Patchbays: mode (e/Space staged), connections, hardware_model (`m`); apply with
+  Ctrl+S / :w. Related OPEN questions show `Q-xxx: <text>`.
 - Also editable: TODO, wishlist, inbox, changes, gear, channels, routing, MIDI,
   controllers, Ableton metadata, performance evidence, backup plan fields.
 - Snapshots / doctor / status / automation remain non-mutating views.
 - Staged editors use source SHA-256 concurrency checks (no blind overwrite).
 - Resolving a question still does **not** rewrite CURRENT or set `reconciled_at`.
-- Agent guide: root `SKILLS.md` (CLI-first). Discovery: `uv run rig inspect …`.
+- Agent guide: root `SKILLS.md` (CLI-first; do not automate TUI). Discovery:
+  `uv run rig inspect …`.
 - Do not implement OBS/Ableton/MIDI/Stream Deck/macOS automation from the TUI;
   those families remain `NOT_IMPLEMENTED`.
 

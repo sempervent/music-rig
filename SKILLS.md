@@ -301,12 +301,19 @@ Textual widgets never write YAML.
 
 ## TUI
 
+The TUI is a **human editor** over the same services as the CLI. Agents should prefer
+`uv run rig …` (CLI-first) and must **not** automate the TUI.
+
 - `rig tui verify`: guided queue + structured answer pickers; Skip / Next /
   Open Target / Edit Target / Reconcile. After answer shows READY_TO_APPLY or
   blockers.
 - `rig tui reconcile`: plan/apply/verify/finalize; **e** Edit Target opens pair
   picker when `patchbay.mode` is missing `pair`.
-- Questions: **t** Target — pair picker when pair missing; **r** Resolve.
+- Questions: **a** Answer (text stays visible), **A** Add, **r** Resolve,
+  **V** Verify, **C** Reconcile. Ctrl+r = Refresh.
+- Vim-like modes for extenders: NORMAL / INSERT / COMMAND (`:w` apply, `:q` /
+  `:q!`). See [docs/tui.md](docs/tui.md). Do not teach agents to drive Pilot/TUI.
+- `rig tui --debug` / `RIG_DEBUG=1` for pipeline diagnostics only.
 
 ## Things Agents Must Never Do
 

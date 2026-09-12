@@ -134,11 +134,12 @@ class InputModal(ModalScreen[str | None]):
 
 
 class SelectModeModal(ModalScreen[str | None]):
-    """Pick a canonical patchbay mode."""
+    """Pick a canonical patchbay mode. Focus primary; Enter confirms; 1–4 keys."""
 
     MODES = ("normal", "half-normal", "thru", "unknown")
     BINDINGS = [
         Binding("escape", "cancel", "Cancel", show=False),
+        Binding("enter", "confirm_focused", "Confirm", show=False, priority=True),
         Binding("1", "pick_normal", show=False),
         Binding("2", "pick_half", show=False),
         Binding("3", "pick_thru", show=False),
@@ -149,20 +150,42 @@ class SelectModeModal(ModalScreen[str | None]):
         super().__init__()
         self._pair_label = pair_label
         self._current = current
+        self._selected = "normal"
 
     def compose(self) -> ComposeResult:
         with Vertical(id="modal"):
             yield Label(f"Set mode for {self._pair_label}", id="modal-title")
-            yield Static(f"Current: {self._current}", id="modal-body")
+            yield Static(
+                f"Current: {self._current}\n"
+                "Enter confirms focused button · 1–4 pick · Esc cancel",
+                id="modal-body",
+            )
             with Vertical(id="mode-choices"):
-                yield Button("1 normal", id="mode-normal")
+                yield Button("1 normal", variant="primary", id="mode-normal")
                 yield Button("2 half-normal", id="mode-half-normal")
                 yield Button("3 thru", id="mode-thru")
                 yield Button("4 unknown", id="mode-unknown")
                 yield Button("Cancel", id="cancel")
 
+    def on_mount(self) -> None:
+        # Focus primary (normal) so Enter confirms a selection immediately.
+        self.query_one("#mode-normal", Button).focus()
+        self._selected = "normal"
+
     def action_cancel(self) -> None:
         self.dismiss(None)
+
+    def action_confirm_focused(self) -> None:
+        focused = self.focused
+        if isinstance(focused, Button):
+            bid = focused.id or ""
+            if bid.startswith("mode-"):
+                self.dismiss(bid.removeprefix("mode-"))
+                return
+            if bid == "cancel":
+                self.dismiss(None)
+                return
+        self.dismiss(self._selected)
 
     def action_pick_normal(self) -> None:
         self.dismiss("normal")
@@ -185,6 +208,40 @@ class SelectModeModal(ModalScreen[str | None]):
         bid = event.button.id or ""
         if bid.startswith("mode-"):
             self.dismiss(bid.removeprefix("mode-"))
+
+
+class CommandLineModal(ModalScreen[str | None]):
+    """Vim COMMAND mode line (:w, :q, :wq, :q!)."""
+
+    BINDINGS = [
+        Binding("escape", "cancel", "Cancel", show=False, priority=True),
+    ]
+
+    def __init__(self, *, prompt: str = ":") -> None:
+        super().__init__()
+        self._prompt = prompt
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="modal"):
+            yield Label("Command", id="modal-title")
+            yield Static(
+                ":w / :write  apply · :q quit (dirty refuses) · :wq apply+quit · :q! discard",
+                id="modal-body",
+            )
+            yield Input(value=self._prompt, id="modal-input")
+
+    def on_mount(self) -> None:
+        inp = self.query_one("#modal-input", Input)
+        inp.cursor_position = len(inp.value)
+        inp.focus()
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+    @on(Input.Submitted, "#modal-input")
+    def _submit(self, event: Input.Submitted) -> None:
+        self.dismiss(event.value)
+
 
 
 class ApplyPatchbayModal(ModalScreen[tuple[bool, bool] | None]):

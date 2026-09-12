@@ -336,12 +336,14 @@ class FieldForm(Vertical):
         *,
         on_pick_refs: Callable[[FieldSpec, list[str]], None] | None = None,
         on_edit_list: Callable[[FieldSpec, list[str]], None] | None = None,
+        on_change: Callable[[], None] | None = None,
     ) -> None:
         super().__init__(id="field-form")
         self._specs = specs
         self._values = values
         self._on_pick_refs = on_pick_refs
         self._on_edit_list = on_edit_list
+        self._on_change = on_change
         self._editors: dict[str, FieldEditor] = {}
 
     def compose(self) -> ComposeResult:
@@ -369,3 +371,54 @@ class FieldForm(Vertical):
     def set_field(self, name: str, value: Any) -> None:
         if name in self._editors:
             self._editors[name].set_value(value)
+            if self._on_change:
+                self._on_change()
+
+    def focus_first_editable(self) -> bool:
+        for editor in self._editors.values():
+            if editor.spec.read_only or editor.spec.type in {
+                FieldType.READONLY,
+                FieldType.TIMESTAMP,
+            }:
+                continue
+            try:
+                for child in editor.query(Input):
+                    child.focus()
+                    return True
+                for child in editor.query(TextArea):
+                    child.focus()
+                    return True
+                for child in editor.query(Select):
+                    child.focus()
+                    return True
+                for child in editor.query(Switch):
+                    child.focus()
+                    return True
+            except Exception:
+                continue
+        return False
+
+    def apply_values(self, values: dict[str, Any]) -> None:
+        for name, value in values.items():
+            if name in self._editors:
+                self._editors[name].set_value(value)
+
+    @on(Input.Changed)
+    def _input_changed(self) -> None:
+        if self._on_change:
+            self._on_change()
+
+    @on(TextArea.Changed)
+    def _textarea_changed(self) -> None:
+        if self._on_change:
+            self._on_change()
+
+    @on(Select.Changed)
+    def _select_changed(self) -> None:
+        if self._on_change:
+            self._on_change()
+
+    @on(Switch.Changed)
+    def _switch_changed(self) -> None:
+        if self._on_change:
+            self._on_change()

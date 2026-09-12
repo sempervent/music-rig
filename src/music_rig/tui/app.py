@@ -27,9 +27,13 @@ Screen {
     padding: 1 1 0 1;
 }
 
-#home-subtitle, #filter-label, #dirty-label {
+#home-subtitle, #filter-label, #dirty-label, #mode-banner {
     color: $text-muted;
     padding: 0 1 1 1;
+}
+
+#mode-banner {
+    text-style: bold;
 }
 
 #split {
@@ -98,11 +102,16 @@ class RigApp(App[None]):
         route: str | None = None,
         object_id: str | None = None,
         pair: str | None = None,
+        debug: bool = False,
     ) -> None:
         super().__init__()
         self._route = normalize_route(route)
         self._object_id = object_id
         self._pair = pair
+        if debug:
+            from music_rig.tui.debug import set_debug
+
+            set_debug(True)
 
     def on_mount(self) -> None:
         self.push_screen(HomeScreen())

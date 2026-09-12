@@ -1,4 +1,4 @@
-"""Staged working document with dirty tracking and source-hash concurrency."""
+"""Staged working document with dirty tracking, undo/redo, and source-hash concurrency."""
 
 from __future__ import annotations
 
@@ -36,7 +36,10 @@ class ConcurrentModificationError(RuntimeError):
 
 
 class WorkingDocument(Generic[T]):
-    """Baseline data plus staged mutations; commits only via an explicit apply callback."""
+    """Baseline data plus staged mutations; commits only via an explicit apply callback.
+
+    Undo/redo scope = unsaved working-copy mutations only (before Apply).
+    """
 
     def __init__(
         self,
@@ -51,15 +54,27 @@ class WorkingDocument(Generic[T]):
         if source_path is not None and source_hash is None and source_path.exists():
             self.source_hash = sha256_file(source_path)
         self._mutations: dict[str, Any] = {}
+        self._undo_stack: list[dict[str, Any]] = []
+        self._redo_stack: list[dict[str, Any]] = []
 
     @property
     def mutations(self) -> dict[str, Any]:
         return dict(self._mutations)
 
+    def _push_undo(self) -> None:
+        self._undo_stack.append(dict(self._mutations))
+        self._redo_stack.clear()
+
     def stage(self, key: str, value: Any) -> None:
+        if self._mutations.get(key) == value and key in self._mutations:
+            return
+        self._push_undo()
         self._mutations[key] = value
 
     def unstage(self, key: str) -> None:
+        if key not in self._mutations:
+            return
+        self._push_undo()
         self._mutations.pop(key, None)
 
     def get(self, key: str, default: Any = None) -> Any:
@@ -84,6 +99,23 @@ class WorkingDocument(Generic[T]):
 
     def discard(self) -> None:
         self._mutations.clear()
+        self._undo_stack.clear()
+        self._redo_stack.clear()
+
+    def undo(self) -> bool:
+        """Restore previous mutation map. Returns False if nothing to undo."""
+        if not self._undo_stack:
+            return False
+        self._redo_stack.append(dict(self._mutations))
+        self._mutations = self._undo_stack.pop()
+        return True
+
+    def redo(self) -> bool:
+        if not self._redo_stack:
+            return False
+        self._undo_stack.append(dict(self._mutations))
+        self._mutations = self._redo_stack.pop()
+        return True
 
     def current_source_hash(self) -> str | None:
         if self.source_path is None or not self.source_path.exists():
