@@ -100,3 +100,10 @@ def has_positive_observation(question: OpenQuestion) -> bool:
         VerificationOutcome.CONFIRMED,
         VerificationOutcome.CORRECTED,
     }
+
+
+def has_apply_authority(question: OpenQuestion) -> bool:
+    """Observation OR (policy-attestation + HUMAN answer)."""
+    from music_rig.verification_policy import has_evidence_authority
+
+    return has_evidence_authority(question)

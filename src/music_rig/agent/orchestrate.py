@@ -329,6 +329,7 @@ def autonomous_reconcile(
         build_agent_packet,
         validate_proposal,
     )
+    from music_rig.actor import ActorKind, get_actor
     from music_rig.progress import ProgressPhase, ProgressTracker, CallbackProgress, NullProgress
 
     ctx = ctx or ReconciliationContext.default()
@@ -338,6 +339,7 @@ def autonomous_reconcile(
     tracker.emit(ProgressPhase.BUILDING_PACKET, f"building packet for {qid}")
     packet = build_agent_packet(qid, ctx=ctx)
     run_id = audit.new_run_id()
+    initiating_actor = get_actor().value
 
     try:
         prov = provider or resolve_provider(
@@ -379,6 +381,8 @@ def autonomous_reconcile(
         record = {
             "artifact": qid,
             "packet_hash": packet.get("packet_hash"),
+            "initiating_actor": initiating_actor,
+            "planner_actor": "BOT",
             "provider_type": getattr(prov, "provider_type", "unknown"),
             "provider_version": None,
             "model": getattr(prov, "model", None),

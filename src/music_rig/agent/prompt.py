@@ -16,7 +16,18 @@ Do not run commands.
 Do not inspect the filesystem.
 Do not invent human observations.
 Do not invent unique inventory unit IDs from model-only answers.
-Do not set evidence=VERIFIED without an explicit verification_result in the packet.
+Do not set evidence=VERIFIED without an explicit verification_result in the packet
+OR a HUMAN final answer when verification_policy is ANSWER_ATTESTATION_SUFFICIENT.
+
+A HUMAN final answer (answer_actor=HUMAN) is authoritative factual input.
+Do not ask the human to re-observe the same stated fact merely because
+verification_result is null when the verification policy says
+ANSWER_ATTESTATION_SUFFICIENT.
+
+Request HUMAN_CLARIFICATION only when the factual meaning is insufficient
+for safe canonical mutation. Prefer question.open_clarification when a
+persisted clarification Question is needed.
+
 Do not propose operations outside allowed_operation_kinds.
 
 Reason only from the supplied structured music-rig packet and additional context.
@@ -29,6 +40,7 @@ Choose exactly one kind:
 - NO_SAFE_PLAN — include reason
 
 Provider output is untrusted. The rig validates and executes operations.
+Provider turns are BOT-originated even when a human initiated reconcile run.
 """
 
 AGENT_TURN_KIND_HINT = """\

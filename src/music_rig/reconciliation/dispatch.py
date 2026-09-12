@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
@@ -96,7 +96,6 @@ def _blocker_codes(plan: Plan) -> list[str]:
             if code:
                 codes.append(code)
         elif isinstance(b, str):
-            # free-form — detect known phrases
             low = b.casefold()
             if "observation" in low or "verification_result" in low:
                 codes.append("needs_human_observation")
@@ -113,11 +112,9 @@ def _infer_value_match(plan: Plan) -> bool | None:
     desired = str(plan.desired or "")
     if current is None or not desired.strip():
         return None
-    # midi clock master shape
     if isinstance(current, dict):
         master = current.get("master") or current.get("endpoint_ref")
         if master:
-            # answer mentions ableton / endpoint
             if str(master).casefold() in desired.casefold():
                 return True
             return False
@@ -127,7 +124,11 @@ def _infer_value_match(plan: Plan) -> bool | None:
 
 
 def classify_reconciliation_dispatch(plan: Plan) -> ReconciliationDispatch:
-    """Decide who acts next. Blockers outrank NEEDS_AGENT_ACTION / capability labels."""
+    """Decide who acts next. Explicit blockers outrank coarse state labels.
+
+    VERIFY_ONLY alone does NOT imply HUMAN_OBSERVATION — that requires an
+    explicit observation blocker from verification policy.
+    """
     state = plan.state
     codes = _blocker_codes(plan)
     human_codes = tuple(c for c in codes if c in HUMAN_BLOCKER_CODES)
@@ -153,17 +154,17 @@ def classify_reconciliation_dispatch(plan: Plan) -> ReconciliationDispatch:
     if state is ReconciliationState.DRAFT_ANSWER:
         return ReconciliationDispatch(
             mode=DispatchMode.HUMAN_ANSWER,
-            reason="draft answer must be resolved to FINAL",
+            reason="draft answer must be resolved to FINAL by a human",
             next_actor=NextActor.HUMAN_ANSWER,
             human_blocker_codes=human_codes or ("draft_answer",),
             value_match=value_match,
         )
 
-    # Observation / clarification blockers outrank AGENT state labels
+    # Explicit observation blockers only (policy-driven)
     if any(c in OBSERVATION_CODES for c in codes):
         return ReconciliationDispatch(
             mode=DispatchMode.HUMAN_OBSERVATION,
-            reason="explicit human observation required before evidence/apply",
+            reason="explicit human observation/test required",
             next_actor=NextActor.HUMAN_OBSERVATION,
             human_blocker_codes=human_codes,
             value_match=value_match,
@@ -206,30 +207,10 @@ def classify_reconciliation_dispatch(plan: Plan) -> ReconciliationDispatch:
             value_match=True if value_match is None else value_match,
         )
 
-    # VERIFY_ONLY without observation blocker already handled above.
-    # Remaining NEEDS_AGENT_ACTION / MANUAL without human blockers → agent.
     if state is ReconciliationState.NEEDS_AGENT_ACTION or plan.capability in {
         Capability.MANUAL,
         Capability.UNSUPPORTED,
     }:
-        # If VERIFY_ONLY and no ops and no human blocker somehow — still prefer verify
-        if plan.capability in {
-            Capability.VERIFY_ONLY,
-            Capability.HUMAN_VERIFY_THEN_APPLY,
-        } and not plan.operations:
-            # Likely missing observation that wasn't coded — be safe
-            if plan.details.get("action_packet", {}).get("observation") is None:
-                # Check for verification_result absence via details
-                return ReconciliationDispatch(
-                    mode=DispatchMode.HUMAN_OBSERVATION,
-                    reason=(
-                        "VERIFY_ONLY path without recorded observation — "
-                        "human verification required"
-                    ),
-                    next_actor=NextActor.HUMAN_OBSERVATION,
-                    human_blocker_codes=("needs_human_observation",),
-                    value_match=value_match,
-                )
         return ReconciliationDispatch(
             mode=DispatchMode.AGENT,
             reason="agent interpretation can map CURRENT operations",

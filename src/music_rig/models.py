@@ -528,6 +528,14 @@ class InventoryDocument(BaseModel):
         return None
 
 
+class AnswerActor(str, Enum):
+    """Provenance of a Question's answer text."""
+
+    HUMAN = "HUMAN"
+    BOT = "BOT"
+    LEGACY_UNKNOWN = "LEGACY_UNKNOWN"
+
+
 class OpenQuestion(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -538,6 +546,8 @@ class OpenQuestion(BaseModel):
     related_todos: list[RigId] = Field(default_factory=list)
     related_changes: list[ChgId] = Field(default_factory=list)
     answer: str = ""
+    # Provenance of answer text. None + non-empty answer ⇒ treat as LEGACY_UNKNOWN.
+    answer_actor: AnswerActor | None = None
     notes: str = ""
     resolved_at: datetime | None = None
     reconciled_at: datetime | None = None
@@ -546,6 +556,8 @@ class OpenQuestion(BaseModel):
     verification: QuestionVerification | None = None
     verification_note: str = ""
     verification_result: VerificationResult | None = None
+    # Linked clarification Question created by an agent when answer is insufficient.
+    clarifies_question: QuestionId | None = None
 
     @field_validator("related_todos", "related_changes")
     @classmethod
@@ -574,6 +586,13 @@ class OpenQuestion(BaseModel):
                 raise ValueError(
                     f"{self.id} reconciled_at requires a non-empty answer"
                 )
+        if not self.answer.strip() and self.answer_actor is not None:
+            raise ValueError(f"{self.id} answer_actor requires non-empty answer")
+        if self.clarifies_question is not None:
+            parent = self.clarifies_question.strip().upper()
+            if parent == self.id:
+                raise ValueError(f"{self.id} cannot clarify itself")
+            object.__setattr__(self, "clarifies_question", parent)
         return self
 
 

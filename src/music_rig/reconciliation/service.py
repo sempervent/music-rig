@@ -460,12 +460,13 @@ def apply_question(
         Capability.VERIFY_ONLY,
         Capability.HUMAN_VERIFY_THEN_APPLY,
     }:
-        from music_rig.reconciliation.action_packet import has_positive_observation
+        from music_rig.reconciliation.action_packet import has_apply_authority
 
-        if not has_positive_observation(q):
+        if not has_apply_authority(q):
             raise StoreError(
                 f"{q.id} capability is {adapter.capability.value}; "
-                "apply requires verification_result CONFIRMED or CORRECTED"
+                "apply requires HUMAN answer attestation or "
+                "verification_result CONFIRMED/CORRECTED"
             )
     else:
         raise StoreError(
@@ -538,6 +539,8 @@ def _complete_todo_in_doc(
     *,
     confirm_dod: bool,
 ) -> TodoDocument:
+    from music_rig.actor import is_bot
+
     task = todo_service.get_task(doc, todo_id)
     if task.status == TodoStatus.DONE:
         # still ensure removed from next_session
@@ -551,6 +554,12 @@ def _complete_todo_in_doc(
         raise StoreError(
             f"{todo_id} has a non-empty definition_of_done; pass --confirm-dod "
             "to complete during finalize/sweep"
+        )
+    if task.definition_of_done.strip() and confirm_dod and is_bot():
+        raise StoreError(
+            f"{todo_id}: BOT actor cannot satisfy human Definition-of-Done "
+            "acknowledgement (--confirm-dod). Run without --am-bot after a human "
+            "confirms DoD, or complete the TODO via the human CLI/TUI."
         )
     updated = TodoTask.model_validate(
         {**task.model_dump(), "status": TodoStatus.DONE.value}

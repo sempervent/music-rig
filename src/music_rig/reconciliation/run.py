@@ -395,9 +395,15 @@ def _deterministic_path(
         out["applied"] = True
         out["message"] = f"Applied deterministic reconciliation for {qid}."
     else:
+        basis = (plan.details or {}).get("evidence_basis")
         out["message"] = (
             f"Deterministic apply available for {qid}.\n"
-            f"Review plan, then: uv run rig reconcile run {qid} --apply --yes"
+            + (
+                f"Evidence basis: {basis}\n"
+                if basis
+                else ""
+            )
+            + f"Review plan, then: uv run rig reconcile run {qid} --apply --yes"
         )
     return out
 

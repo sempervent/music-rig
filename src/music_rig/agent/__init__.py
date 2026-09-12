@@ -185,6 +185,7 @@ def build_agent_packet(
     q = question_service.get_question(question_id, questions_path=ctx.paths.questions)
     from music_rig.reconciliation.service import question_state
     from music_rig.reconciliation.adapters import get_adapter
+    from music_rig.verification_policy import evidence_basis_for, verification_policy_for
 
     paths = ctx.path_dict()
     adapter = get_adapter(q.target.domain if q.target else None)
@@ -223,8 +224,15 @@ def build_agent_packet(
         "artifact": {"type": "question", "id": q.id},
         "question": q.question,
         "final_human_answer": q.answer,
+        "answer_actor": (
+            q.answer_actor.value if q.answer_actor is not None else (
+                "LEGACY_UNKNOWN" if q.answer.strip() else None
+            )
+        ),
         "answer_state": question_service.derive_answer_state(q).value,
         "question_status": q.status.value,
+        "verification_policy": verification_policy_for(q).value,
+        "evidence_basis": evidence_basis_for(q).value,
         "verification_result": (
             {
                 "outcome": q.verification_result.outcome.value,
@@ -243,6 +251,7 @@ def build_agent_packet(
         "capability": plan.capability.value,
         "related_todos": list(q.related_todos),
         "related_changes": list(q.related_changes),
+        "clarifies_question": q.clarifies_question,
         "relevant_current_context": context,
         "allowed_operation_kinds": allowed,
         "candidate_operations": candidate_ops,
@@ -254,7 +263,7 @@ def build_agent_packet(
         "forbidden_claims": [
             "Do not invent unique inventory unit IDs from model-only answers.",
             "Do not invent verification_result.",
-            "Do not set evidence VERIFIED without Stage 17 observation.",
+            "Do not set evidence VERIFIED without Stage 17 observation OR HUMAN answer attestation when policy allows.",
         ],
         "truth_boundaries": TRUTH_BOUNDARIES,
         "plan_blockers": plan.blockers,
