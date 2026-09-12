@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Optional
 
@@ -66,6 +67,8 @@ from music_rig.reconcile import (
     format_reconcile_change,
     format_reconcile_question,
 )
+from music_rig.reconciliation import service as reconcile_service
+from music_rig.reconciliation.types import err_payload, ok_payload
 from music_rig.render import check_render_sync, render_docs
 from music_rig import rig_views
 from music_rig.status import build_status_text
@@ -101,7 +104,7 @@ question_app = typer.Typer(
     no_args_is_help=True,
 )
 reconcile_app = typer.Typer(
-    help="Guided reconciliation of OPEN changes/questions.",
+    help="Reconcile questions/changes into CURRENT via adapters (CLI-first).",
     invoke_without_command=True,
     no_args_is_help=False,
 )
@@ -3950,19 +3953,326 @@ def reconcile_main(ctx: typer.Context) -> None:
         _fail(str(exc))
 
 
-@reconcile_app.command("change")
-def reconcile_change_cmd(chg_id: str) -> None:
+def _reconcile_emit(payload: dict, *, as_json: bool, exit_code: int = 0) -> None:
+    if as_json:
+        # Plain JSON only — no Rich markup / ANSI.
+        typer.echo(json.dumps(payload, indent=2, default=str))
+    else:
+        if payload.get("ok"):
+            console.print_json(data=payload.get("result", payload))
+        else:
+            err = payload.get("error") or {}
+            console.print(f"[red]{err.get('code', 'error')}:[/red] {err.get('message')}")
+    if exit_code:
+        raise typer.Exit(exit_code)
+
+
+@reconcile_app.command("status")
+def reconcile_status_cmd(
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Legacy advisory summary (also the default for `rig reconcile`)."""
     try:
+        text = build_reconcile_summary()
+        if as_json:
+            _reconcile_emit(
+                ok_payload("status", {"text": text.rstrip()}), as_json=True
+            )
+        else:
+            console.print(text.rstrip())
+    except StoreError as exc:
+        if as_json:
+            _reconcile_emit(
+                err_payload("store_error", str(exc)), as_json=True, exit_code=1
+            )
+        _fail(str(exc))
+
+
+@reconcile_app.command("queue")
+def reconcile_queue_cmd(
+    artifact_type: Optional[str] = typer.Option(None, "--type"),
+    state: Optional[str] = typer.Option(None, "--state"),
+    ready: bool = typer.Option(False, "--ready"),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    try:
+        items = reconcile_service.build_queue(
+            artifact_type=artifact_type, state=state, ready=ready
+        )
+        payload = ok_payload(
+            "queue", {"items": [i.to_dict() for i in items], "count": len(items)}
+        )
+        if as_json:
+            _reconcile_emit(payload, as_json=True)
+            return
+        console.print(f"[bold]RECONCILE QUEUE[/bold] ({len(items)})")
+        for item in items:
+            console.print(
+                f"  {item.artifact_type:<8} {item.artifact_id:<8} "
+                f"{item.state.value:<20} {item.summary[:60]}"
+            )
+    except StoreError as exc:
+        if as_json:
+            _reconcile_emit(
+                err_payload("store_error", str(exc)), as_json=True, exit_code=1
+            )
+            return
+        _fail(str(exc))
+    except ValueError as exc:
+        if as_json:
+            _reconcile_emit(
+                err_payload("invalid_state", str(exc)), as_json=True, exit_code=1
+            )
+            return
+        _fail(str(exc))
+
+
+@reconcile_app.command("show")
+def reconcile_show_cmd(
+    artifact_type: str = typer.Argument(...),
+    artifact_id: str = typer.Argument(...),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    try:
+        result = reconcile_service.show_artifact(artifact_type, artifact_id)
+        if as_json:
+            _reconcile_emit(ok_payload("show", result), as_json=True)
+            return
+        if "advisory" in result:
+            console.print(result["advisory"])
+        else:
+            console.print_json(data=result)
+    except StoreError as exc:
+        if as_json:
+            _reconcile_emit(
+                err_payload("store_error", str(exc)), as_json=True, exit_code=1
+            )
+            return
+        _fail(str(exc))
+
+
+@reconcile_app.command("plan")
+def reconcile_plan_cmd(
+    artifact_type: str = typer.Argument(...),
+    artifact_id: str = typer.Argument(...),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    try:
+        kind = artifact_type.strip().lower()
+        if kind not in {"question", "questions", "q"}:
+            raise StoreError("plan currently supports question artifacts only")
+        plan = reconcile_service.plan_question(artifact_id)
+        payload = ok_payload("plan", plan.to_dict())
+        if as_json:
+            # Exit 0 even for NEEDS_AGENT_ACTION
+            _reconcile_emit(payload, as_json=True, exit_code=0)
+            return
+        console.print(f"[bold]PLAN {artifact_id}[/bold]  {plan.state.value}")
+        console.print(f"Capability: {plan.capability.value}")
+        if plan.current is not None:
+            console.print(f"CURRENT: {plan.current}")
+        if plan.desired is not None:
+            console.print(f"Desired: {plan.desired}")
+        for op in plan.operations:
+            console.print(f"  op: {op}")
+        for b in plan.blockers:
+            console.print(f"  blocker: {b}")
+        for cmd in plan.suggested_commands:
+            console.print(f"  $ {cmd}")
+    except StoreError as exc:
+        if as_json:
+            _reconcile_emit(
+                err_payload("store_error", str(exc)), as_json=True, exit_code=1
+            )
+            return
+        _fail(str(exc))
+
+
+@reconcile_app.command("apply")
+def reconcile_apply_cmd(
+    artifact_type: str = typer.Argument(...),
+    artifact_id: str = typer.Argument(...),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    yes: bool = typer.Option(False, "--yes"),
+    snapshot_before: bool = typer.Option(False, "--snapshot-before"),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    try:
+        kind = artifact_type.strip().lower()
+        if kind not in {"question", "questions", "q"}:
+            raise StoreError("apply currently supports question artifacts only")
+        result = reconcile_service.apply_question(
+            artifact_id,
+            dry_run=dry_run,
+            yes=yes,
+            snapshot_before=snapshot_before,
+        )
+        payload = ok_payload("apply", result)
+        if as_json:
+            _reconcile_emit(payload, as_json=True)
+            return
+        console.print(f"[bold]APPLY {artifact_id}[/bold]")
+        console.print_json(data=result)
+    except StoreError as exc:
+        if as_json:
+            _reconcile_emit(
+                err_payload("store_error", str(exc)), as_json=True, exit_code=1
+            )
+            return
+        _fail(str(exc))
+    except NotImplementedError as exc:
+        if as_json:
+            _reconcile_emit(
+                err_payload("not_supported", str(exc)), as_json=True, exit_code=1
+            )
+            return
+        _fail(str(exc))
+
+
+@reconcile_app.command("verify")
+def reconcile_verify_cmd(
+    artifact_type: str = typer.Argument(...),
+    artifact_id: str = typer.Argument(...),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    try:
+        kind = artifact_type.strip().lower()
+        if kind not in {"question", "questions", "q"}:
+            raise StoreError("verify currently supports question artifacts only")
+        result = reconcile_service.verify_question(artifact_id)
+        verification = result.get("verification")
+        exit_code = 1 if verification == "MISMATCH" else 0
+        payload = ok_payload("verify", result)
+        # Documented: ok:true with verification=MISMATCH and exit 1
+        if as_json:
+            _reconcile_emit(payload, as_json=True, exit_code=exit_code)
+            return
+        console.print(
+            f"[bold]VERIFY {artifact_id}[/bold]  {verification}  state={result.get('state')}"
+        )
+        console.print(result.get("verify", {}).get("message", ""))
+        if exit_code:
+            raise typer.Exit(exit_code)
+    except StoreError as exc:
+        if as_json:
+            _reconcile_emit(
+                err_payload("store_error", str(exc)), as_json=True, exit_code=1
+            )
+            return
+        _fail(str(exc))
+
+
+@reconcile_app.command("finalize")
+def reconcile_finalize_cmd(
+    artifact_type: str = typer.Argument(...),
+    artifact_id: str = typer.Argument(...),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    yes: bool = typer.Option(False, "--yes"),
+    as_json: bool = typer.Option(False, "--json"),
+    complete_linked_todos: bool = typer.Option(False, "--complete-linked-todos"),
+    apply_linked_changes: bool = typer.Option(False, "--apply-linked-changes"),
+    confirm_dod: bool = typer.Option(False, "--confirm-dod"),
+    no_current_change: bool = typer.Option(False, "--no-current-change"),
+    note: str = typer.Option("", "--note"),
+    snapshot_before: bool = typer.Option(False, "--snapshot-before"),
+) -> None:
+    try:
+        kind = artifact_type.strip().lower()
+        if kind not in {"question", "questions", "q"}:
+            raise StoreError("finalize currently supports question artifacts only")
+        result = reconcile_service.finalize_question(
+            artifact_id,
+            dry_run=dry_run,
+            yes=yes,
+            complete_linked_todos=complete_linked_todos,
+            apply_linked_changes=apply_linked_changes,
+            confirm_dod=confirm_dod,
+            no_current_change=no_current_change,
+            note=note,
+            snapshot_before=snapshot_before,
+        )
+        payload = ok_payload("finalize", result)
+        if as_json:
+            _reconcile_emit(payload, as_json=True)
+            return
+        console.print(f"[bold]FINALIZE {artifact_id}[/bold]")
+        console.print_json(data=result)
+    except StoreError as exc:
+        if as_json:
+            _reconcile_emit(
+                err_payload("store_error", str(exc)), as_json=True, exit_code=1
+            )
+            return
+        _fail(str(exc))
+
+
+@reconcile_app.command("sweep")
+def reconcile_sweep_cmd(
+    dry_run: bool = typer.Option(True, "--dry-run/--write"),
+    yes: bool = typer.Option(False, "--yes"),
+    confirm_dod: bool = typer.Option(False, "--confirm-dod"),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Finalize CURRENT_MATCHES / READY_TO_FINALIZE only. Never answers OPEN."""
+    try:
+        # Default dry-run=True; --write clears dry_run
+        result = reconcile_service.sweep(
+            dry_run=dry_run, yes=yes, confirm_dod=confirm_dod
+        )
+        payload = ok_payload("sweep", result)
+        if as_json:
+            _reconcile_emit(payload, as_json=True)
+            return
+        console.print("[bold]SWEEP[/bold]")
+        console.print_json(data=result)
+    except StoreError as exc:
+        if as_json:
+            _reconcile_emit(
+                err_payload("store_error", str(exc)), as_json=True, exit_code=1
+            )
+            return
+        _fail(str(exc))
+
+
+@reconcile_app.command("change")
+def reconcile_change_cmd(
+    chg_id: str,
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Legacy: wrap show change."""
+    try:
+        if as_json:
+            result = reconcile_service.show_change(chg_id)
+            _reconcile_emit(ok_payload("show", result), as_json=True)
+            return
         console.print(format_reconcile_change(chg_id).rstrip())
     except StoreError as exc:
+        if as_json:
+            _reconcile_emit(
+                err_payload("store_error", str(exc)), as_json=True, exit_code=1
+            )
+            return
         _fail(str(exc))
 
 
 @reconcile_app.command("question")
-def reconcile_question_cmd(question_id: str) -> None:
+def reconcile_question_cmd(
+    question_id: str,
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """Legacy: wrap show question."""
     try:
+        if as_json:
+            result = reconcile_service.show_question(question_id)
+            _reconcile_emit(ok_payload("show", result), as_json=True)
+            return
         console.print(format_reconcile_question(question_id).rstrip())
     except StoreError as exc:
+        if as_json:
+            _reconcile_emit(
+                err_payload("store_error", str(exc)), as_json=True, exit_code=1
+            )
+            return
         _fail(str(exc))
 
 

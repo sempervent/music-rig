@@ -219,6 +219,10 @@ def cleanup_scan() -> dict[str, Any]:
             {"severity": "warning", "code": "controllers_scan_failed", "id": "controls", "detail": str(exc)}
         )
 
+    from music_rig.reconciliation.service import cleanup_reconciliation_issues
+
+    issues.extend(cleanup_reconciliation_issues())
+
     return {"issues": issues, "count": len(issues)}
 
 

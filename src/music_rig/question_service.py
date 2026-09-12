@@ -164,6 +164,8 @@ def resolve_question(
         answer=cleaned,
         notes=current.notes,
         resolved_at=clock(),
+        reconciled_at=None,
+        reconciliation_note="",
         target=current.target,
     )
     new_qdoc = OpenQuestionsDocument(
@@ -205,6 +207,7 @@ def defer_question(
             **current.model_dump(),
             "status": QuestionStatus.DEFERRED,
             "resolved_at": None,
+            "reconciled_at": None,
         }
     )
     # DEFERRED may keep a prior answer as evidence; clear resolved_at
@@ -251,6 +254,8 @@ def reopen_question(
         answer=current.answer,
         notes=notes,
         resolved_at=None,
+        reconciled_at=None,
+        reconciliation_note="",
         target=current.target,
     )
     new_qdoc = OpenQuestionsDocument(
@@ -509,6 +514,60 @@ def update_question_fields(
     if render:
         render_docs(
             todo_path=todo_path,
+            docs_todo=docs_todo,
+            docs_wishlist=docs_wishlist,
+            questions_path=questions_path,
+            docs_questions=docs_questions,
+            write=True,
+        )
+    return updated
+
+
+def mark_reconciled(
+    question_id: str,
+    *,
+    note: str = "",
+    clock: Clock = default_clock,
+    no_current_change: bool = False,
+    render: bool = True,
+    questions_path: Path | None = None,
+    docs_todo=None,
+    docs_wishlist=None,
+    docs_questions=None,
+) -> OpenQuestion:
+    """Mark a RESOLVED question as reconciled into CURRENT (or explicitly no-change).
+
+    Does not invent answers. resolve_question never sets reconciled_at.
+    """
+    qdoc = load_questions(questions_path)
+    key = question_id.strip().upper()
+    current = qdoc.question_map().get(key)
+    if current is None:
+        raise StoreError(f"Question {key} does not exist.")
+    if current.status != QuestionStatus.RESOLVED:
+        raise StoreError(f"{key} must be RESOLVED before reconciliation.")
+    if not current.answer.strip():
+        raise StoreError(f"{key} RESOLVED requires a non-empty answer.")
+    note_clean = note.strip()
+    if no_current_change and not note_clean:
+        raise StoreError(
+            f"{key}: --no-current-change requires a non-empty --note."
+        )
+    if current.reconciled_at is not None:
+        raise StoreError(f"{key} is already reconciled.")
+    updated = OpenQuestion(
+        **{
+            **current.model_dump(),
+            "reconciled_at": clock(),
+            "reconciliation_note": note_clean,
+        }
+    )
+    new_qdoc = OpenQuestionsDocument(
+        questions=[updated if q.id == key else q for q in qdoc.questions]
+    )
+    write_documents(questions=new_qdoc, questions_path=questions_path)
+    if render:
+        render_docs(
             docs_todo=docs_todo,
             docs_wishlist=docs_wishlist,
             questions_path=questions_path,

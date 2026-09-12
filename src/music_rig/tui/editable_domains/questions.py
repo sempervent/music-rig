@@ -55,6 +55,19 @@ QUESTION_FIELDS: list[FieldSpec] = [
         ),
     ),
     FieldSpec(name="resolved_at", label="Resolved at", type=FieldType.TIMESTAMP, read_only=True),
+    FieldSpec(
+        name="reconciled_at",
+        label="Reconciled at",
+        type=FieldType.TIMESTAMP,
+        read_only=True,
+        help="Set by rig reconcile finalize — not by resolve",
+    ),
+    text_spec(
+        "reconciliation_note",
+        "Reconciliation note",
+        multiline=True,
+        help="Required when finalizing with --no-current-change",
+    ),
 ]
 
 
@@ -107,6 +120,8 @@ class QuestionsEditableAdapter(BaseEditableAdapter):
             "related_changes": list(q.related_changes),
             "target": target,
             "resolved_at": q.resolved_at.isoformat() if q.resolved_at else None,
+            "reconciled_at": q.reconciled_at.isoformat() if q.reconciled_at else None,
+            "reconciliation_note": q.reconciliation_note,
         }
 
     def detail_markdown(self, record_id: str) -> str:
