@@ -17,13 +17,21 @@ Stage 13–18 Textual UI for browsing and editing music-rig planning/CURRENT sta
 
 ## Launch
 
+Prefer the project environment (avoids stale global `rig` installs):
+
 ```bash
 uv run rig tui
+# or, with the project venv activated:
+#   source .venv/bin/activate && rig tui
+
 uv run rig tui question Q-008
 uv run rig tui patchbay PB-B
 uv run rig tui todo
-uv run rig tui --debug          # or RIG_DEBUG=1
+uv run rig tui --debug          # or RIG_DEBUG=1 — logs python/textual paths + screen push/pop
 ```
+
+Screens use ``RigHeader`` (not Textual's stock ``Header``) so rapid Questions ↔
+Reconcile navigation cannot hit Textual 8.2.8's ``HeaderTitle`` lifecycle race.
 
 ## Vim-like modes
 

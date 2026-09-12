@@ -6,7 +6,8 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import VerticalScroll
 from textual.screen import Screen
-from textual.widgets import Footer, Header, Static
+from textual.widgets import Footer, Static
+from music_rig.tui.header import RigHeader
 
 
 class TextViewScreen(Screen):
@@ -23,7 +24,7 @@ class TextViewScreen(Screen):
         self._text_fn = text_fn
 
     def compose(self) -> ComposeResult:
-        yield Header(show_clock=False)
+        yield RigHeader(show_clock=False)
         with VerticalScroll():
             yield Static(self._title, id="screen-title")
             yield Static("", id="text-body")

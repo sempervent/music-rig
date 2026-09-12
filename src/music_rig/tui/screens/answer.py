@@ -12,7 +12,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
-from textual.widgets import Button, Footer, Header, Static, TextArea
+from textual.widgets import Button, Footer, Static, TextArea
 
 from music_rig import question_service
 from music_rig.models import OpenQuestion, QuestionStatus
@@ -22,6 +22,7 @@ from music_rig.tui.dialogs import ConfirmModal, HelpScreen
 from music_rig.tui.modes import EditorMode, ModeController
 from music_rig.tui.save_outcome import SaveOutcome
 from music_rig.tui.widgets import format_target
+from music_rig.tui.header import RigHeader
 
 
 def _answer_context_markdown(q: OpenQuestion) -> str:
@@ -111,7 +112,7 @@ class AnswerScreen(Screen[tuple[SaveOutcome, str | None]]):
         self._q: OpenQuestion | None = None
 
     def compose(self) -> ComposeResult:
-        yield Header(show_clock=False)
+        yield RigHeader(show_clock=False)
         with Vertical(id="screen-body"):
             yield Static(
                 f"{'Answer & Resolve' if self.resolve_on_save else 'Answer'} {self.question_id}",

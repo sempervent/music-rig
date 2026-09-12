@@ -16,7 +16,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
-from textual.widgets import DataTable, Footer, Header, Static
+from textual.widgets import DataTable, Footer, Static
 
 from music_rig import question_service
 from music_rig.models import OpenQuestion, QuestionStatus
@@ -32,6 +32,7 @@ from music_rig.tui.dialogs import CommandLineModal, ConfirmModal, HelpScreen, In
 from music_rig.tui.modes import VIM_HELP_COMMON, EditorMode, ModeController, parse_command
 from music_rig.tui.save_outcome import SaveOutcome
 from music_rig.tui.widgets import format_target, truncate
+from music_rig.tui.header import RigHeader
 
 
 class QuestionsScreen(Screen):
@@ -74,7 +75,7 @@ class QuestionsScreen(Screen):
         self._search_idx = -1
 
     def compose(self) -> ComposeResult:
-        yield Header(show_clock=False)
+        yield RigHeader(show_clock=False)
         with Vertical(id="screen-body"):
             yield Static("Questions", id="screen-title")
             yield Static("", id="filter-label")

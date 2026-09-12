@@ -6,7 +6,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
-from textual.widgets import DataTable, Footer, Header, Static
+from textual.widgets import DataTable, Footer, Static
 
 from music_rig import verification_service
 from music_rig.presentation import blocker_message
@@ -14,6 +14,7 @@ from music_rig.reconciliation import service as reconcile_service
 from music_rig.store import StoreError
 from music_rig.tui.dialogs import ConfirmModal, HelpScreen, InputModal
 from music_rig.tui.pickers import ReferencePickerModal
+from music_rig.tui.header import RigHeader
 
 
 class VerifyScreen(Screen):
@@ -39,7 +40,7 @@ class VerifyScreen(Screen):
         self._skipped: set[str] = set()
 
     def compose(self) -> ComposeResult:
-        yield Header(show_clock=False)
+        yield RigHeader(show_clock=False)
         yield Static("Verify queue", id="screen-title")
         with Horizontal(id="split"):
             yield DataTable(id="list-table")

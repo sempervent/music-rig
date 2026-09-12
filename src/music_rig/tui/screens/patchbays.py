@@ -13,7 +13,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
-from textual.widgets import DataTable, Footer, Header, Static
+from textual.widgets import DataTable, Footer, Static
 
 from music_rig.patchbay_state import list_pairs, load_raw
 from music_rig.store import StoreError
@@ -32,6 +32,7 @@ from music_rig.tui.modes import VIM_HELP_COMMON, EditorMode, ModeController, par
 from music_rig.tui.save_outcome import SaveOutcome
 from music_rig.tui.widgets import mode_cell
 from music_rig.tui.working import ConcurrentModificationError, WorkingDocument
+from music_rig.tui.header import RigHeader
 
 MODE_CYCLE = ("unknown", "normal", "half-normal", "thru")
 
@@ -53,7 +54,7 @@ class PatchbayListScreen(Screen):
         self._bay_ids: list[str] = []
 
     def compose(self) -> ComposeResult:
-        yield Header(show_clock=False)
+        yield RigHeader(show_clock=False)
         with Vertical(id="screen-body"):
             yield Static("Patchbays", id="screen-title")
             yield Static(
@@ -159,7 +160,7 @@ class PatchbayEditorScreen(Screen):
         self._quit_after_apply = False
 
     def compose(self) -> ComposeResult:
-        yield Header(show_clock=False)
+        yield RigHeader(show_clock=False)
         with Vertical(id="screen-body"):
             yield Static(f"Patchbay {self.bay_id}", id="screen-title")
             yield Static("", id="dirty-label")

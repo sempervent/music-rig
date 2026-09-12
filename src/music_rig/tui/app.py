@@ -114,9 +114,31 @@ class RigApp(App[None]):
             set_debug(True)
 
     def on_mount(self) -> None:
+        from music_rig.tui.debug import debug_log
+
+        debug_log("app.mount", route=self._route, object_id=self._object_id)
         self.push_screen(HomeScreen())
         if self._route:
             self.open_domain(self._route, self._object_id, pair=self._pair)
+
+    def push_screen(self, screen, *args, **kwargs):  # type: ignore[override]
+        from music_rig.tui.debug import debug_log, is_debug
+
+        if is_debug():
+            name = type(screen).__name__ if not isinstance(screen, str) else screen
+            debug_log("push_screen", screen=name, stack=len(self.screen_stack))
+        return super().push_screen(screen, *args, **kwargs)
+
+    def pop_screen(self):  # type: ignore[override]
+        from music_rig.tui.debug import debug_log, is_debug
+
+        if is_debug() and self.screen_stack:
+            debug_log(
+                "pop_screen",
+                screen=type(self.screen).__name__,
+                stack=len(self.screen_stack),
+            )
+        return super().pop_screen()
 
     def open_domain(
         self,

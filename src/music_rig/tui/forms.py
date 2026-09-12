@@ -7,7 +7,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen, Screen
-from textual.widgets import Button, DataTable, Footer, Header, Label, Static
+from textual.widgets import Button, DataTable, Footer, Label, Static
 
 from music_rig.store import StoreError
 from music_rig.tui.debug import debug_log, format_error, is_debug
@@ -19,6 +19,7 @@ from music_rig.tui.modes import VIM_HELP_COMMON, EditorMode, ModeController, par
 from music_rig.tui.pickers import OrderedListEditorModal, ReferencePickerModal, load_ref_choices
 from music_rig.tui.save_outcome import SaveOutcome
 from music_rig.tui.working import ConcurrentModificationError
+from music_rig.tui.header import RigHeader
 
 
 class ReviewChangesModal(ModalScreen[bool]):
@@ -145,7 +146,7 @@ class RecordEditScreen(Screen[bool]):
         self._quit_after_apply = False
 
     def compose(self) -> ComposeResult:
-        yield Header(show_clock=False)
+        yield RigHeader(show_clock=False)
         with Vertical(id="screen-body"):
             yield Static(f"Edit {self.adapter.label} · {self.record_id}", id="screen-title")
             yield Static("", id="dirty-label")
