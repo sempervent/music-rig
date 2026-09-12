@@ -332,6 +332,22 @@ The TUI is a **human editor** over the same services as the CLI. Agents should p
 
 ## Reconciliation (human)
 
+Actionable progress (ignore coarse adapter enums in the UI):
+
+```text
+Need answer        → answer it
+Need verification  → physically/software verify it (not an LLM)
+Need clarification → supply the missing fact
+Need agent         → Cursor/Ollama plans interpretation only
+Ready              → deterministic reconciliation / finalize
+```
+
+**Never invoke a provider to satisfy a blocker that requires a human fact,
+human observation, DoD acknowledgement, or other human authority.
+Provider use is for interpretation, not evidence creation.**
+
+`--yes` confirms writes. It does **not** mean “I physically checked the rig.”
+
 One-time provider setup:
 
 ```bash
@@ -339,6 +355,7 @@ uv run rig agent provider setup
 # or:
 uv run rig agent provider use cursor
 uv run rig agent provider use ollama --model <installed-model>
+uv run rig agent provider benchmark --provider ollama
 ```
 
 Normal use:
@@ -350,13 +367,15 @@ uv run rig reconcile run Q-xxx --provider ollama --model <model>
 ```
 
 TUI: select Question → Reconcile (`g`). Uses deterministic adapters when possible;
-otherwise the configured Cursor/Ollama planner.
+human-observation states open Verify — they do **not** start an LLM.
+Otherwise the configured Cursor/Ollama planner runs with visible progress.
 
 ```text
 Human answers Question
         ↓
 rig reconcile run
         ↓
+human fact/observation missing? → stop (no provider)
 deterministic adapter? → plan/apply/finalize path
 agent interpretation?  → Cursor/Ollama planner → review → apply
 ```

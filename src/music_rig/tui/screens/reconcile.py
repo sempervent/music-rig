@@ -233,6 +233,11 @@ class ReconcileScreen(Screen):
         from music_rig.tui.screens.agent_plan import AgentPlanScreen
 
         def _done(result: dict | None) -> None:
+            if result and result.get("redirect") == "verify":
+                from music_rig.tui.screens.verify import VerifyScreen
+
+                self.app.push_screen(VerifyScreen(initial_id=item.artifact_id))
+                return
             if result and result.get("ok") and result.get("applied"):
                 self.notify(f"Applied reconciliation for {item.artifact_id}")
                 self.action_refresh()

@@ -1,4 +1,4 @@
-"""Unified `rig reconcile run` — deterministic first, agent planner when needed."""
+"""Unified `rig reconcile run` — dispatch-first, provider only when eligible."""
 
 from __future__ import annotations
 
@@ -9,7 +9,10 @@ from music_rig.agent.provider import detect_providers, provider_status
 from music_rig.models import ReconciliationState
 from music_rig.reconciliation import service as recon
 from music_rig.reconciliation.context import ReconciliationContext
-from music_rig.reconciliation.types import Capability
+from music_rig.reconciliation.dispatch import (
+    DispatchMode,
+    classify_reconciliation_dispatch,
+)
 
 
 def reconcile_run(
@@ -22,8 +25,15 @@ def reconcile_run(
     provider: str | None = None,
     ollama_model: str | None = None,
     root=None,
+    interactive_verify: bool | None = None,
+    on_progress=None,
 ) -> dict[str, Any]:
-    """End-to-end reconciliation entrypoint (preview by default)."""
+    """End-to-end reconciliation entrypoint (preview by default).
+
+    Provider is invoked only when ``classify_reconciliation_dispatch`` returns
+    AGENT. Human observation / answer / clarification never call a provider.
+    ``--yes`` confirms writes; it does NOT fabricate human observation.
+    """
     ctx = ctx or ReconciliationContext.default()
     qid = question_id.upper()
     paths = ctx.path_dict()
@@ -42,57 +52,101 @@ def reconcile_run(
         docs_wishlist=paths.get("docs_wishlist"),
         docs_questions=paths.get("docs_questions"),
     )
+    dispatch = classify_reconciliation_dispatch(plan)
     state = plan.state
     capability = plan.capability
+    base = {
+        "artifact_id": qid,
+        "state": state.value,
+        "capability": capability.value,
+        "dispatch": dispatch.to_dict(),
+        "provider_invoked": False,
+        "value_match": dispatch.value_match,
+        "plan": plan.to_dict(),
+    }
 
-    if state in {ReconciliationState.NEEDS_ANSWER, ReconciliationState.DRAFT_ANSWER}:
+    if dispatch.mode is DispatchMode.DONE:
         return {
-            "ok": False,
-            "mode": "needs_human",
-            "artifact_id": qid,
-            "state": state.value,
-            "capability": capability.value,
-            "message": (
-                f"{qid} needs a final human answer before reconciliation.\n"
-                f"  uv run rig question answer {qid} --answer \"…\""
-            ),
-            "provider_invoked": False,
+            **base,
+            "ok": True,
+            "mode": "already_reconciled",
+            "message": f"{qid} is already reconciled.",
         }
 
-    if state in {
-        ReconciliationState.READY_TO_APPLY,
-        ReconciliationState.CURRENT_MATCHES,
-        ReconciliationState.READY_TO_FINALIZE,
-    }:
-        return _deterministic_path(
+    if dispatch.mode is DispatchMode.HUMAN_ANSWER:
+        return {
+            **base,
+            "ok": False,
+            "mode": "needs_human",
+            "message": (
+                f"{qid} needs a final human answer before reconciliation.\n"
+                f'  uv run rig question answer {qid} --answer "…"'
+            ),
+        }
+
+    if dispatch.mode is DispatchMode.HUMAN_OBSERVATION:
+        return _human_observation_path(
             qid,
             plan=plan,
+            dispatch=dispatch,
             apply=apply,
             yes=yes,
             paths=paths,
+            interactive_verify=interactive_verify,
+            base=base,
         )
 
-    agentish = state == ReconciliationState.NEEDS_AGENT_ACTION or capability in {
-        Capability.MANUAL,
-        Capability.UNSUPPORTED,
-    }
-    if agentish or (
-        state == ReconciliationState.BLOCKED and capability == Capability.MANUAL
-    ):
+    if dispatch.mode is DispatchMode.HUMAN_CLARIFICATION:
+        return {
+            **base,
+            "ok": False,
+            "mode": "needs_clarification",
+            "message": (
+                f"{qid}: human clarification required — an agent cannot invent "
+                f"the missing fact.\n"
+                f'  uv run rig question answer {qid} --answer "…"'
+            ),
+            "blockers": list(plan.blockers or []),
+        }
+
+    if dispatch.mode is DispatchMode.DETERMINISTIC:
+        return {
+            **base,
+            **_deterministic_path(
+                qid,
+                plan=plan,
+                apply=apply,
+                yes=yes,
+                paths=paths,
+                finalize=False,
+            ),
+        }
+
+    if dispatch.mode is DispatchMode.FINALIZE:
+        return {
+            **base,
+            **_deterministic_path(
+                qid,
+                plan=plan,
+                apply=apply,
+                yes=yes,
+                paths=paths,
+                finalize=True,
+            ),
+        }
+
+    if dispatch.mode is DispatchMode.AGENT:
         status = provider_status(root=root)
         if not status.get("configured") and not provider:
             detected = detect_providers(root=root)
             return {
+                **base,
                 "ok": False,
                 "mode": "needs_provider",
-                "artifact_id": qid,
-                "state": state.value,
-                "capability": capability.value,
                 "provider_configured": False,
                 "detected": detected,
                 "message": _missing_provider_message(detected),
                 "setup_hint": "uv run rig agent provider setup",
-                "provider_invoked": False,
             }
 
         autonomy = AutonomyLevel.PLAN_ONLY
@@ -108,50 +162,158 @@ def reconcile_run(
             provider_name=provider,
             ollama_model=ollama_model,
             root=root,
+            on_progress=on_progress,
         )
         result["mode"] = "agent"
         result["provider_invoked"] = True
         result["state"] = state.value
         result["capability"] = capability.value
+        result["dispatch"] = dispatch.to_dict()
+        result["value_match"] = dispatch.value_match
         return result
 
-    if capability in {
-        Capability.VERIFY_ONLY,
-        Capability.HUMAN_VERIFY_THEN_APPLY,
-    }:
-        return {
-            "ok": False,
-            "mode": "needs_verification",
-            "artifact_id": qid,
-            "state": state.value,
-            "capability": capability.value,
-            "message": (
-                f"{qid} needs guided verification.\n"
-                f"  uv run rig verify question {qid}"
-            ),
-            "provider_invoked": False,
-        }
-
-    if state == ReconciliationState.RECONCILED:
-        return {
-            "ok": True,
-            "mode": "already_reconciled",
-            "artifact_id": qid,
-            "state": state.value,
-            "message": f"{qid} is already reconciled.",
-            "provider_invoked": False,
-        }
-
     return {
+        **base,
         "ok": False,
-        "mode": "unsupported",
-        "artifact_id": qid,
-        "state": state.value,
-        "capability": capability.value,
-        "message": f"No automated path for {qid} in state {state.value}.",
+        "mode": "blocked",
+        "message": (
+            f"No automated path for {qid}: {dispatch.reason}."
+        ),
         "blockers": list(plan.blockers or []),
-        "provider_invoked": False,
     }
+
+
+def _human_observation_path(
+    qid: str,
+    *,
+    plan,
+    dispatch,
+    apply: bool,
+    yes: bool,
+    paths: dict[str, Any],
+    interactive_verify: bool | None,
+    base: dict[str, Any],
+) -> dict[str, Any]:
+    """Human verification required — never invoke a provider."""
+    current = plan.current
+    desired = plan.desired
+    match_line = (
+        "MATCH"
+        if dispatch.value_match is True
+        else ("MISMATCH" if dispatch.value_match is False else "UNKNOWN")
+    )
+    message = _format_observation_message(
+        qid,
+        current=current,
+        desired=desired,
+        match_line=match_line,
+    )
+
+    out: dict[str, Any] = {
+        **base,
+        "ok": False,
+        "mode": "needs_verification",
+        "message": message,
+        "blockers": list(plan.blockers or []),
+        "suggested_commands": [
+            f"uv run rig verify record {qid} --outcome confirmed --value … --yes --json",
+            f"uv run rig tui verify",
+            f"uv run rig verify question {qid}",
+        ],
+    }
+
+    # Interactive TTY --apply may offer observation confirmation.
+    # --yes alone NEVER fabricates observation.
+    if apply and interactive_verify and not yes:
+        confirmed = interactive_verify  # callable or bool handled by CLI
+        if callable(interactive_verify):
+            confirmed = interactive_verify(
+                {
+                    "question_id": qid,
+                    "current": current,
+                    "desired": desired,
+                    "value_match": dispatch.value_match,
+                }
+            )
+        if confirmed:
+            # Record verification then re-enter deterministic path via caller.
+            out["interactive_observation_offered"] = True
+            out["interactive_observation_confirmed"] = True
+            out["message"] = (
+                message
+                + "\n\nInteractive verification confirmed — "
+                "record via verify machinery before apply."
+            )
+            out["next_step"] = "record_verification_result"
+            return out
+
+    if apply and yes:
+        out["message"] = (
+            message
+            + "\n\n--yes does not imply human observation. "
+            "Record verification first:\n"
+            f"  uv run rig verify record {qid} --outcome confirmed "
+            f"--value … --yes --json"
+        )
+        out["ok"] = False
+        return out
+
+    return out
+
+
+def _format_observation_message(
+    qid: str,
+    *,
+    current: Any,
+    desired: Any,
+    match_line: str,
+) -> str:
+    current_lines = _format_current(current)
+    return "\n".join(
+        [
+            f"RECONCILE {qid}",
+            "",
+            "Answer:",
+            f"  {desired}",
+            "",
+            "CURRENT:",
+            *current_lines,
+            "",
+            "Value comparison:",
+            f"  {match_line}",
+            "",
+            "Remaining requirement:",
+            "  Human verification required before this can become VERIFIED.",
+            "",
+            "No agent was invoked because an agent cannot perform this observation.",
+            "",
+            "Next:",
+            "  Verify the fact on the actual rig, then record the observation with:",
+            f"    uv run rig verify record {qid} --outcome confirmed --value … --yes --json",
+            "",
+            "  Or use:",
+            "    uv run rig tui verify",
+        ]
+    )
+
+
+def _format_current(current: Any) -> list[str]:
+    if isinstance(current, dict):
+        lines = []
+        master = current.get("master") or current.get("endpoint_ref")
+        status = current.get("status") or current.get("evidence")
+        if master is not None:
+            lines.append(f"  Clock master: {master}")
+        if status is not None:
+            lines.append(f"  Evidence: {status}")
+        for k, v in current.items():
+            if k in {"master", "endpoint_ref", "status", "evidence"}:
+                continue
+            lines.append(f"  {k}: {v}")
+        return lines or [f"  {current!r}"]
+    if current is None:
+        return ["  (none)"]
+    return [f"  {current}"]
 
 
 def _deterministic_path(
@@ -161,6 +323,7 @@ def _deterministic_path(
     apply: bool,
     yes: bool,
     paths: dict[str, Any],
+    finalize: bool,
 ) -> dict[str, Any]:
     state = plan.state
     out: dict[str, Any] = {
@@ -177,7 +340,7 @@ def _deterministic_path(
         "message": f"Deterministic plan for {qid}: {state.value}",
     }
 
-    if state in {
+    if finalize or state in {
         ReconciliationState.CURRENT_MATCHES,
         ReconciliationState.READY_TO_FINALIZE,
     }:

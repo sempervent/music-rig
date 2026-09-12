@@ -31,6 +31,7 @@ from music_rig.reconcile import (
     format_reconcile_question,
 )
 from music_rig.reconciliation.adapters import get_adapter
+from music_rig.reconciliation.dispatch import classify_reconciliation_dispatch
 from music_rig.reconciliation.types import (
     Capability,
     Plan,
@@ -769,6 +770,32 @@ def finalize_question(
     return result
 
 
+def _finding_is_agent_eligible(finding, *, paths: dict[str, Any]) -> bool:
+    """True only when central dispatch says AGENT (not human observation)."""
+    try:
+        kwargs = {
+            "questions_path": paths.get("questions"),
+            "changes_path": paths.get("changes"),
+            "todo_path": paths.get("todo"),
+            "patchbays_path": paths.get("patchbays"),
+            "routing_path": paths.get("routing"),
+            "midi_path": paths.get("midi"),
+            "controllers_path": paths.get("controllers"),
+            "ableton_path": paths.get("ableton"),
+            "docs_todo": paths.get("docs_todo"),
+            "docs_wishlist": paths.get("docs_wishlist"),
+            "docs_questions": paths.get("docs_questions"),
+        }
+        plan = plan_question(finding.artifact_id, **kwargs)
+    except Exception:
+        # Fall back: never treat observation wording as agent-eligible
+        summary = (finding.summary or "").casefold()
+        if "observation" in summary or "verif" in summary:
+            return False
+        return finding.state == ReconciliationState.NEEDS_AGENT_ACTION.value
+    return classify_reconciliation_dispatch(plan).provider_eligible
+
+
 def sweep(
     *,
     dry_run: bool = True,
@@ -919,10 +946,7 @@ def sweep(
             for f in findings
             if f.check_id == "question_convergence"
             and f.status is FindingStatus.BLOCKED
-            and (
-                f.state == ReconciliationState.NEEDS_AGENT_ACTION.value
-                or "agent" in f.summary.lower()
-            )
+            and _finding_is_agent_eligible(f, paths=ctx.path_dict())
         }
     )
     if counts["needs_agent_action"]:

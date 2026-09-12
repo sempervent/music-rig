@@ -199,6 +199,51 @@ class QuestionConvergenceCheck:
                     details={"verify": verify.to_dict()},
                 )
         if st == ReconciliationState.NEEDS_AGENT_ACTION:
+            from music_rig.reconciliation.dispatch import (
+                DispatchMode,
+                classify_reconciliation_dispatch,
+            )
+
+            dispatch = classify_reconciliation_dispatch(plan)
+            if dispatch.mode is DispatchMode.HUMAN_OBSERVATION:
+                return Finding(
+                    check_id=self.id,
+                    artifact_type="question",
+                    artifact_id=q.id,
+                    status=FindingStatus.BLOCKED,
+                    summary="human verification required",
+                    state=st.value,
+                    details={
+                        "capability": plan.capability.value,
+                        "dispatch": dispatch.to_dict(),
+                    },
+                )
+            if dispatch.mode is DispatchMode.HUMAN_CLARIFICATION:
+                return Finding(
+                    check_id=self.id,
+                    artifact_type="question",
+                    artifact_id=q.id,
+                    status=FindingStatus.BLOCKED,
+                    summary="human clarification required",
+                    state=st.value,
+                    details={
+                        "capability": plan.capability.value,
+                        "dispatch": dispatch.to_dict(),
+                    },
+                )
+            if not dispatch.provider_eligible:
+                return Finding(
+                    check_id=self.id,
+                    artifact_type="question",
+                    artifact_id=q.id,
+                    status=FindingStatus.BLOCKED,
+                    summary=dispatch.reason,
+                    state=st.value,
+                    details={
+                        "capability": plan.capability.value,
+                        "dispatch": dispatch.to_dict(),
+                    },
+                )
             return Finding(
                 check_id=self.id,
                 artifact_type="question",
@@ -206,7 +251,10 @@ class QuestionConvergenceCheck:
                 status=FindingStatus.BLOCKED,
                 summary="needs agent-assisted CURRENT updates",
                 state=st.value,
-                details={"capability": plan.capability.value},
+                details={
+                    "capability": plan.capability.value,
+                    "dispatch": dispatch.to_dict(),
+                },
             )
         return Finding(
             check_id=self.id,

@@ -827,7 +827,9 @@ def test_allowlisted_includes_path_and_channels_clear():
     assert get_spec("channels.clear_source").agent_allowed is True
 
 
-def test_cli_provider_status(fx21):
+def test_cli_provider_status(fx21, monkeypatch):
+    monkeypatch.setattr("music_rig.store.ROOT", fx21["tmp"])
+    monkeypatch.setattr("music_rig.local_config.ROOT", fx21["tmp"])
     r = runner.invoke(app, ["agent", "provider", "status", "--json"])
     assert r.exit_code == 0, r.output
     payload = json.loads(r.output)

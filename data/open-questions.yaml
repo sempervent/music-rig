@@ -350,13 +350,13 @@ questions:
   question: Is Ableton definitely the master clock in practice, or do KAOSS/SL-2 sometimes
     lead?
   area: MIDI
-  status: OPEN
+  status: RESOLVED
   related_todos:
   - RIG-031
   related_changes: []
-  answer: ''
+  answer: Ableton is definitely the master clock; nothing else is master currently
   notes: ''
-  resolved_at: null
+  resolved_at: '2026-09-12T11:44:53.155699-04:00'
   reconciled_at: null
   reconciliation_note: ''
   target:
