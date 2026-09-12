@@ -10,7 +10,7 @@
 | drums | Drums | INTENDED | padKONTROL / Launchpad X MIDI ch10 — from docs/ableton-track-map.md |
 | minikorg | miniKORG | INTENDED | TASCAM 3/4 |
 | mixer | MIXER | INTENDED | Alesis main out → TASCAM 1/2 |
-| kaoss | KAOSS | INTENDED | KAOSS Replay → TASCAM 9/10 |
+| kaoss | KAOSS | INTENDED | TASCAM OUT 3/4 → KAOSS Replay → TASCAM IN 15/16 |
 | acoustic-clean | ACOUSTIC CLEAN | INTENDED | TASCAM 5 |
 | bass-clean | BASS CLEAN | INTENDED | TASCAM 6 |
 | guitar-clean | GUITAR CLEAN | INTENDED | TASCAM 7 |

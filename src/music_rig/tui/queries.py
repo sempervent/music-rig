@@ -68,7 +68,7 @@ def home_counts(
     try:
         pb = load_raw(patchbays_path)
         bays = len(pb.get("patchbays") or {})
-        for bay_id in (pb.get("patchbays") or {}):
+        for bay_id in pb.get("patchbays") or {}:
             for pair in list_pairs(bay_id, pb):
                 if str(pair.get("mode", "unknown")).lower() == "unknown":
                     unknown_modes += 1

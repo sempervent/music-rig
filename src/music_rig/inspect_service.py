@@ -3,22 +3,18 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Any
 
 from music_rig.presentation import format_domains_table, format_id_label_rows
 from music_rig.store import (
     StoreError,
     load_changes,
-    load_controllers,
-    load_inbox,
     load_inventory,
     load_questions,
     load_todo,
     load_wishlist,
 )
 from music_rig.tui.editable_domains import registry
-
 
 # Domains that participate in reconcile adapters (supports_reconcile=True when
 # listed here or when inspect id maps to a reconcile target domain prefix).
@@ -35,9 +31,7 @@ _RECONCILE_DOMAIN_HINTS = frozenset(
     }
 )
 
-_DERIVED_DOMAINS = frozenset(
-    {"doctor", "status", "reconcile", "automation", "snapshot"}
-)
+_DERIVED_DOMAINS = frozenset({"doctor", "status", "reconcile", "automation", "snapshot"})
 
 _MUTABLE_DOMAINS = frozenset(
     {
@@ -274,7 +268,12 @@ def cleanup_scan() -> dict[str, Any]:
         for tid in q.related_todos:
             if tid not in todo_ids:
                 issues.append(
-                    {"severity": "error", "code": "dangling_ref", "id": q.id, "detail": f"related_todos {tid}"}
+                    {
+                        "severity": "error",
+                        "code": "dangling_ref",
+                        "id": q.id,
+                        "detail": f"related_todos {tid}",
+                    }
                 )
         for cid in q.related_changes:
             if cid not in change_ids:
@@ -339,7 +338,10 @@ def cleanup_scan() -> dict[str, Any]:
                     avail = str(ctl.get("availability") or "")
                     target = ctl.get("target") or {}
                     state = str(target.get("state") or "")
-                    if avail == ControlAvailability.BROKEN.value and state == TargetState.MAPPED.value:
+                    if (
+                        avail == ControlAvailability.BROKEN.value
+                        and state == TargetState.MAPPED.value
+                    ):
                         issues.append(
                             {
                                 "severity": "error",
@@ -350,7 +352,12 @@ def cleanup_scan() -> dict[str, Any]:
                         )
     except Exception as exc:
         issues.append(
-            {"severity": "warning", "code": "controllers_scan_failed", "id": "controls", "detail": str(exc)}
+            {
+                "severity": "warning",
+                "code": "controllers_scan_failed",
+                "id": "controls",
+                "detail": str(exc),
+            }
         )
 
     from music_rig.reconciliation.service import cleanup_reconciliation_issues

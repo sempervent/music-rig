@@ -1,4 +1,12 @@
-# Structured physical/logical change captures.
-# OPEN means reality may differ from documented CURRENT until reconciled.
-# APPLIED means CURRENT docs/data were updated to match; DISMISSED means not applicable.
-items: []
+items:
+- id: CHG-001
+  created_at: '2026-09-12T14:45:11.772977-04:00'
+  category: AUDIO_ROUTING
+  summary: Correct KAOSS Replay to TASCAM OUT 3/4 → KAOSS → TASCAM IN 15/16
+  details: HUMAN Stage 23 factual correction. Named path and route labels use OUT/IN explicitly.
+    Channels 15/16 already KAOSS; 9/10 remain UNASSIGNED. Ableton kaoss track notes updated.
+  status: APPLIED
+  session_id: null
+  affected_areas:
+  - Routing
+  related_questions: []

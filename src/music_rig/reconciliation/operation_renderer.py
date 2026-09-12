@@ -89,9 +89,7 @@ def render_human(operation: RigOperation) -> str:
     return f"{operation.kind}: {desc}"
 
 
-def operation_json_view(
-    operation: RigOperation, *, prefix: str = "uv run rig"
-) -> dict[str, Any]:
+def operation_json_view(operation: RigOperation, *, prefix: str = "uv run rig") -> dict[str, Any]:
     return {
         "operation": operation.to_dict(),
         "rendered_cli": render_cli(operation, prefix=prefix),

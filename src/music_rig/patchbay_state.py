@@ -159,9 +159,7 @@ def validate_patchbays_doc(data: dict[str, Any]) -> list[str]:
             seen_nums.setdefault(num, []).append(key)
         for num, keys in seen_nums.items():
             if len(keys) > 1:
-                errors.append(
-                    f"{bay_id}: duplicate jack number {num} as keys {keys}"
-                )
+                errors.append(f"{bay_id}: duplicate jack number {num} as keys {keys}")
 
         for key, jack in jacks.items():
             if not isinstance(jack, dict):
@@ -183,9 +181,7 @@ def validate_patchbays_doc(data: dict[str, Any]) -> list[str]:
                 continue
             other = _get_jack(jacks, paired_n)
             if other is None:
-                errors.append(
-                    f"{bay_id} jack {key}: paired_with {paired_n} does not exist"
-                )
+                errors.append(f"{bay_id} jack {key}: paired_with {paired_n} does not exist")
                 continue
             back = other.get("paired_with")
             if back is not None:
@@ -274,9 +270,7 @@ def resolve_pair(
         jack_a = _get_jack(jacks, a)
         jack_b = _get_jack(jacks, b)
         if jack_a is None or jack_b is None:
-            raise StoreError(
-                f"{bay_key} pair {a}/{b} is not represented in CURRENT patchbay data."
-            )
+            raise StoreError(f"{bay_key} pair {a}/{b} is not represented in CURRENT patchbay data.")
         row_a = str(jack_a.get("row", "")).lower()
         row_b = str(jack_b.get("row", "")).lower()
         if row_a == "upper" and row_b == "lower":
@@ -289,19 +283,13 @@ def resolve_pair(
             else:
                 upper_n, lower_n, upper, lower = a, b, jack_a, jack_b
         else:
-            raise StoreError(
-                f"{bay_key} pair {a}/{b} is not represented in CURRENT patchbay data."
-            )
+            raise StoreError(f"{bay_key} pair {a}/{b} is not represented in CURRENT patchbay data.")
         up_pair = _norm_jack_num(upper.get("paired_with"))
         lo_pair = _norm_jack_num(lower.get("paired_with"))
         if up_pair is not None and up_pair != lower_n:
-            raise StoreError(
-                f"{bay_key} pair {a}/{b} is not represented in CURRENT patchbay data."
-            )
+            raise StoreError(f"{bay_key} pair {a}/{b} is not represented in CURRENT patchbay data.")
         if lo_pair is not None and lo_pair != upper_n:
-            raise StoreError(
-                f"{bay_key} pair {a}/{b} is not represented in CURRENT patchbay data."
-            )
+            raise StoreError(f"{bay_key} pair {a}/{b} is not represented in CURRENT patchbay data.")
         return upper_n, lower_n, upper, lower
 
     if not spec.isdigit():
@@ -309,9 +297,7 @@ def resolve_pair(
     n = int(spec)
     jack = _get_jack(jacks, n)
     if jack is None:
-        raise StoreError(
-            f"{bay_key} jack {n} is not represented in CURRENT patchbay data."
-        )
+        raise StoreError(f"{bay_key} jack {n} is not represented in CURRENT patchbay data.")
     paired_raw = jack.get("paired_with")
     paired_n = _norm_jack_num(paired_raw) if paired_raw is not None else None
     other = _get_jack(jacks, paired_n) if paired_n is not None else None
@@ -321,8 +307,7 @@ def resolve_pair(
     if row == "lower":
         if paired_n is None or other is None:
             raise StoreError(
-                f"{bay_key} jack {n} is not part of a represented pair "
-                "in CURRENT patchbay data."
+                f"{bay_key} jack {n} is not part of a represented pair in CURRENT patchbay data."
             )
         return paired_n, n, other, jack
     if paired_n is not None and other is not None:

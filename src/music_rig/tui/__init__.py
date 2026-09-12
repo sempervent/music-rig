@@ -13,9 +13,9 @@ def run_tui(
     """Launch the interactive TUI. Optional route/object_id deep-link into a domain."""
     import sys
 
-    import music_rig
     import textual
 
+    import music_rig
     from music_rig.tui.app import RigApp
     from music_rig.tui.debug import debug_log, set_debug
 

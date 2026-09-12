@@ -27,14 +27,17 @@ jobs:
       - name: Sync dependencies
         run: uv sync --locked --extra dev --extra docs
 
+      - name: Run pre-commit
+        run: uv run pre-commit run --all-files
+
       - name: Run unit tests with coverage
-        run: uv run pytest --cov-fail-under=75
+        run: uv run pytest
 
       - name: Run rig check
-        run: uv run rig check
+        run: uv run rig --am-bot check
 
       - name: Check generated Markdown is synchronized
-        run: uv run rig render --check
+        run: uv run rig --am-bot render --check
 
       - name: Print channel map
         run: uv run python scripts/print_channel_map.py

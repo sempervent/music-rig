@@ -23,9 +23,7 @@ def filter_questions(
             q
             for q in items
             if q.status == QuestionStatus.OPEN
-            or (
-                q.status == QuestionStatus.RESOLVED and q.reconciled_at is None
-            )
+            or (q.status == QuestionStatus.RESOLVED and q.reconciled_at is None)
         ]
     elif status_filter == "OPEN":
         items = [q for q in items if q.status == QuestionStatus.OPEN]
@@ -35,9 +33,7 @@ def filter_questions(
         items = [q for q in items if q.status == QuestionStatus.DEFERRED]
     elif status_filter == "UNRECONCILED":
         items = [
-            q
-            for q in items
-            if q.status == QuestionStatus.RESOLVED and q.reconciled_at is None
+            q for q in items if q.status == QuestionStatus.RESOLVED and q.reconciled_at is None
         ]
     elif status_filter != "ALL":
         items = [q for q in items if q.status.value == status_filter]

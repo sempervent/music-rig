@@ -19,7 +19,7 @@ tracks:
   - id: kaoss
     name: KAOSS
     evidence: INTENDED
-    notes: KAOSS Replay → TASCAM 9/10
+    notes: TASCAM OUT 3/4 → KAOSS Replay → TASCAM IN 15/16
   - id: acoustic-clean
     name: ACOUSTIC CLEAN
     evidence: INTENDED

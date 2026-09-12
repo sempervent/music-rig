@@ -2,20 +2,13 @@
 
 from __future__ import annotations
 
-import json
-from datetime import datetime, timezone
-from pathlib import Path
 import pytest
-import yaml
-from typer.testing import CliRunner
-from music_rig import channel_state, question_service, todo_service
-from music_rig.channel_state import propose_set_source, validate_channel_map
-from music_rig.cli import app
-from music_rig.models import AnswerState, QuestionStatus, ReconciliationState, TodoStatus
-from music_rig.reconciliation import service as reconcile_service
-from music_rig.store import StoreError, load_questions, load_todo
+
+from music_rig.models import QuestionStatus
+from music_rig.store import load_questions
 from music_rig.tui.app import RigApp
 from music_rig.tui.screens.answer import AnswerScreen
+
 
 @pytest.mark.asyncio
 async def test_tui_save_draft(fx19):
@@ -33,6 +26,7 @@ async def test_tui_save_draft(fx19):
     assert q.status == QuestionStatus.OPEN
     assert q.resolved_at is None
     assert q.verification_result is None
+
 
 @pytest.mark.asyncio
 async def test_tui_answer_and_resolve(fx19):
@@ -54,4 +48,3 @@ async def test_tui_answer_and_resolve(fx19):
     assert q.resolved_at is not None
     assert q.reconciled_at is None
     assert q.verification_result is None
-

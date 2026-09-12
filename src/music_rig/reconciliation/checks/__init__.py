@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
-from enum import Enum
+from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import Any, Protocol
 
 from music_rig.models import ChangeStatus, QuestionStatus, ReconciliationState
@@ -15,7 +15,7 @@ from music_rig.reconciliation.types import VerificationStatus
 from music_rig.store import load_changes, load_questions, load_todo
 
 
-class FindingStatus(str, Enum):
+class FindingStatus(StrEnum):
     OK = "OK"
     READY = "READY"
     BLOCKED = "BLOCKED"
@@ -50,8 +50,7 @@ class Finding:
 class ReconciliationCheck(Protocol):
     id: str
 
-    def inspect(self, ctx: ReconciliationContext) -> list[Finding]:
-        ...
+    def inspect(self, ctx: ReconciliationContext) -> list[Finding]: ...
 
 
 class QuestionConvergenceCheck:
@@ -153,7 +152,10 @@ class QuestionConvergenceCheck:
                 ReconciliationState.READY_TO_APPLY,
             }
         ):
-            if st == ReconciliationState.READY_TO_APPLY and verify.status != VerificationStatus.MATCH:
+            if (
+                st == ReconciliationState.READY_TO_APPLY
+                and verify.status != VerificationStatus.MATCH
+            ):
                 return Finding(
                     check_id=self.id,
                     artifact_type="question",
@@ -162,10 +164,14 @@ class QuestionConvergenceCheck:
                     summary=f"state {st.value}",
                     state=st.value,
                 )
-            if st not in {
-                ReconciliationState.CURRENT_MATCHES,
-                ReconciliationState.READY_TO_FINALIZE,
-            } and verify.status != VerificationStatus.MATCH:
+            if (
+                st
+                not in {
+                    ReconciliationState.CURRENT_MATCHES,
+                    ReconciliationState.READY_TO_FINALIZE,
+                }
+                and verify.status != VerificationStatus.MATCH
+            ):
                 return Finding(
                     check_id=self.id,
                     artifact_type="question",
@@ -174,7 +180,10 @@ class QuestionConvergenceCheck:
                     summary=f"state {st.value}",
                     state=st.value,
                 )
-            if st == ReconciliationState.CURRENT_MATCHES or verify.status == VerificationStatus.MATCH:
+            if (
+                st == ReconciliationState.CURRENT_MATCHES
+                or verify.status == VerificationStatus.MATCH
+            ):
                 return Finding(
                     check_id=self.id,
                     artifact_type="question",

@@ -7,17 +7,15 @@ from pathlib import Path
 from typing import Any
 
 from music_rig import store as store_mod
+from music_rig.models import InventoryDocument, InventoryItem, WishlistDocument
 from music_rig.store import (
-    StoreError,
+    _dump_yaml,
     load_inventory,
     load_wishlist,
     parse_existing_yaml,
     write_documents,
     write_text_files,
-    _dump_yaml,
 )
-from music_rig.models import InventoryDocument, InventoryItem, WishlistDocument
-
 
 SUPPORTED_RENAME_DOMAINS = ("gear",)
 DEFERRED_RENAME_DOMAINS = (

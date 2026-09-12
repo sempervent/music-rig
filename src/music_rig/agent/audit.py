@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -18,7 +18,7 @@ def agent_runs_dir(*, root: Path | None = None) -> Path:
 
 
 def new_run_id() -> str:
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     return f"{stamp}-{uuid4().hex[:8]}"
 
 
@@ -35,7 +35,7 @@ def write_agent_run(
     path = directory / f"{rid}.json"
     safe = dict(record)
     safe["run_id"] = rid
-    safe.setdefault("timestamp", datetime.now(timezone.utc).isoformat())
+    safe.setdefault("timestamp", datetime.now(UTC).isoformat())
     # Never persist env values
     if "env" in safe:
         safe.pop("env", None)

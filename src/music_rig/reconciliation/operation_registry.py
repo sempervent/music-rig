@@ -5,9 +5,12 @@ Maps operation kinds to preparers and executors. Not presentation, not path asse
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any
 
+from music_rig.reconciliation.context import ReconciliationContext
+from music_rig.reconciliation.operations import OperationMutability, RigOperation
 from music_rig.reconciliation.preparers import (
     PreparedOperation,
     materialize_working_docs,
@@ -25,14 +28,10 @@ from music_rig.reconciliation.preparers import (
     prepare_path_set_evidence,
     prepare_path_set_mode,
 )
-from music_rig.reconciliation.context import ReconciliationContext
-from music_rig.reconciliation.operations import OperationMutability, RigOperation
 from music_rig.store import StoreError
 
 Dispatcher = Callable[[RigOperation, ReconciliationContext, bool], dict[str, Any]]
-Preparer = Callable[
-    [RigOperation, ReconciliationContext, dict[str, Any]], PreparedOperation
-]
+Preparer = Callable[[RigOperation, ReconciliationContext, dict[str, Any]], PreparedOperation]
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,9 +58,7 @@ class OperationSpec:
         return {
             "operation": self.kind,
             "domain": list(self.domains) or ["*"],
-            "read_write": (
-                "read" if self.mutability is OperationMutability.READ_ONLY else "write"
-            ),
+            "read_write": ("read" if self.mutability is OperationMutability.READ_ONLY else "write"),
             "autonomous_safe": self.autonomous_safe,
             "requires_verification": self.requires_human_verification,
             "transaction_support": self.supports_preparation and self.preparer is not None,
@@ -440,9 +437,7 @@ def validate_operation_shape(op: RigOperation, *, agent: bool = True) -> None:
     # path.set_evidence uses evidence as required arg — allow that key only there
     for key in op.args:
         fold = key.casefold()
-        if fold in forbidden and not (
-            op.kind == "path.set_evidence" and fold == "evidence"
-        ):
+        if fold in forbidden and not (op.kind == "path.set_evidence" and fold == "evidence"):
             raise StoreError(f"forbidden argument {key!r} on {op.kind}")
         if fold == "evidence" and op.kind != "path.set_evidence":
             if str(op.args[key]).casefold() == "verified":

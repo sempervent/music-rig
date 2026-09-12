@@ -170,7 +170,6 @@ def format_reconcile_change(
 
     item = change_service.get_change(chg_id, changes_path=changes_path)
     qdoc = load_questions(questions_path)
-    todo = load_todo(todo_path)
 
     related_q = list(item.related_questions)
     # also find questions pointing at this change
@@ -201,12 +200,8 @@ def format_reconcile_change(
         lines.append(f"  {path}")
     lines.append("")
     lines.append("Related:")
-    lines.append(
-        "  Questions: " + (", ".join(related_q) if related_q else "—")
-    )
-    lines.append(
-        "  TODOs: " + (", ".join(dict.fromkeys(related_todos)) if related_todos else "—")
-    )
+    lines.append("  Questions: " + (", ".join(related_q) if related_q else "—"))
+    lines.append("  TODOs: " + (", ".join(dict.fromkeys(related_todos)) if related_todos else "—"))
     lines.append("")
     lines.append("Reconciliation process:")
     lines.append("  1. Verify physical state.")
@@ -265,9 +260,7 @@ def format_reconcile_question(
                     f"{target.pair} <mode> --question {q.id}"
                 )
             else:
-                lines.append(
-                    f"    uv run rig current patchbay verify {target.bay}"
-                )
+                lines.append(f"    uv run rig current patchbay verify {target.bay}")
                 lines.append(
                     f"    # or: uv run rig current patchbay set-mode {target.bay} "
                     f"<jack> <mode> --question {q.id}"
@@ -280,14 +273,10 @@ def format_reconcile_question(
             )
         elif target is not None and target.domain == "routing.verify" and target.path:
             lines.append(f"  This question maps to CURRENT path: {target.path}")
-            lines.append(
-                f"    uv run rig current path verify {target.path}"
-            )
+            lines.append(f"    uv run rig current path verify {target.path}")
         elif target is not None and target.domain == "inventory.patchbay_mapping":
             lines.append("  Inspect the physical patchbay units and their model labels.")
-            lines.append(
-                "  Record only observed unit identity; do not invent a PB letter mapping."
-            )
+            lines.append("  Record only observed unit identity; do not invent a PB letter mapping.")
             lines.append(f"  then: uv run rig question resolve {q.id}")
         elif target is not None and target.domain == "midi.clock_master":
             lines.append("  This question maps to CURRENT MIDI clock master evidence.")
@@ -307,32 +296,20 @@ def format_reconcile_question(
             and target.domain in {"controls.verify", "controls.context"}
             and target.gear
         ):
-            lines.append(
-                f"  This question maps to controller verification for {target.gear}."
-            )
+            lines.append(f"  This question maps to controller verification for {target.gear}.")
             lines.append(f"    uv run rig current controls verify {target.gear}")
             lines.append(f"    # optionally pass --question {q.id} on the apply step")
-        elif (
-            target is not None
-            and target.domain == "ableton.template"
-            and target.path
-        ):
-            lines.append(
-                f"  This question maps to Ableton template specification: {target.path}."
-            )
+        elif target is not None and target.domain == "ableton.template" and target.path:
+            lines.append(f"  This question maps to Ableton template specification: {target.path}.")
             lines.append(f"    uv run rig ableton template {target.path}")
-            lines.append(
-                "  Verify the live set directly before updating INTENDED evidence."
-            )
+            lines.append("  Verify the live set directly before updating INTENDED evidence.")
         else:
             lines.append("  inspect the physical rig")
             lines.append(f"  then: uv run rig question resolve {q.id}")
             if q.related_todos:
                 lines.append(f"  or continue: uv run rig todo show {q.related_todos[0]}")
     elif q.status == QuestionStatus.RESOLVED:
-        lines.append(
-            "  if the answer changes CURRENT docs, reconcile those files,"
-        )
+        lines.append("  if the answer changes CURRENT docs, reconcile those files,")
         lines.append("  then mark any related OPEN changes APPLIED")
     else:
         lines.append(f"  reopen when ready: uv run rig question reopen {q.id}")
@@ -376,8 +353,6 @@ def reconciliation_advisories(
                 done_open_q += 1
                 break
     if done_open_q:
-        advisories.append(
-            f"{done_open_q} DONE TODO(s) still linked to an OPEN factual question"
-        )
+        advisories.append(f"{done_open_q} DONE TODO(s) still linked to an OPEN factual question")
 
     return advisories

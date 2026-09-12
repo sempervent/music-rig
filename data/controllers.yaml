@@ -82,7 +82,7 @@ controllers:
               action: template-home
             notes: PAD 8 → HOME (RIG-036); MIDI message unknown
           - id: encoder-06
-            label: Encoder #6
+            label: "Encoder #6"
             physical_type: ENCODER
             availability: BROKEN
             evidence: VERIFIED

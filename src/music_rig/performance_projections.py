@@ -16,14 +16,12 @@ RECOVERY_BANNER = (
 
 
 def _cell(value: object) -> str:
-    return (
-        str(value if value not in (None, "") else "—")
-        .replace("|", "\\|")
-        .replace("\n", " ")
-    )
+    return str(value if value not in (None, "") else "—").replace("|", "\\|").replace("\n", " ")
 
 
-def render_performance_doc(doc: PerformanceDocument, surfaces, readiness: PerformanceReadiness) -> str:
+def render_performance_doc(
+    doc: PerformanceDocument, surfaces, readiness: PerformanceReadiness
+) -> str:
     lines = [
         "# Performance",
         "",

@@ -81,9 +81,7 @@ def main() -> int:
             {
                 "kind": "NEEDS_HUMAN_CLARIFICATION",
                 "rationale": "ambiguous destinations",
-                "clarification_questions": [
-                    "Which Alesis return is Acoustic — 2 or 3?"
-                ],
+                "clarification_questions": ["Which Alesis return is Acoustic — 2 or 3?"],
             }
         )
         return 0

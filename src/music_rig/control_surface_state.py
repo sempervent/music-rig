@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from music_rig.models import ControlSurfacesDocument, INACTIVE_OWNERSHIP
+from music_rig.models import INACTIVE_OWNERSHIP, ControlSurfacesDocument
 from music_rig.store import (
     CONTROL_SURFACES_PATH,
     StoreError,

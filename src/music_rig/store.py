@@ -10,8 +10,8 @@ from music_rig.models import (
     AbletonDocument,
     BackupsDocument,
     ChangesDocument,
-    ControlSurfacesDocument,
     ControllersDocument,
+    ControlSurfacesDocument,
     InboxDocument,
     InventoryDocument,
     MidiDocument,
@@ -300,9 +300,7 @@ def load_control_surfaces(path: Path | None = None) -> ControlSurfacesDocument:
         raise StoreError(f"Control surfaces schema validation failed: {exc}") from exc
 
 
-def save_control_surfaces(
-    doc: ControlSurfacesDocument, path: Path | None = None
-) -> None:
+def save_control_surfaces(doc: ControlSurfacesDocument, path: Path | None = None) -> None:
     target = path or CONTROL_SURFACES_PATH
     ControlSurfacesDocument.model_validate(doc.model_dump())
     _atomic_write(target, _dump_yaml(doc.model_dump(mode="json", exclude_none=True)))
@@ -371,9 +369,7 @@ def write_documents(
     payloads: list[tuple[Path, str]] = []
     if todo is not None:
         TodoDocument.model_validate(todo.model_dump())
-        payloads.append(
-            (todo_path or TODO_PATH, _dump_yaml(todo.model_dump(mode="json")))
-        )
+        payloads.append((todo_path or TODO_PATH, _dump_yaml(todo.model_dump(mode="json"))))
     if wishlist is not None:
         WishlistDocument.model_validate(wishlist.model_dump())
         payloads.append(
@@ -384,9 +380,7 @@ def write_documents(
         )
     if inbox is not None:
         InboxDocument.model_validate(inbox.model_dump())
-        payloads.append(
-            (inbox_path or INBOX_PATH, _dump_yaml(inbox.model_dump(mode="json")))
-        )
+        payloads.append((inbox_path or INBOX_PATH, _dump_yaml(inbox.model_dump(mode="json"))))
     if changes is not None:
         ChangesDocument.model_validate(changes.model_dump())
         payloads.append(

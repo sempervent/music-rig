@@ -7,7 +7,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
-from textual.widgets import DataTable, Footer, Input, Static
+from textual.widgets import DataTable, Footer, Static
 
 from music_rig.store import StoreError
 from music_rig.tui.adapters.base import SimpleAdapter
@@ -68,7 +68,11 @@ class ListDetailScreen(Screen):
         self._row_ids = []
         needle = self._search.casefold()
         for row in self.adapter.rows():
-            if needle and needle not in row.search_text.casefold() and needle not in row.id.casefold():
+            if (
+                needle
+                and needle not in row.search_text.casefold()
+                and needle not in row.id.casefold()
+            ):
                 continue
             table.add_row(*row.cells)
             self._row_ids.append(row.id)
@@ -126,9 +130,7 @@ class ListDetailScreen(Screen):
         self.app.pop_screen()
 
     def action_help(self) -> None:
-        action_lines = "\n".join(
-            f"{a.key or '—':<4} {a.label}" for a in self.adapter.actions()
-        )
+        action_lines = "\n".join(f"{a.key or '—':<4} {a.label}" for a in self.adapter.actions())
         self.app.push_screen(
             HelpScreen(
                 f"{self.adapter.label} (read-only)\n\n"

@@ -6,14 +6,20 @@ from pathlib import Path
 from typing import Any
 
 from music_rig import change_service, inbox_service, wishlist_service
+from music_rig import store as store_mod
 from music_rig.models import (
     ChangeCategory,
+    ChangeRecord,
+    ChangesDocument,
     ChangeStatus,
+    InboxDocument,
+    InboxItem,
     InboxStatus,
+    WishlistDocument,
+    WishlistItem,
     WishPriority,
     WishStatus,
 )
-from music_rig import store as store_mod
 from music_rig.store import (
     StoreError,
     load_changes,
@@ -21,7 +27,6 @@ from music_rig.store import (
     load_wishlist,
     write_documents,
 )
-from music_rig.models import ChangesDocument, ChangeRecord, InboxDocument, InboxItem, WishlistDocument, WishlistItem
 from music_rig.tui.editable import ApplyResult, BaseEditableAdapter, WorkingRecord
 from music_rig.tui.fields import FieldSpec, FieldType, enum_spec, readonly_spec, text_spec
 
@@ -52,11 +57,15 @@ class WishlistEditableAdapter(BaseEditableAdapter):
             text_spec("likely_music_impact", "Likely music impact", multiline=True),
             text_spec("notes", "Notes", multiline=True),
             text_spec("details", "Details", multiline=True),
-            FieldSpec(name="todo_refs", label="TODO refs", type=FieldType.REF_LIST, ref_domain="todo"),
+            FieldSpec(
+                name="todo_refs", label="TODO refs", type=FieldType.REF_LIST, ref_domain="todo"
+            ),
             text_spec("inventory_ref", "Inventory ref", help="Required when status=ACQUIRED"),
         ]
 
-    def list_records(self, *, status_filter: str | None = None, search: str = "") -> list[dict[str, Any]]:
+    def list_records(
+        self, *, status_filter: str | None = None, search: str = ""
+    ) -> list[dict[str, Any]]:
         needle = search.casefold()
         rows = []
         for w in load_wishlist().items:
@@ -160,7 +169,9 @@ class InboxEditableAdapter(BaseEditableAdapter):
             text_spec("notes", "Notes", multiline=True),
         ]
 
-    def list_records(self, *, status_filter: str | None = None, search: str = "") -> list[dict[str, Any]]:
+    def list_records(
+        self, *, status_filter: str | None = None, search: str = ""
+    ) -> list[dict[str, Any]]:
         needle = search.casefold()
         rows = []
         for i in load_inbox().items:
@@ -273,7 +284,9 @@ class ChangesEditableAdapter(BaseEditableAdapter):
             ),
         ]
 
-    def list_records(self, *, status_filter: str | None = None, search: str = "") -> list[dict[str, Any]]:
+    def list_records(
+        self, *, status_filter: str | None = None, search: str = ""
+    ) -> list[dict[str, Any]]:
         needle = search.casefold()
         rows = []
         for c in load_changes().items:

@@ -6,8 +6,9 @@ of `--json` payloads. Width-aware tables replace fragile tab-separated dumps.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from io import StringIO
-from typing import Any, Sequence
+from typing import Any
 
 from rich.console import Console
 from rich.table import Table
@@ -131,7 +132,9 @@ def format_reconcile_queue_table(
             d = {
                 "artifact_type": getattr(item, "artifact_type", ""),
                 "artifact_id": getattr(item, "artifact_id", ""),
-                "state": getattr(getattr(item, "state", None), "value", str(getattr(item, "state", ""))),
+                "state": getattr(
+                    getattr(item, "state", None), "value", str(getattr(item, "state", ""))
+                ),
                 "summary": getattr(item, "summary", ""),
                 "area": getattr(item, "area", ""),
             }
@@ -240,9 +243,7 @@ def format_verify_summary_table(
     by_area = summary.get("by_area") or {}
     if by_area:
         rows = [[k, str(v)] for k, v in by_area.items()]
-        sections.append(
-            render_table(["Area", "Count"], rows, title="BY AREA", width=width)
-        )
+        sections.append(render_table(["Area", "Count"], rows, title="BY AREA", width=width))
 
     by_cap = summary.get("after_answer_capability") or {}
     if by_cap:
@@ -271,9 +272,7 @@ def format_verify_summary_table(
     by_kind = summary.get("by_kind") or {}
     if by_kind:
         rows = [[k, str(v)] for k, v in by_kind.items()]
-        sections.append(
-            render_table(["Kind", "Count"], rows, title="BY KIND", width=width)
-        )
+        sections.append(render_table(["Kind", "Count"], rows, title="BY KIND", width=width))
 
     top = summary.get("top") or []
     if top:

@@ -6,7 +6,7 @@ import subprocess
 from collections import Counter
 from pathlib import Path
 
-from music_rig.models import ChangeStatus, InboxStatus, QuestionStatus, TodoStatus, WishStatus
+from music_rig.models import ChangeStatus, InboxStatus, QuestionStatus, TodoStatus
 from music_rig.session_service import find_active
 from music_rig.store import (
     ROOT,
@@ -85,20 +85,14 @@ def build_status_text() -> str:
 
     status_counts = Counter(t.status for t in todo.tasks)
     ready_p0 = sum(
-        1
-        for t in todo.tasks
-        if t.status == TodoStatus.READY and t.priority.value == "P0"
+        1 for t in todo.tasks if t.status == TodoStatus.READY and t.priority.value == "P0"
     )
     ready_p1 = sum(
-        1
-        for t in todo.tasks
-        if t.status == TodoStatus.READY and t.priority.value == "P1"
+        1 for t in todo.tasks if t.status == TodoStatus.READY and t.priority.value == "P1"
     )
     open_inbox = sum(1 for i in inbox.items if i.status == InboxStatus.OPEN)
     open_changes = sum(1 for c in changes.items if c.status == ChangeStatus.OPEN)
-    open_questions = sum(
-        1 for q in questions.questions if q.status == QuestionStatus.OPEN
-    )
+    open_questions = sum(1 for q in questions.questions if q.status == QuestionStatus.OPEN)
 
     wish_p1 = [w for w in wish.items if w.priority and w.priority.value == "P1"]
     wish_p1_status = Counter(w.status for w in wish_p1)

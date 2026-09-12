@@ -5,13 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from music_rig.models import (
-    INACTIVE_OWNERSHIP,
-    TERMINAL_FOR_NEXT,
-    ChangeStatus,
-    QuestionStatus,
-)
-from music_rig.render import check_render_sync
 from music_rig import (
     ableton_state,
     backup_state,
@@ -25,6 +18,13 @@ from music_rig import (
     routing_state,
 )
 from music_rig.automation import known_plan_category
+from music_rig.models import (
+    INACTIVE_OWNERSHIP,
+    TERMINAL_FOR_NEXT,
+    ChangeStatus,
+    QuestionStatus,
+)
+from music_rig.render import check_render_sync
 from music_rig.store import (
     BACKUPS_PATH,
     CHANGES_PATH,
@@ -98,9 +98,7 @@ def run_checks(
 
     try:
         midi = midi_state.load_raw(midi_path)
-        for err in midi_state.validate_midi_doc(
-            midi, inventory_path=inventory_path
-        ):
+        for err in midi_state.validate_midi_doc(midi, inventory_path=inventory_path):
             errors.append(f"midi: {err}")
     except StoreError as exc:
         errors.append(str(exc))
@@ -163,9 +161,7 @@ def run_checks(
         # Skip production backups cross-checks when only a planning TODO fixture is in play.
         if backups_path is not None or todo_path is None:
             backups_raw = backup_state.load_raw(backups_path or BACKUPS_PATH)
-            for err in backup_state.validate_backups_doc(
-                backups_raw, todo_path=todo_path
-            ):
+            for err in backup_state.validate_backups_doc(backups_raw, todo_path=todo_path):
                 errors.append(f"backups: {err}")
     except StoreError as exc:
         errors.append(str(exc))
@@ -180,21 +176,15 @@ def run_checks(
 
     try:
         changes = load_changes(changes_path)
-        open_count = sum(
-            1 for item in changes.items if item.status == ChangeStatus.OPEN
-        )
+        open_count = sum(1 for item in changes.items if item.status == ChangeStatus.OPEN)
         if open_count:
-            warnings.append(
-                f"{open_count} unreconciled rig change(s) are OPEN."
-            )
+            warnings.append(f"{open_count} unreconciled rig change(s) are OPEN.")
     except StoreError as exc:
         errors.append(str(exc))
 
     try:
         questions = load_questions(questions_path)
-        open_q = sum(
-            1 for q in questions.questions if q.status == QuestionStatus.OPEN
-        )
+        open_q = sum(1 for q in questions.questions if q.status == QuestionStatus.OPEN)
         if open_q:
             warnings.append(f"{open_q} open question(s) remain unresolved.")
     except StoreError as exc:
@@ -256,9 +246,7 @@ def run_checks(
         for item in wishlist.items:
             for ref in item.todo_refs:
                 if ref not in known:
-                    errors.append(
-                        f"Wishlist '{item.item}' references unknown TODO {ref}"
-                    )
+                    errors.append(f"Wishlist '{item.item}' references unknown TODO {ref}")
         if todo_path is None or controllers_path is not None:
             try:
                 controllers = control_state.load_document(
@@ -301,9 +289,7 @@ def run_checks(
             for cid in q.related_changes:
                 chg = known_changes.get(cid)
                 if chg is not None and q.id not in chg.related_questions:
-                    errors.append(
-                        f"{q.id} lists {cid} but {cid} does not list {q.id}"
-                    )
+                    errors.append(f"{q.id} lists {cid} but {cid} does not list {q.id}")
             if q.status == QuestionStatus.RESOLVED:
                 if not q.answer.strip():
                     errors.append(f"{q.id} RESOLVED requires a non-empty answer")
@@ -315,9 +301,7 @@ def run_checks(
             if item.status.value == "ACQUIRED" and not (
                 item.inventory_ref and item.inventory_ref.strip()
             ):
-                errors.append(
-                    f"Wishlist '{item.item}' ACQUIRED requires inventory_ref"
-                )
+                errors.append(f"Wishlist '{item.item}' ACQUIRED requires inventory_ref")
 
     if changes is not None and questions is not None:
         qmap = questions.question_map()
@@ -327,9 +311,7 @@ def run_checks(
                 if q is None:
                     errors.append(f"{chg.id} references unknown question {qid}")
                 elif chg.id not in q.related_changes:
-                    errors.append(
-                        f"{chg.id} lists {qid} but {qid} does not list {chg.id}"
-                    )
+                    errors.append(f"{chg.id} lists {qid} but {qid} does not list {chg.id}")
 
     try:
         stale = check_render_sync(
@@ -362,9 +344,7 @@ def run_checks(
             docs_automation=docs_automation,
         )
         for path in stale:
-            errors.append(
-                f"{path} is out of date with canonical YAML\nRun: uv run rig render"
-            )
+            errors.append(f"{path} is out of date with canonical YAML\nRun: uv run rig render")
     except StoreError as exc:
         errors.append(str(exc))
 

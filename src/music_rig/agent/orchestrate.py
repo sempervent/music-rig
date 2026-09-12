@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from music_rig.agent import audit
@@ -13,7 +13,7 @@ from music_rig.agent.errors import (
     ProviderNotConfiguredError,
     ProviderTimeoutError,
 )
-from music_rig.agent.inspection import InspectionRequest, execute_inspection
+from music_rig.agent.inspection import execute_inspection
 from music_rig.agent.provider import (
     AgentTurnKind,
     TurnProvider,
@@ -24,10 +24,9 @@ from music_rig.agent.transaction import (
     commit_transaction,
     prepare_transaction,
 )
-from music_rig.local_config import load_local_config
 from music_rig.reconciliation.context import ReconciliationContext
 from music_rig.reconciliation.operation_registry import get_spec
-from music_rig.reconciliation.operation_renderer import operation_json_view, render_human
+from music_rig.reconciliation.operation_renderer import render_human
 from music_rig.reconciliation.operations import RigOperation
 from music_rig.store import StoreError
 
@@ -77,7 +76,7 @@ def format_timing_summary(timing: dict[str, Any] | None, *, provider_label: str)
     return "\n".join(lines) if len(lines) > 1 else ""
 
 
-class AutonomyLevel(str, Enum):
+class AutonomyLevel(StrEnum):
     PLAN_ONLY = "PLAN_ONLY"
     APPLY_SAFE = "APPLY_SAFE"
     APPLY_AND_FINALIZE = "APPLY_AND_FINALIZE"
@@ -121,9 +120,7 @@ def run_provider_loop(
 
         if turn.kind is AgentTurnKind.NEEDS_MORE_CONTEXT:
             inspection_reqs = (
-                turn.inspection_as_requests()
-                if hasattr(turn, "inspection_as_requests")
-                else []
+                turn.inspection_as_requests() if hasattr(turn, "inspection_as_requests") else []
             )
             if not inspection_reqs:
                 # dataclass-era fallback
@@ -267,9 +264,7 @@ def format_plan_review(
     lines.append("")
     lines.append("After successful apply:")
     lines.append(
-        f"{question_id} → RECONCILED"
-        if finalize
-        else f"{question_id} → (finalize not requested)"
+        f"{question_id} → RECONCILED" if finalize else f"{question_id} → (finalize not requested)"
     )
     lines.append("")
     lines.append(f"Atomic transaction: {'YES' if atomic else 'NO'}")
@@ -290,8 +285,7 @@ def _human_op_line(op: RigOperation) -> str:
         return f"Set {args.get('bay_id')} {args.get('jack_spec')} mode → {args.get('mode')}"
     if op.kind == "channels.set_source":
         return (
-            f"Set {args.get('device')} channel {args.get('channel')} "
-            f"source → {args.get('source')}"
+            f"Set {args.get('device')} channel {args.get('channel')} source → {args.get('source')}"
         )
     if op.kind == "channels.clear_source":
         return f"Clear {args.get('device')} channel {args.get('channel')} source"
@@ -325,12 +319,12 @@ def autonomous_reconcile(
     on_progress=None,
 ) -> dict[str, Any]:
     """Provider loop → validate → prepare transaction → optional apply."""
+    from music_rig.actor import get_actor
     from music_rig.agent import (
         build_agent_packet,
         validate_proposal,
     )
-    from music_rig.actor import ActorKind, get_actor
-    from music_rig.progress import ProgressPhase, ProgressTracker, CallbackProgress, NullProgress
+    from music_rig.progress import CallbackProgress, NullProgress, ProgressPhase, ProgressTracker
 
     ctx = ctx or ReconciliationContext.default()
     qid = question_id.upper()
@@ -590,10 +584,16 @@ def autonomous_reconcile(
         result["timing_summary"] = timing_text
 
     # Default PLAN_ONLY / dry-run: stop before commit
-    do_apply = apply and yes and not dry_run and autonomy in {
-        AutonomyLevel.APPLY_SAFE,
-        AutonomyLevel.APPLY_AND_FINALIZE,
-    }
+    do_apply = (
+        apply
+        and yes
+        and not dry_run
+        and autonomy
+        in {
+            AutonomyLevel.APPLY_SAFE,
+            AutonomyLevel.APPLY_AND_FINALIZE,
+        }
+    )
     if not do_apply:
         audit.write_agent_run(
             {

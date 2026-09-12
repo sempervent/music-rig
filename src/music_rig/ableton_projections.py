@@ -74,9 +74,7 @@ def render_ableton_section(doc: AbletonDocument) -> str:
             ]
         )
         for send in template.sends:
-            lines.append(
-                f"| {send.send_ref} | {_cell(send.role)} | {_cell(send.notes)} |"
-            )
+            lines.append(f"| {send.send_ref} | {_cell(send.role)} | {_cell(send.notes)} |")
     if not doc.templates:
         lines.append("| — | — | 0 | 0 | — | UNKNOWN | — |")
     lines.append("")

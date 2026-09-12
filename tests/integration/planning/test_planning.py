@@ -186,9 +186,7 @@ def test_render_check_failure_on_stale(tmp_path: Path):
     wish_yaml.write_text(
         yaml.safe_dump(wish.model_dump(mode="json"), sort_keys=False), encoding="utf-8"
     )
-    docs_todo.write_text(
-        f"Intro\n{TODO_START}\nstale\n{TODO_END}\nOutro\n", encoding="utf-8"
-    )
+    docs_todo.write_text(f"Intro\n{TODO_START}\nstale\n{TODO_END}\nOutro\n", encoding="utf-8")
     docs_wish.write_text(
         f"Intro\n{WISH_START}\n{render_wishlist_section(wish)}{WISH_END}\n",
         encoding="utf-8",

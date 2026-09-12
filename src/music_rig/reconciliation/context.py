@@ -8,9 +8,10 @@ Not: dispatch decisions, end-to-end orchestration, or CLI rendering.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from music_rig import store as store_mod
 

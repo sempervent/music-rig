@@ -2,22 +2,9 @@
 
 from __future__ import annotations
 
-import json
-import pytest
-from music_rig.models import ReconciliationState
-from music_rig.progress import CollectingProgress, ProgressEvent, ProgressPhase, ProgressTracker
-from music_rig.reconciliation.dispatch import (
-    DispatchMode,
-    HUMAN_BLOCKER_CODES,
-    classify_reconciliation_dispatch,
-)
-from music_rig.reconciliation.types import Capability, Plan
 from music_rig.models import AnswerActor, ReconciliationState
-from music_rig.reconciliation.dispatch import (
-    DispatchMode,
-    NextActor,
-    classify_reconciliation_dispatch,
-)
+from music_rig.reconciliation.types import Capability, Plan
+
 
 def _plan(
     *,
@@ -41,6 +28,7 @@ def _plan(
         suggested_commands=[],
         details=details or {},
     )
+
 
 def test_provider_call_counts_by_dispatch(monkeypatch):
     from music_rig.reconciliation import run as run_mod
@@ -112,6 +100,7 @@ def test_provider_call_counts_by_dispatch(monkeypatch):
         assert result["mode"] == mode
         assert result["provider_invoked"] is False
 
+
 def test_agent_required_invokes_provider_once(monkeypatch):
     from music_rig.reconciliation import run as run_mod
 
@@ -137,6 +126,7 @@ def test_agent_required_invokes_provider_once(monkeypatch):
     assert calls["n"] == 1
     assert result["provider_invoked"] is True
     assert result["mode"] == "agent"
+
 
 def test_yes_does_not_fabricate_observation(monkeypatch):
     from music_rig.reconciliation import run as run_mod
@@ -203,6 +193,7 @@ def _q014_plan(*, actor: AnswerActor = AnswerActor.HUMAN) -> Plan:
         details={"answer_actor": "BOT"},
     )
 
+
 def test_reconcile_run_q014_shaped_never_calls_provider(monkeypatch):
     from music_rig.reconciliation import run as run_mod
 
@@ -213,9 +204,7 @@ def test_reconcile_run_q014_shaped_never_calls_provider(monkeypatch):
         raise AssertionError("provider must not be invoked")
 
     monkeypatch.setattr(run_mod, "autonomous_reconcile", boom)
-    monkeypatch.setattr(
-        run_mod.recon, "plan_question", lambda *a, **k: _q014_plan()
-    )
+    monkeypatch.setattr(run_mod.recon, "plan_question", lambda *a, **k: _q014_plan())
 
     result = run_mod.reconcile_run("Q-014")
     assert calls["n"] == 0
@@ -225,4 +214,3 @@ def test_reconcile_run_q014_shaped_never_calls_provider(monkeypatch):
     assert "observation" not in (result.get("message") or "").casefold() or (
         "evidence basis" in (result.get("message") or "").casefold()
     )
-

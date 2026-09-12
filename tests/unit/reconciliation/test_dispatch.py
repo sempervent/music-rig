@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-import json
 import pytest
+
 from music_rig.models import ReconciliationState
-from music_rig.progress import CollectingProgress, ProgressEvent, ProgressPhase, ProgressTracker
 from music_rig.reconciliation.dispatch import (
-    DispatchMode,
     HUMAN_BLOCKER_CODES,
+    DispatchMode,
     classify_reconciliation_dispatch,
 )
 from music_rig.reconciliation.types import Capability, Plan
+
 
 def _plan(
     *,
@@ -36,6 +36,7 @@ def _plan(
         details=details or {},
     )
 
+
 @pytest.mark.parametrize(
     "state",
     [
@@ -51,6 +52,7 @@ def test_non_agent_states_not_provider_eligible(state):
     d = classify_reconciliation_dispatch(_plan(state=state))
     assert d.provider_eligible is False
 
+
 def test_human_observation_blocker_outranks_needs_agent_action():
     d = classify_reconciliation_dispatch(
         _plan(
@@ -64,6 +66,7 @@ def test_human_observation_blocker_outranks_needs_agent_action():
     assert d.mode is DispatchMode.HUMAN_OBSERVATION
     assert d.provider_eligible is False
 
+
 def test_agent_eligible_for_manual_without_human_blockers():
     d = classify_reconciliation_dispatch(
         _plan(
@@ -76,6 +79,7 @@ def test_agent_eligible_for_manual_without_human_blockers():
     assert d.mode is DispatchMode.AGENT
     assert d.provider_eligible is True
 
+
 def test_clarification_blocker():
     d = classify_reconciliation_dispatch(
         _plan(
@@ -87,6 +91,7 @@ def test_clarification_blocker():
     assert d.mode is DispatchMode.HUMAN_CLARIFICATION
     assert d.provider_eligible is False
 
+
 @pytest.mark.parametrize("code", sorted(HUMAN_BLOCKER_CODES))
 def test_hard_human_blocker_codes_block_provider(code):
     d = classify_reconciliation_dispatch(
@@ -96,4 +101,3 @@ def test_hard_human_blocker_codes_block_provider(code):
         )
     )
     assert d.provider_eligible is False
-

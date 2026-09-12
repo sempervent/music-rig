@@ -89,14 +89,10 @@ def validate_inventory_doc(data: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     for item in doc.items:
         if not _ID_RE.fullmatch(item.id):
-            errors.append(
-                f"{item.id!r}: inventory IDs use lowercase letters, digits, and hyphens"
-            )
+            errors.append(f"{item.id!r}: inventory IDs use lowercase letters, digits, and hyphens")
         for unit in item.units:
             if not _ID_RE.fullmatch(unit.id):
-                errors.append(
-                    f"{unit.id!r}: unit IDs use lowercase letters, digits, and hyphens"
-                )
+                errors.append(f"{unit.id!r}: unit IDs use lowercase letters, digits, and hyphens")
     return errors
 
 
@@ -272,9 +268,7 @@ def propose_set_condition(
     data: dict[str, Any] | None = None,
 ) -> tuple[CurrentPreview, dict[str, Any]]:
     raw = copy.deepcopy(data if data is not None else load_raw(inventory_path))
-    return _replace_item(
-        raw, gear_id, {"condition": condition.value}, domain="inventory.condition"
-    )
+    return _replace_item(raw, gear_id, {"condition": condition.value}, domain="inventory.condition")
 
 
 def propose_set_location(
@@ -353,7 +347,9 @@ def propose_acquire(
         tasks = []
         for task in todo_doc.tasks:
             if task.id in refs and task.status == TodoStatus.WAITING:
-                tasks.append(task.model_copy(update={"status": TodoStatus.READY, "waiting_on": None}))
+                tasks.append(
+                    task.model_copy(update={"status": TodoStatus.READY, "waiting_on": None})
+                )
             else:
                 tasks.append(task)
         todo_doc = TodoDocument(next_session=list(todo_doc.next_session), tasks=tasks)

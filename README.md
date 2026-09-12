@@ -51,11 +51,12 @@ flowchart LR
 
   subgraph Recorder[TASCAM US-16x08]
     T12[1/2 Clean Mixer Out]
-    T34[3/4 miniKORG]
+    T34in[IN 3/4 miniKORG]
+    T34out[OUT 3/4 → KAOSS feed]
     T5[5 Acoustic Clean]
     T6[6 Bass Clean]
     T7[7 Electric Clean]
-    T910[9/10 KAOSS Replay]
+    T1516[IN 15/16 KAOSS return]
     T1112[11/12 SR-18]
   end
 
@@ -63,7 +64,7 @@ flowchart LR
   Electric --> A2
   Kazoo --> A4
   Privia --> A56
-  MiniKORG --> T34
+  MiniKORG --> T34in
   SR18 --> T1112
   Acoustic --> T5
   Bass --> T6
@@ -74,7 +75,7 @@ flowchart LR
   A56 --> Aux
   Aux --> RC1 --> CryBaby --> JOYO --> Pedals --> CH1 --> Return
   Main --> T12
-  Monitor --> KAOSS[KAOSS Replay] --> T910
+  T34out --> KAOSS[KAOSS Replay] --> T1516
 ```
 
 Clean paths use preamp → A/B/Y before the confirmed TASCAM clean legs (5/6/7). AUX SEND order is RC-1 → Cry Baby → JOYO. Patchbay detail: [docs/patchbays.md](docs/patchbays.md).
@@ -380,20 +381,21 @@ More detail: [docs/tui.md](docs/tui.md) and [SKILLS.md](SKILLS.md).
 
 ## Documentation CI/CD
 
-- CI runs pytest (xdist on `cpu_count - 2` workers, asyncio auto mode, coverage fail under 75%), `rig check`, `rig render --check`, channel-map print, and `mkdocs build --strict`.
+- CI runs pre-commit (ruff + ryl), pytest (xdist on `cpu_count - 2` workers, asyncio auto mode, coverage fail under 80%), `rig --am-bot check`, `rig --am-bot render --check`, channel-map print, and `mkdocs build --strict`.
 - Pushes to `main` also deploy the MkDocs site to GitHub Pages.
 - Local validation:
 
 ```bash
 uv sync --locked --extra dev --extra docs
-uv run pytest --cov-fail-under=75
-uv run rig check
-uv run rig render --check
+uv run pre-commit run --all-files
+uv run pytest
+uv run rig --am-bot check
+uv run rig --am-bot render --check
 uv run python scripts/print_channel_map.py
 uv run mkdocs build --strict
 ```
 
-Coverage measures `music_rig` excluding thin `cli.py` wiring and the Textual `tui/` package (logic lives in services; TUI has dedicated pilot tests). CI fails under 75%. Parallelism is `-n auto` → `max(1, cpu_count - 2)`; use `-n0` to debug. Async tests are plain `async def test_*` via pytest-asyncio `asyncio_mode = auto`.
+Coverage measures `music_rig` excluding thin `cli.py` wiring and the Textual `tui/` package (logic lives in services; TUI has dedicated pilot tests). Full suite fails under 80% (`--cov-fail-under=80` in `addopts`; use `--cov-fail-under=0` for subsets). Parallelism is `-n auto` → `max(1, cpu_count - 2)`; use `-n0` to debug. Async tests are plain `async def test_*` via pytest-asyncio `asyncio_mode = auto`.
 
 Test layout (unit / integration / smoke by module): [docs/testing.md](docs/testing.md).
 

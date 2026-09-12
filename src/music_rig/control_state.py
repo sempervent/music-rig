@@ -8,11 +8,11 @@ from typing import Any
 
 from music_rig import ableton_state, midi_state
 from music_rig.models import (
-    ControlAvailability,
-    ControlTarget,
-    ControllersDocument,
-    CurrentPreview,
     INACTIVE_OWNERSHIP,
+    ControlAvailability,
+    ControllersDocument,
+    ControlTarget,
+    CurrentPreview,
     MidiEvidenceStatus,
     MidiMessage,
     PerformanceDocument,
@@ -20,9 +20,7 @@ from music_rig.models import (
     TargetState,
 )
 from music_rig.store import (
-    ABLETON_PATH,
     CONTROLLERS_PATH,
-    MIDI_PATH,
     PERFORMANCE_PATH,
     StoreError,
     _dump_yaml,
@@ -87,11 +85,7 @@ def dump_with_header(data: dict[str, Any], *, existing_text: str | None = None) 
 
 def _device_channels(midi_path: Path | None) -> dict[str, int]:
     doc = midi_state.load_document(midi_path)
-    return {
-        item.gear_ref: item.channel
-        for item in doc.channels
-        if isinstance(item.channel, int)
-    }
+    return {item.gear_ref: item.channel for item in doc.channels if isinstance(item.channel, int)}
 
 
 def validate_controllers_doc(
@@ -145,13 +139,8 @@ def validate_controllers_doc(
                     target.kind == TargetKind.PERFORMANCE_ACTION
                     and target.action not in performance_actions
                 ):
-                    errors.append(
-                        f"{control.id}: unknown performance action {target.action!r}"
-                    )
-                elif (
-                    target.kind == TargetKind.ABLETON_ACTION
-                    and target.action not in actions
-                ):
+                    errors.append(f"{control.id}: unknown performance action {target.action!r}")
+                elif target.kind == TargetKind.ABLETON_ACTION and target.action not in actions:
                     errors.append(f"{control.id}: unknown Ableton action {target.action!r}")
     return errors
 
@@ -163,9 +152,7 @@ def resolve_message_channel(
         return message.channel
     channel = _device_channels(midi_path).get(gear_ref)
     if channel is None:
-        raise StoreError(
-            f"{gear_ref}: DEVICE channel has no numeric assignment in data/midi.yaml"
-        )
+        raise StoreError(f"{gear_ref}: DEVICE channel has no numeric assignment in data/midi.yaml")
     return channel
 
 
@@ -295,9 +282,7 @@ def add_message(gear_ref: str, context_id: str, control_id: str, message, **kwar
     )
 
 
-def remove_message(
-    gear_ref: str, context_id: str, control_id: str, index: int = 0, **kwargs
-):
+def remove_message(gear_ref: str, context_id: str, control_id: str, index: int = 0, **kwargs):
     def update(ctl):
         if index < 0 or index >= len(ctl.messages):
             raise StoreError(f"Message index {index} is out of range.")
@@ -333,10 +318,7 @@ def propose_set_target(gear_ref: str, context_id: str, control_id: str, target, 
     parsed = target if isinstance(target, ControlTarget) else ControlTarget.model_validate(target)
 
     def update(ctl):
-        if (
-            ctl.availability == ControlAvailability.BROKEN
-            and parsed.state == TargetState.MAPPED
-        ):
+        if ctl.availability == ControlAvailability.BROKEN and parsed.state == TargetState.MAPPED:
             raise StoreError("Cannot map a BROKEN control; set availability first.")
         return ctl.model_copy(update={"target": parsed})
 
@@ -361,7 +343,11 @@ def clear_target(gear_ref: str, context_id: str, control_id: str, **kwargs):
 
 
 def propose_set_evidence(gear_ref: str, context_id: str, control_id: str, evidence, **kwargs):
-    status = evidence if isinstance(evidence, MidiEvidenceStatus) else MidiEvidenceStatus(str(evidence).upper())
+    status = (
+        evidence
+        if isinstance(evidence, MidiEvidenceStatus)
+        else MidiEvidenceStatus(str(evidence).upper())
+    )
     return _mutate(
         gear_ref,
         context_id,
@@ -535,10 +521,19 @@ def find_gaps(doc: ControllersDocument) -> list[dict[str, str]]:
     gaps: list[dict[str, str]] = []
     for controller in doc.controllers:
         if not controller.contexts:
-            gaps.append({"gear": controller.gear_ref, "context": "—", "control": "—", "gap": "no contexts"})
+            gaps.append(
+                {"gear": controller.gear_ref, "context": "—", "control": "—", "gap": "no contexts"}
+            )
         for context in controller.contexts:
             if not context.controls:
-                gaps.append({"gear": controller.gear_ref, "context": context.id, "control": "—", "gap": "no controls modeled"})
+                gaps.append(
+                    {
+                        "gear": controller.gear_ref,
+                        "context": context.id,
+                        "control": "—",
+                        "gap": "no controls modeled",
+                    }
+                )
             for control in context.controls:
                 reasons = []
                 if (

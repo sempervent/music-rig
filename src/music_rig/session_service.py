@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Callable
 
 from music_rig import inbox_service, todo_service
 from music_rig.inbox_service import default_clock
@@ -18,7 +18,6 @@ from music_rig.models import (
 from music_rig.store import (
     StoreError,
     load_all_sessions,
-    load_session,
     load_todo,
     save_session,
     session_path,
@@ -67,8 +66,7 @@ def start_session(
     existing = find_active(sessions_dir)
     if existing is not None:
         raise StoreError(
-            f"{existing.id} is already active.\n"
-            "Use `rig session status` or end it first."
+            f"{existing.id} is already active.\nUse `rig session status` or end it first."
         )
     started = clock()
     session = SessionLog(
@@ -127,9 +125,7 @@ def add_note(
     clock: Clock = default_clock,
     sessions_dir: Path | None = None,
 ) -> SessionLog:
-    return append_event(
-        SessionEventType.NOTE, text, clock=clock, sessions_dir=sessions_dir
-    )
+    return append_event(SessionEventType.NOTE, text, clock=clock, sessions_dir=sessions_dir)
 
 
 def add_discovery(
@@ -138,9 +134,7 @@ def add_discovery(
     clock: Clock = default_clock,
     sessions_dir: Path | None = None,
 ) -> SessionLog:
-    return append_event(
-        SessionEventType.DISCOVERY, text, clock=clock, sessions_dir=sessions_dir
-    )
+    return append_event(SessionEventType.DISCOVERY, text, clock=clock, sessions_dir=sessions_dir)
 
 
 def start_task(
@@ -199,9 +193,7 @@ def session_capture(
     sessions_dir: Path | None = None,
     inbox_path=None,
 ) -> tuple[SessionLog, object]:
-    item = inbox_service.capture_text(
-        text, clock=clock, inbox_path=inbox_path, render=False
-    )
+    item = inbox_service.capture_text(text, clock=clock, inbox_path=inbox_path, render=False)
     session = append_event(
         SessionEventType.CAPTURE,
         item.text,

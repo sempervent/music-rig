@@ -5,13 +5,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from music_rig import store as store_mod
 from music_rig import todo_service
 from music_rig.models import TodoPriority, TodoStatus
-from music_rig import store as store_mod
 from music_rig.store import StoreError, load_todo
 from music_rig.tui.editable import ApplyResult, BaseEditableAdapter, WorkingRecord
 from music_rig.tui.fields import FieldSpec, FieldType, enum_spec, readonly_spec, text_spec
-
 
 TODO_FIELDS: list[FieldSpec] = [
     readonly_spec("id", "ID"),
@@ -54,7 +53,9 @@ class TodoEditableAdapter(BaseEditableAdapter):
     def get_field_specs(self) -> list[FieldSpec]:
         return list(TODO_FIELDS)
 
-    def list_records(self, *, status_filter: str | None = None, search: str = "") -> list[dict[str, Any]]:
+    def list_records(
+        self, *, status_filter: str | None = None, search: str = ""
+    ) -> list[dict[str, Any]]:
         doc = load_todo()
         needle = search.casefold()
         rows = []
@@ -123,14 +124,8 @@ class TodoEditableAdapter(BaseEditableAdapter):
                     continue
                 linked = True
                 st = question_state(q)
-                rec = (
-                    q.reconciled_at.isoformat()
-                    if q.reconciled_at is not None
-                    else "—"
-                )
-                lines.append(
-                    f"- {q.id}: recon_state={st.value} reconciled_at={rec}"
-                )
+                rec = q.reconciled_at.isoformat() if q.reconciled_at is not None else "—"
+                lines.append(f"- {q.id}: recon_state={st.value} reconciled_at={rec}")
                 for cid in q.related_changes:
                     chg = cdoc.item_map().get(cid)
                     chg_st = chg.status.value if chg else "?"

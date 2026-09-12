@@ -44,9 +44,7 @@ def load_local_config(
             raise StoreError(f"{target.name}: paths must be a mapping")
         unknown = sorted(set(paths) - LOCAL_PATH_KEYS)
         if unknown:
-            raise StoreError(
-                f"{target.name}: unknown path locator key(s): {', '.join(unknown)}"
-            )
+            raise StoreError(f"{target.name}: unknown path locator key(s): {', '.join(unknown)}")
     try:
         return LocalConfig.model_validate(raw)
     except Exception as exc:
@@ -71,10 +69,7 @@ def resolve_path(
 def has_any_configured_path(config: LocalConfig | None) -> bool:
     if config is None:
         return False
-    return any(
-        getattr(config.paths, key) not in (None, "")
-        for key in sorted(LOCAL_PATH_KEYS)
-    )
+    return any(getattr(config.paths, key) not in (None, "") for key in sorted(LOCAL_PATH_KEYS))
 
 
 def save_local_config(

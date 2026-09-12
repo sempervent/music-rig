@@ -148,9 +148,7 @@ def resolve_channel_key(device: str, channel: str | int, section: dict[Any, Any]
         for key in section:
             if str(key) == str(cand):
                 return key
-    raise StoreError(
-        f"Alesis channel {channel!r} is not represented in CURRENT channel-map data."
-    )
+    raise StoreError(f"Alesis channel {channel!r} is not represented in CURRENT channel-map data.")
 
 
 def propose_set_source(

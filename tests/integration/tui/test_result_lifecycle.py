@@ -17,11 +17,11 @@ from music_rig.models import QuestionStatus
 from music_rig.store import load_questions
 from music_rig.tui.app import RigApp
 from music_rig.tui.dialogs import ConfirmModal, InputModal, SelectModeModal
+from music_rig.tui.screen_results import AnswerNextAction, AnswerResult
 from music_rig.tui.screens.answer import AnswerScreen
 from music_rig.tui.screens.home import HomeScreen
 from music_rig.tui.screens.questions import QuestionsScreen
 from music_rig.tui.screens.reconcile import ReconcileScreen
-from music_rig.tui.screen_results import AnswerNextAction, AnswerResult
 
 
 @dataclass

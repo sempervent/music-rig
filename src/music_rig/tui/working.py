@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Generic, TypeVar
+from typing import Any, TypeVar
 
 T = TypeVar("T")
 
@@ -35,7 +36,7 @@ class ConcurrentModificationError(RuntimeError):
     """Raised when the source file changed since the editor was opened."""
 
 
-class WorkingDocument(Generic[T]):
+class WorkingDocument[T]:
     """Baseline data plus staged mutations; commits only via an explicit apply callback.
 
     Undo/redo scope = unsaved working-copy mutations only (before Apply).
@@ -132,7 +133,7 @@ class WorkingDocument(Generic[T]):
         if self.source_path is not None and self.source_path.exists():
             self.source_hash = sha256_file(self.source_path)
 
-    def apply(self, commit: Callable[["WorkingDocument[T]"], None]) -> None:
+    def apply(self, commit: Callable[[WorkingDocument[T]], None]) -> None:
         """Validate concurrency, then invoke commit callback. Keeps mutations on failure."""
         if not self.source_unchanged():
             raise ConcurrentModificationError(

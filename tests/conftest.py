@@ -10,7 +10,7 @@ import pytest
 import yaml
 
 # Fail fast if pytest was launched with Homebrew/system Python instead of uv.
-if sys.version_info < (3, 12):
+if sys.version_info < (3, 12):  # noqa: UP036 — intentional interpreter guard
     raise RuntimeError(
         f"music-rig tests require Python >= 3.12 (got {sys.version.split()[0]} "
         f"from {sys.executable}).\n"
@@ -20,9 +20,7 @@ if sys.version_info < (3, 12):
 try:
     import pydantic
 except ImportError as exc:  # pragma: no cover
-    raise RuntimeError(
-        "pydantic is missing in this interpreter.\nUse: uv run pytest"
-    ) from exc
+    raise RuntimeError("pydantic is missing in this interpreter.\nUse: uv run pytest") from exc
 if tuple(int(p) for p in pydantic.__version__.split(".")[:2]) < (2, 0):
     raise RuntimeError(
         f"music-rig requires pydantic v2 (got {pydantic.__version__} from "
@@ -263,8 +261,6 @@ def tui_fx(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         "inventory": inventory,
         "tmp_path": tmp_path,
     }
-
-
 
 
 pytest_plugins = [

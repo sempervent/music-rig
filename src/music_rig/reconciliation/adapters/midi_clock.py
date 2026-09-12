@@ -37,7 +37,6 @@ from music_rig.verification_policy import (
     VerificationPolicy,
     evidence_basis_for,
     has_bot_answer,
-    has_human_attestation,
     verification_policy_for,
 )
 
@@ -72,11 +71,7 @@ def _desired_endpoint(question: OpenQuestion) -> str | None:
         else []
     )
     low = answer.casefold()
-    hits = [
-        str(c)
-        for c in choices
-        if str(c).upper() != "UNKNOWN" and str(c).casefold() in low
-    ]
+    hits = [str(c) for c in choices if str(c).upper() != "UNKNOWN" and str(c).casefold() in low]
     if len(hits) == 1:
         return hits[0]
     return None
@@ -90,11 +85,7 @@ class MidiClockAdapter(ReconciliationAdapter):
         data = midi_state.load_raw(paths.get("midi"))
         clock = data.get("clock") if isinstance(data.get("clock"), dict) else {}
         master = clock.get("master") if isinstance(clock.get("master"), dict) else {}
-        endpoint = (
-            master.get("endpoint_ref")
-            or master.get("gear_ref")
-            or master.get("device_ref")
-        )
+        endpoint = master.get("endpoint_ref") or master.get("gear_ref") or master.get("device_ref")
         return {
             "master": endpoint,
             "status": master.get("status"),
@@ -183,9 +174,7 @@ class MidiClockAdapter(ReconciliationAdapter):
                 )
             )
         elif vr and vr.outcome == VerificationOutcome.UNKNOWN:
-            operations.append(
-                op(PlanOperationKind.NO_CURRENT_CHANGE, note="observation UNKNOWN")
-            )
+            operations.append(op(PlanOperationKind.NO_CURRENT_CHANGE, note="observation UNKNOWN"))
 
         from music_rig.reconciliation.suggestions import (
             ActionSuggestion,
@@ -214,10 +203,7 @@ class MidiClockAdapter(ReconciliationAdapter):
             suggestions.append(
                 ActionSuggestion(
                     kind=SuggestionKind.CLI_HINT,
-                    intent=(
-                        f"current midi set-clock-master {endpoint} "
-                        f"--question {question.id}"
-                    ),
+                    intent=(f"current midi set-clock-master {endpoint} --question {question.id}"),
                     description=f"Set clock master to {endpoint}",
                     code="set_clock_master",
                     params={"endpoint": endpoint, "question_id": question.id},
@@ -242,9 +228,7 @@ class MidiClockAdapter(ReconciliationAdapter):
             ),
             "verification_policy": policy.value,
             "evidence_basis": basis.value,
-            "answer_actor": (
-                question.answer_actor.value if question.answer_actor else None
-            ),
+            "answer_actor": (question.answer_actor.value if question.answer_actor else None),
         }
         if has_bot_answer(question):
             ans = [suggest_answer(question.id)]
@@ -253,8 +237,7 @@ class MidiClockAdapter(ReconciliationAdapter):
                     "code": "needs_human_answer",
                     "field": "answer_actor",
                     "message": (
-                        "BOT answer is not human factual authority. "
-                        "A human must Answer & Resolve."
+                        "BOT answer is not human factual authority. A human must Answer & Resolve."
                     ),
                     "suggestions": [s.to_dict() for s in ans],
                     "suggested_commands": render_suggestions(ans),
@@ -265,11 +248,7 @@ class MidiClockAdapter(ReconciliationAdapter):
             and question.status == QuestionStatus.RESOLVED
             and not has_positive_observation(question)
         ):
-            obs = [
-                suggest_verify_record(
-                    question.id, outcome="confirmed", value=endpoint or "…"
-                )
-            ]
+            obs = [suggest_verify_record(question.id, outcome="confirmed", value=endpoint or "…")]
             blockers.append(
                 {
                     "code": "needs_human_observation",

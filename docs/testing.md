@@ -58,20 +58,37 @@ YAML must be read-only.
 
 ## Coverage gate
 
-Full suite (CI / local validation):
+Full suite (CI / local validation) enforces **80%** via `pyproject.toml`
+`addopts` (`--cov-fail-under=80`):
 
 ```bash
-uv run pytest --cov-fail-under=75 -q
+uv run pytest -q
 ```
 
 Subset / debug without the gate:
 
 ```bash
+uv run pytest -m unit --cov-fail-under=0
+uv run pytest -m integration --cov-fail-under=0
+uv run pytest -m smoke --cov-fail-under=0
 uv run pytest path/to/tests -n0 --cov-fail-under=0
 ```
 
 CLI (`music_rig.cli`) and TUI packages are omitted from coverage; domain and
 service modules are the gate.
+
+## Lint gates
+
+Ruff (Python) and ryl (YAML) are configured in `pyproject.toml`. Pre-commit
+runs them via local `uv run` system hooks (no duplicated rule config):
+
+```bash
+uv run pre-commit run --all-files
+# or directly:
+uv run ruff check --fix .
+uv run ruff format .
+uv run ryl check .
+```
 
 ## Reconciliation
 

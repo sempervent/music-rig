@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import json
-import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -14,14 +13,10 @@ from typer.testing import CliRunner
 from music_rig import patchbay_state, question_service, store
 from music_rig.cli import app
 from music_rig.models import (
-    ChangeCategory,
-    ChangeRecord,
     ChangeStatus,
     QuestionStatus,
     ReconciliationState,
-    TodoPriority,
     TodoStatus,
-    TodoTask,
 )
 from music_rig.reconciliation import service as reconcile_service
 from music_rig.reconciliation.adapters import get_adapter, registered_domains
@@ -31,7 +26,7 @@ from music_rig.store import StoreError, load_changes, load_questions, load_todo
 
 
 def _clock():
-    return datetime(2026, 9, 11, 20, 0, 0, tzinfo=timezone.utc)
+    return datetime(2026, 9, 11, 20, 0, 0, tzinfo=UTC)
 
 
 def _write_docs(tmp: Path) -> dict[str, Path]:
@@ -369,9 +364,7 @@ def test_normalize_mode_deterministic():
 
 
 def test_resolve_does_not_set_reconciled_at(fx):
-    q = question_service.resolve_question(
-        "Q-008", "half-normal", clock=_clock, render=False
-    )
+    q = question_service.resolve_question("Q-008", "half-normal", clock=_clock, render=False)
     assert q.status == QuestionStatus.RESOLVED
     assert q.reconciled_at is None
     assert q.resolved_at is not None
@@ -608,19 +601,13 @@ def test_inspect_cleanup_resolved_not_reconciled(fx):
 def test_manual_cli_e2e_fixture_yaml(fx):
     """CLI-only e2e on temp fixture; assert YAML afterward."""
     runner = CliRunner()
-    r1 = runner.invoke(
-        app, ["question", "resolve", "Q-008", "half-normal"], catch_exceptions=False
-    )
+    runner.invoke(app, ["question", "resolve", "Q-008", "half-normal"], catch_exceptions=False)
     # question resolve may need different argv — check service already covered;
     # use service resolve then CLI apply/verify/finalize
     question_service.resolve_question("Q-008", "HALF_NORMAL", clock=_clock, render=False)
-    apply = runner.invoke(
-        app, ["reconcile", "apply", "question", "Q-008", "--yes", "--json"]
-    )
+    apply = runner.invoke(app, ["reconcile", "apply", "question", "Q-008", "--yes", "--json"])
     assert apply.exit_code == 0, apply.stdout
-    verify = runner.invoke(
-        app, ["reconcile", "verify", "question", "Q-008", "--json"]
-    )
+    verify = runner.invoke(app, ["reconcile", "verify", "question", "Q-008", "--json"])
     assert verify.exit_code == 0
     assert json.loads(verify.stdout)["result"]["verification"] == "MATCH"
     fin = runner.invoke(

@@ -2,45 +2,32 @@
 
 from __future__ import annotations
 
-import json
-import shutil
-import subprocess
-import sys
 from pathlib import Path
+
 import pytest
-import yaml
-from typer.testing import CliRunner
-from music_rig import channel_state, patchbay_state, question_service
-from music_rig import store as store_mod
+
+from fixtures.repo_fixtures import _provider
+from music_rig import channel_state, patchbay_state
 from music_rig.agent import (
     AgentReconciliationProposal,
     ProposalStatus,
     apply_proposal,
-    build_agent_packet,
-    capabilities,
     validate_proposal,
 )
 from music_rig.agent import transaction as transaction_mod
 from music_rig.agent.errors import (
     ConcurrentModificationError,
     PlanConflictError,
-    ProviderInvalidResponseError,
-    ProviderTimeoutError,
 )
-from music_rig.agent.inspection import InspectionRequest, execute_inspection
-from music_rig.agent.orchestrate import AutonomyLevel, autonomous_reconcile, run_provider_loop
-from music_rig.agent.provider import CommandProvider
+from music_rig.agent.orchestrate import AutonomyLevel, autonomous_reconcile
 from music_rig.agent.transaction import (
     commit_transaction,
     evaluate_postconditions,
     prepare_transaction,
 )
-from music_rig.cli import app
-from music_rig.reconciliation.context import ReconciliationContext
-from music_rig.reconciliation.operation_registry import allowlisted_kinds, get_spec
 from music_rig.reconciliation.operations import RigOperation
-from music_rig.store import StoreError, ROOT, load_questions
-from fixtures.repo_fixtures import _provider
+from music_rig.store import StoreError, load_questions
+
 
 def test_atomic_multi_domain_success(fx21):
     """channels + patchbay + finalize commit in one atomic write."""
@@ -88,6 +75,7 @@ def test_atomic_multi_domain_success(fx21):
     assert fx21["patchbays"].read_bytes() != before_pb
     assert fx21["questions"].read_bytes() != before_q
 
+
 def test_prepare_invalid_op_zero_writes(fx21):
     ctx = fx21["ctx"]
     before = {
@@ -101,6 +89,7 @@ def test_prepare_invalid_op_zero_writes(fx21):
     assert fx21["channels"].read_bytes() == before["channels"]
     assert fx21["patchbays"].read_bytes() == before["patchbays"]
     assert fx21["questions"].read_bytes() == before["questions"]
+
 
 def test_commit_failure_rollback(fx21, monkeypatch):
     ctx = fx21["ctx"]
@@ -132,6 +121,7 @@ def test_commit_failure_rollback(fx21, monkeypatch):
     for path_str, data in originals.items():
         assert Path(path_str).read_bytes() == data
 
+
 def test_concurrency_refuses(fx21):
     ctx = fx21["ctx"]
     ops = [
@@ -146,6 +136,7 @@ def test_concurrency_refuses(fx21):
     fx21["patchbays"].write_text(text + "\n# concurrent edit\n", encoding="utf-8")
     with pytest.raises(ConcurrentModificationError):
         commit_transaction(prepared, ctx=ctx, artifact_id="Q-200")
+
 
 def test_plan_conflict(fx21):
     ctx = fx21["ctx"]
@@ -164,6 +155,7 @@ def test_plan_conflict(fx21):
     with pytest.raises(PlanConflictError) as excinfo:
         prepare_transaction(ops, ctx=ctx)
     assert excinfo.value.conflict_key
+
 
 def test_q001_style_channel_ops_apply(fx21):
     ops = [
@@ -212,6 +204,7 @@ def test_q001_style_channel_ops_apply(fx21):
     assert ch["alesis"]["2"]["source"] == "Acoustic"
     assert ch["alesis"]["3"]["source"] == "Electric"
 
+
 def test_q007_model_mapping_no_unit_invention(fx21):
     proposal = AgentReconciliationProposal(
         artifact_id="Q-007",
@@ -232,6 +225,7 @@ def test_q007_model_mapping_no_unit_invention(fx21):
     result = validate_proposal(proposal, ctx=fx21["ctx"])
     assert result["ok"] is False
     assert any("unit-id" in e for e in result["errors"])
+
 
 def test_evidence_verified_rejected(fx21):
     proposal = AgentReconciliationProposal(
@@ -256,9 +250,9 @@ def test_evidence_verified_rejected(fx21):
             prepare_transaction(proposal.operations, ctx=fx21["ctx"])
     else:
         assert any(
-            "verified" in e.casefold() or "evidence" in e.casefold()
-            for e in result["errors"]
+            "verified" in e.casefold() or "evidence" in e.casefold() for e in result["errors"]
         )
+
 
 def test_irrelevant_domain_rejected(fx21):
     proposal = AgentReconciliationProposal(
@@ -277,6 +271,7 @@ def test_irrelevant_domain_rejected(fx21):
     assert result["ok"] is False
     assert any("not relevant" in e or "unregistered" in e for e in result["errors"])
 
+
 def test_unknown_operation_rejected(fx21):
     proposal = AgentReconciliationProposal(
         artifact_id="Q-200",
@@ -293,6 +288,7 @@ def test_unknown_operation_rejected(fx21):
     result = validate_proposal(proposal, ctx=fx21["ctx"])
     assert result["ok"] is False
     assert any("unregistered" in e for e in result["errors"])
+
 
 def test_postcondition_failure_rolls_back(fx21, monkeypatch):
     ctx = fx21["ctx"]
@@ -330,6 +326,7 @@ def test_postcondition_failure_rolls_back(fx21, monkeypatch):
     assert post["ok"] is False
     assert any("reconciled_at" in e for e in post["errors"])
 
+
 def test_clarification_stops_writes(fx21, monkeypatch):
     monkeypatch.setenv("FAKE_PROVIDER_MODE", "CLARIFY")
     before = fx21["patchbays"].read_bytes()
@@ -347,4 +344,3 @@ def test_clarification_stops_writes(fx21, monkeypatch):
     assert result.get("writes") is False or result.get("applied") is not True
     assert result.get("status") == "NEEDS_HUMAN_CLARIFICATION"
     assert fx21["patchbays"].read_bytes() == before
-

@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import shutil
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from pathlib import Path
-from typing import Callable
 from zoneinfo import ZoneInfo
 
 import yaml
@@ -41,10 +41,10 @@ def default_clock() -> datetime:
     try:
         return datetime.now(ZoneInfo("America/New_York"))
     except Exception:
-        return datetime.now(timezone.utc)
+        return datetime.now(UTC)
 
 
-class BackupReadiness(str, Enum):
+class BackupReadiness(StrEnum):
     READY = "READY"
     MISSING_PATH = "MISSING PATH"
     MANUAL = "MANUAL"
@@ -52,7 +52,7 @@ class BackupReadiness(str, Enum):
     UNKNOWN = "UNKNOWN"
 
 
-class BackupPackageResult(str, Enum):
+class BackupPackageResult(StrEnum):
     COMPLETE = "COMPLETE"
     PARTIAL = "PARTIAL"
     FAILED = "FAILED"
@@ -129,28 +129,20 @@ def item_readiness(
     config: LocalConfig | None,
 ) -> BackupItemStatus:
     if item.kind == BackupKind.REPOSITORY_STATE:
-        return BackupItemStatus(
-            item, BackupReadiness.READY, "automatic via rig snapshot"
-        )
+        return BackupItemStatus(item, BackupReadiness.READY, "automatic via rig snapshot")
     if item.kind == BackupKind.MANUAL_EXPORT:
         if item.locator_key:
             path = resolve_path(item.locator_key, config)
             if path is not None:
                 if path.exists():
-                    return BackupItemStatus(
-                        item, BackupReadiness.READY, "export path configured"
-                    )
+                    return BackupItemStatus(item, BackupReadiness.READY, "export path configured")
                 return BackupItemStatus(
                     item, BackupReadiness.MISSING_PATH, "configured path missing"
                 )
-        return BackupItemStatus(
-            item, BackupReadiness.MANUAL, "manual export required"
-        )
+        return BackupItemStatus(item, BackupReadiness.MANUAL, "manual export required")
     if item.kind in {BackupKind.FILE_COPY, BackupKind.DIRECTORY_COPY}:
         if not item.locator_key:
-            return BackupItemStatus(
-                item, BackupReadiness.NOT_CONFIGURED, "no locator_key"
-            )
+            return BackupItemStatus(item, BackupReadiness.NOT_CONFIGURED, "no locator_key")
         path = resolve_path(item.locator_key, config)
         if path is None:
             return BackupItemStatus(
@@ -192,9 +184,7 @@ def _safe_copy_file(source: Path, dest: Path) -> None:
         # Copy target file content once; do not recurse into link trees.
         target = source.resolve(strict=True)
         if not target.is_file():
-            raise StoreError(
-                f"Symlink {source} does not resolve to a regular file"
-            )
+            raise StoreError(f"Symlink {source} does not resolve to a regular file")
         shutil.copyfile(target, dest, follow_symlinks=True)
         return
     if not source.is_file():
@@ -280,9 +270,7 @@ def create_backup_package(
     except Exception as exc:
         critical_failed = True
         errors.append(f"repository-state failed: {exc}")
-        outcomes.append(
-            BackupItemOutcome("repository-state", "FAILED", str(exc))
-        )
+        outcomes.append(BackupItemOutcome("repository-state", "FAILED", str(exc)))
 
     doc = load_document(backups_path)
     for item in doc.items:
@@ -299,13 +287,9 @@ def create_backup_package(
                         _safe_copy_directory(path, target)
                     else:
                         _safe_copy_file(path, target / path.name)
-                    outcomes.append(
-                        BackupItemOutcome(item.id, "COPIED", "export path copied")
-                    )
+                    outcomes.append(BackupItemOutcome(item.id, "COPIED", "export path copied"))
                 except Exception as exc:
-                    outcomes.append(
-                        BackupItemOutcome(item.id, "FAILED", str(exc))
-                    )
+                    outcomes.append(BackupItemOutcome(item.id, "FAILED", str(exc)))
                     errors.append(f"{item.id}: {exc}")
                     if item.importance == BackupImportance.CRITICAL:
                         critical_failed = True
@@ -340,18 +324,14 @@ def create_backup_package(
                 target_dir = dest / "copies" / item.id
                 if item.kind == BackupKind.DIRECTORY_COPY or path.is_dir():
                     if path.is_symlink() and path.is_dir():
-                        raise StoreError(
-                            f"Refusing to follow directory symlink for {item.id}"
-                        )
+                        raise StoreError(f"Refusing to follow directory symlink for {item.id}")
                     if path.is_dir():
                         _safe_copy_directory(path, target_dir)
                     else:
                         _safe_copy_file(path, target_dir / path.name)
                 else:
                     _safe_copy_file(path, target_dir / path.name)
-                outcomes.append(
-                    BackupItemOutcome(item.id, "COPIED", "copied from local path")
-                )
+                outcomes.append(BackupItemOutcome(item.id, "COPIED", "copied from local path"))
             except Exception as exc:
                 outcomes.append(BackupItemOutcome(item.id, "FAILED", str(exc)))
                 errors.append(f"{item.id}: {exc}")
@@ -359,9 +339,7 @@ def create_backup_package(
                     critical_failed = True
             continue
 
-        outcomes.append(
-            BackupItemOutcome(item.id, "UNKNOWN", readiness.detail or "skipped")
-        )
+        outcomes.append(BackupItemOutcome(item.id, "UNKNOWN", readiness.detail or "skipped"))
 
     if critical_failed or snapshot_id is None:
         result = BackupPackageResult.FAILED
@@ -388,12 +366,10 @@ def create_backup_package(
         "result": result.value,
         "snapshot_id": snapshot_id,
         "tool_version": __version__,
-        "local_config_present": load_local_config(local_config_path, root=root)
-        is not None,
+        "local_config_present": load_local_config(local_config_path, root=root) is not None,
         "configured_paths_present": has_any_configured_path(config),
         "outcomes": [
-            {"item_id": o.item_id, "status": o.status, "detail": o.detail}
-            for o in outcomes
+            {"item_id": o.item_id, "status": o.status, "detail": o.detail} for o in outcomes
         ],
         "errors": errors,
     }

@@ -192,9 +192,7 @@ def reconcile_run(
         **base,
         "ok": False,
         "mode": "blocked",
-        "message": (
-            f"No automated path for {qid}: {dispatch.reason}."
-        ),
+        "message": (f"No automated path for {qid}: {dispatch.reason}."),
         "blockers": list(plan.blockers or []),
     }
 
@@ -212,8 +210,8 @@ def _human_observation_path(
 ) -> dict[str, Any]:
     """Human verification required — never invoke a provider."""
     from music_rig.reconciliation.suggestions import (
-        SuggestionKind,
         ActionSuggestion,
+        SuggestionKind,
         render_suggestions,
         suggest_verify_record,
     )
@@ -277,8 +275,7 @@ def _human_observation_path(
             out["interactive_observation_offered"] = True
             out["interactive_observation_confirmed"] = True
             out["message"] = (
-                message
-                + "\n\nInteractive verification confirmed — "
+                message + "\n\nInteractive verification confirmed — "
                 "record via verify machinery before apply."
             )
             out["next_step"] = "record_verification_result"
@@ -288,8 +285,7 @@ def _human_observation_path(
         from music_rig.reconciliation.suggestions import render_suggestion
 
         out["message"] = (
-            message
-            + "\n\n--yes does not imply human observation. "
+            message + "\n\n--yes does not imply human observation. "
             "Record verification first:\n"
             f"  {render_suggestion(suggest_verify_record(qid))}"
         )
@@ -457,11 +453,7 @@ def _deterministic_path(
         )
         out["message"] = (
             f"Deterministic apply available for {qid}.\n"
-            + (
-                f"Evidence basis: {basis}\n"
-                if basis
-                else ""
-            )
+            + (f"Evidence basis: {basis}\n" if basis else "")
             + f"Review plan, then: {render_suggestion(run_sug)}"
         )
     return out

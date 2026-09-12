@@ -7,6 +7,7 @@ from textual.binding import Binding
 from textual.containers import VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Footer, Static
+
 from music_rig.tui.header import RigHeader
 
 

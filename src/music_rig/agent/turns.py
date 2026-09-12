@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class AgentTurnKind(str, Enum):
+class AgentTurnKind(StrEnum):
     READY = "READY"
     NEEDS_MORE_CONTEXT = "NEEDS_MORE_CONTEXT"
     NEEDS_HUMAN_CLARIFICATION = "NEEDS_HUMAN_CLARIFICATION"

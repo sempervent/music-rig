@@ -82,9 +82,7 @@ def assert_inactive_allowed(
     )
     refs = usage["routing"]
     if refs:
-        where = ", ".join(
-            f"{ref['path']}/{ref['branch']}:{ref['node']}" for ref in refs
-        )
+        where = ", ".join(f"{ref['path']}/{ref['branch']}:{ref['node']}" for ref in refs)
         raise StoreError(
             f"Cannot make {gear_id!r} inactive: CURRENT routing references it at {where}."
         )

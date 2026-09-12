@@ -74,9 +74,7 @@ class AgentPlanScreen(ModalScreen[dict | None]):
             dry_run=True,
             on_progress=on_progress,
         )
-        result["_progress_events"] = [
-            e.to_dict() if hasattr(e, "to_dict") else e for e in events
-        ]
+        result["_progress_events"] = [e.to_dict() if hasattr(e, "to_dict") else e for e in events]
         return result
 
     def _on_progress_event(self, ev) -> None:
@@ -87,7 +85,9 @@ class AgentPlanScreen(ModalScreen[dict | None]):
         if ev.provider or ev.model:
             who = " / ".join(x for x in (ev.provider, ev.model) if x)
             msg = f"{who} — {ev.message}"
-        status.set_running(msg, elapsed_s=ev.elapsed_s, phase=str(getattr(ev.phase, "value", ev.phase)))
+        status.set_running(
+            msg, elapsed_s=ev.elapsed_s, phase=str(getattr(ev.phase, "value", ev.phase))
+        )
 
     def on_worker_state_changed(self, event) -> None:  # noqa: ANN001
         if event.worker is not self._worker:
@@ -150,10 +150,7 @@ class AgentPlanScreen(ModalScreen[dict | None]):
         plan.update(body)
         can_apply = bool(
             result.get("ok")
-            and (
-                result.get("prepared_transaction")
-                or result.get("mode") == "deterministic"
-            )
+            and (result.get("prepared_transaction") or result.get("mode") == "deterministic")
         )
         self.query_one("#apply", Button).disabled = not can_apply
 
@@ -187,9 +184,7 @@ class AgentPlanScreen(ModalScreen[dict | None]):
         self.query_one("#apply", Button).disabled = True
 
         def _work() -> dict:
-            return reconcile_run(
-                self.question_id, apply=True, yes=True, dry_run=False
-            )
+            return reconcile_run(self.question_id, apply=True, yes=True, dry_run=False)
 
         self._worker = self.run_worker(_work, exclusive=True, thread=True)
 
@@ -216,8 +211,8 @@ class ProviderSetupScreen(ModalScreen[None]):
     BINDINGS = [Binding("escape", "cancel", "Cancel")]
 
     def compose(self) -> ComposeResult:
-        from music_rig.agent.provider import detect_providers
         from music_rig.agent.ollama_provider import ollama_model_details
+        from music_rig.agent.provider import detect_providers
 
         detected = detect_providers()
         yield RigHeader(show_clock=False)

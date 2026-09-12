@@ -7,10 +7,11 @@ always through reconciliation.service — no parallel engines.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from music_rig import question_service
 from music_rig.inbox_service import default_clock
@@ -142,8 +143,7 @@ def list_verify_queue(
         t.id
         for t in todo.tasks
         if t.priority == TodoPriority.P0
-        and t.status
-        not in {TodoStatus.DONE, TodoStatus.CANCELLED, TodoStatus.DEFERRED}
+        and t.status not in {TodoStatus.DONE, TodoStatus.CANCELLED, TodoStatus.DEFERRED}
     }
     items: list[VerifyQueueItem] = []
     for q in load_questions(questions_path).questions:
@@ -184,15 +184,11 @@ def recommend_next(
     questions_path: Path | None = None,
     todo_path: Path | None = None,
 ) -> dict[str, Any] | None:
-    queue = list_verify_queue(
-        area=area, questions_path=questions_path, todo_path=todo_path
-    )
+    queue = list_verify_queue(area=area, questions_path=questions_path, todo_path=todo_path)
     if not queue:
         return None
     top = queue[0]
-    card = build_card(
-        top.question_id, questions_path=questions_path, todo_path=todo_path
-    )
+    card = build_card(top.question_id, questions_path=questions_path, todo_path=todo_path)
     return {
         "question_id": top.question_id,
         "why": top.priority_reason,
@@ -284,9 +280,7 @@ def normalize_answer(
             return mapping[aliases[key].casefold()]
         if key in mapping:
             return mapping[key]
-        raise StoreError(
-            f"Invalid BOOL answer {raw!r}; expected one of: {', '.join(choices)}"
-        )
+        raise StoreError(f"Invalid BOOL answer {raw!r}; expected one of: {', '.join(choices)}")
 
     if at == "ENUM":
         choices = v.choices
@@ -299,9 +293,7 @@ def normalize_answer(
             key = key.replace("--", "-")
         if key in mapping:
             return mapping[key]
-        raise StoreError(
-            f"Invalid ENUM answer {raw!r}; expected one of: {', '.join(choices)}"
-        )
+        raise StoreError(f"Invalid ENUM answer {raw!r}; expected one of: {', '.join(choices)}")
 
     if at == "REF":
         choices = _ref_choices(v, inventory_path=inventory_path)
@@ -311,8 +303,13 @@ def normalize_answer(
         raise StoreError(
             f"Invalid REF answer {raw!r}; expected a known "
             f"{v.ref_domain or 'ref'} id"
-            + (f" ({', '.join(choices[:12])}…)" if len(choices) > 12 else
-               f" ({', '.join(choices)})" if choices else "")
+            + (
+                f" ({', '.join(choices[:12])}…)"
+                if len(choices) > 12
+                else f" ({', '.join(choices)})"
+                if choices
+                else ""
+            )
         )
 
     return cleaned
@@ -333,18 +330,14 @@ def build_card(
     state = None
     operations: list[Any] = []
     try:
-        plan = reconcile_service.plan_question(
-            q.id, questions_path=questions_path
-        )
+        plan = reconcile_service.plan_question(q.id, questions_path=questions_path)
         current = plan.current
         capability = plan.capability.value
         blockers = plan.blockers
         state = plan.state.value
         operations = plan.operations
     except StoreError:
-        capability = (
-            _capability_for(q).value if _capability_for(q) else None
-        )
+        capability = _capability_for(q).value if _capability_for(q) else None
 
     todo = load_todo(todo_path)
     related_work = []
@@ -405,7 +398,7 @@ def build_card(
         "suggested_commands": [
             f"uv run rig verify run {q.id}",
             f"uv run rig verify record {q.id} --outcome confirmed --yes --json",
-            f"uv run rig verify answer {q.id} --value \"…\" --json",
+            f'uv run rig verify answer {q.id} --value "…" --json',
             f"uv run rig reconcile plan question {q.id} --json",
         ],
     }
@@ -499,27 +492,26 @@ def record_observation(
         }
         if key not in aliases:
             raise StoreError(
-                f"Invalid outcome {outcome!r}; expected "
-                "confirmed|corrected|unknown|failed_test"
+                f"Invalid outcome {outcome!r}; expected confirmed|corrected|unknown|failed_test"
             )
         outcome_e = aliases[key]
     else:
         outcome_e = outcome
 
     observed_value = (value or "").strip()
-    if outcome_e in {
-        VerificationOutcome.CONFIRMED,
-        VerificationOutcome.CORRECTED,
-    } and observed_value:
-        observed_value = normalize_answer(
-            q, observed_value, inventory_path=inventory_path
-        )
+    if (
+        outcome_e
+        in {
+            VerificationOutcome.CONFIRMED,
+            VerificationOutcome.CORRECTED,
+        }
+        and observed_value
+    ):
+        observed_value = normalize_answer(q, observed_value, inventory_path=inventory_path)
     elif outcome_e == VerificationOutcome.UNKNOWN and not observed_value:
         observed_value = "UNKNOWN"
     elif outcome_e == VerificationOutcome.UNKNOWN and observed_value:
-        observed_value = normalize_answer(
-            q, observed_value, inventory_path=inventory_path
-        )
+        observed_value = normalize_answer(q, observed_value, inventory_path=inventory_path)
 
     if outcome_e == VerificationOutcome.CORRECTED and not observed_value:
         raise StoreError("CORRECTED requires --value")
@@ -540,10 +532,15 @@ def record_observation(
 
     resolve_answer = False
     answer_value = q.answer
-    if outcome_e in {
-        VerificationOutcome.CONFIRMED,
-        VerificationOutcome.CORRECTED,
-    } and observed_value and observed_value.casefold() != "unknown":
+    if (
+        outcome_e
+        in {
+            VerificationOutcome.CONFIRMED,
+            VerificationOutcome.CORRECTED,
+        }
+        and observed_value
+        and observed_value.casefold() != "unknown"
+    ):
         resolve_answer = True
         answer_value = observed_value
     elif outcome_e == VerificationOutcome.UNKNOWN:
@@ -619,8 +616,8 @@ def record_observation(
     if dry_run:
         return payload
 
-    from music_rig.store import load_questions, write_documents
     from music_rig.models import OpenQuestionsDocument
+    from music_rig.store import load_questions, write_documents
 
     qdoc = load_questions(questions_path)
     data = q.model_dump(mode="json")
@@ -663,8 +660,8 @@ def record_observation(
             questions=[updated if x.id == q.id else x for x in qdoc.questions]
         )
         # bidirectional link
-        from music_rig.store import load_changes
         from music_rig.models import ChangeRecord, ChangesDocument
+        from music_rig.store import load_changes
 
         cdoc = load_changes(changes_path)
         items = []
@@ -673,9 +670,7 @@ def record_observation(
                 qrefs = list(item.related_questions)
                 if q.id not in qrefs:
                     qrefs.append(q.id)
-                items.append(
-                    ChangeRecord(**{**item.model_dump(), "related_questions": qrefs})
-                )
+                items.append(ChangeRecord(**{**item.model_dump(), "related_questions": qrefs}))
             else:
                 items.append(item)
         write_documents(
@@ -801,9 +796,7 @@ def summary(
     }
 
 
-def production_readiness_matrix(
-    *, questions_path: Path | None = None
-) -> list[dict[str, Any]]:
+def production_readiness_matrix(*, questions_path: Path | None = None) -> list[dict[str, Any]]:
     """Metadata-only matrix for production questions (no answers invented)."""
     rows = []
     for q in load_questions(questions_path).questions:
@@ -815,12 +808,8 @@ def production_readiness_matrix(
                 "area": q.area,
                 "status": q.status.value,
                 "answer": q.answer,
-                "resolved_at": (
-                    q.resolved_at.isoformat() if q.resolved_at else None
-                ),
-                "reconciled_at": (
-                    q.reconciled_at.isoformat() if q.reconciled_at else None
-                ),
+                "resolved_at": (q.resolved_at.isoformat() if q.resolved_at else None),
+                "reconciled_at": (q.reconciled_at.isoformat() if q.reconciled_at else None),
                 "kind": v.kind if v else None,
                 "answer_type": v.answer_type if v else None,
                 "target": _target_label(q),

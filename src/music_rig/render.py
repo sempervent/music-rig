@@ -4,13 +4,22 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from music_rig.models import (
-    OpenQuestionsDocument,
-    QuestionStatus,
-    TodoDocument,
-    TodoStatus,
-    WishlistDocument,
+from music_rig import (
+    ableton_state,
+    channel_state,
+    control_state,
+    control_surface_state,
+    midi_state,
+    patchbay_state,
+    performance_state,
+    routing_state,
 )
+from music_rig.ableton_projections import render_ableton_section
+from music_rig.backup_projections import (
+    render_automation_readiness_doc,
+    render_backups_doc,
+)
+from music_rig.control_projections import render_controller_mappings_section
 from music_rig.current_projections import (
     render_alesis_section,
     render_patchbays_mermaid,
@@ -18,76 +27,66 @@ from music_rig.current_projections import (
     render_tascam_mermaid,
     render_tascam_section,
 )
-from music_rig.routing_projections import (
-    render_aux_send_loop_mermaid,
-    render_current_routing_section,
-    render_pedal_chains_section,
-)
 from music_rig.inventory_projections import render_inventory_section
 from music_rig.midi_projections import (
     render_midi_clock_section,
     render_midi_topology_mermaid,
     render_midi_topology_section,
 )
-from music_rig.control_projections import render_controller_mappings_section
-from music_rig.ableton_projections import render_ableton_section
+from music_rig.models import (
+    OpenQuestionsDocument,
+    QuestionStatus,
+    TodoDocument,
+    TodoStatus,
+    WishlistDocument,
+)
 from music_rig.performance_projections import (
     render_live_recovery_doc,
     render_performance_doc,
 )
-from music_rig.backup_projections import (
-    render_automation_readiness_doc,
-    render_backups_doc,
-)
-from music_rig import (
-    ableton_state,
-    channel_state,
-    control_state,
-    control_surface_state,
-    inventory_state,
-    midi_state,
-    patchbay_state,
-    performance_state,
-    routing_state,
+from music_rig.routing_projections import (
+    render_aux_send_loop_mermaid,
+    render_current_routing_section,
+    render_pedal_chains_section,
 )
 from music_rig.store import (
     ABLETON_PATH,
     BACKUPS_PATH,
     CHANNEL_MAP_PATH,
-    CONTROLLERS_PATH,
     CONTROL_SURFACES_PATH,
+    CONTROLLERS_PATH,
     DIAGRAM_AUX_LOOP_PATH,
+    DIAGRAM_MIDI_TOPOLOGY_PATH,
     DIAGRAM_PATCHBAYS_PATH,
     DIAGRAM_TASCAM_PATH,
-    DIAGRAM_MIDI_TOPOLOGY_PATH,
-    DOCS_ALESIS_PATH,
     DOCS_ABLETON_PATH,
+    DOCS_ALESIS_PATH,
     DOCS_AUTOMATION_PATH,
     DOCS_BACKUPS_PATH,
-    DOCS_LIVE_RECOVERY_PATH,
-    DOCS_PERFORMANCE_PATH,
     DOCS_CONTROLLERS_PATH,
-    DOCS_PATCHBAYS_PATH,
-    DOCS_PEDAL_CHAINS_PATH,
     DOCS_INVENTORY_PATH,
+    DOCS_LIVE_RECOVERY_PATH,
     DOCS_MIDI_CLOCK_PATH,
     DOCS_MIDI_TOPOLOGY_PATH,
+    DOCS_PATCHBAYS_PATH,
+    DOCS_PEDAL_CHAINS_PATH,
+    DOCS_PERFORMANCE_PATH,
     DOCS_QUESTIONS_PATH,
     DOCS_ROUTING_PATH,
     DOCS_TASCAM_PATH,
     DOCS_TODO_PATH,
     DOCS_WISHLIST_PATH,
-    PATCHBAYS_PATH,
-    QUESTIONS_PATH,
-    ROUTING_PATH,
     INVENTORY_PATH,
     MIDI_PATH,
+    PATCHBAYS_PATH,
     PERFORMANCE_PATH,
+    QUESTIONS_PATH,
+    ROUTING_PATH,
     TODO_PATH,
     WISHLIST_PATH,
     StoreError,
-    load_questions,
     load_inventory,
+    load_questions,
     load_todo,
     load_wishlist,
 )
@@ -181,9 +180,7 @@ def render_todo_section(doc: TodoDocument) -> str:
     lines.append("|---|---|---|")
     if waiting:
         for task in waiting:
-            lines.append(
-                f"| {task.id} | {_cell(task.task)} | {_cell(task.waiting_on)} |"
-            )
+            lines.append(f"| {task.id} | {_cell(task.task)} | {_cell(task.waiting_on)} |")
     else:
         lines.append("| — | — | — |")
     lines.append("")
@@ -191,28 +188,17 @@ def render_todo_section(doc: TodoDocument) -> str:
     active = [
         t
         for t in doc.tasks
-        if t.status
-        not in {TodoStatus.WAITING, TodoStatus.DONE, TodoStatus.CANCELLED}
+        if t.status not in {TodoStatus.WAITING, TodoStatus.DONE, TodoStatus.CANCELLED}
     ]
     lines.append("## Active queue")
     lines.append("")
     lines.append(
-        "| ID | Task | Area | Priority | Status | Depends On | "
-        "Definition of Done | Notes |"
+        "| ID | Task | Area | Priority | Status | Depends On | Definition of Done | Notes |"
     )
     lines.append("|---|---|---|---|---|---|---|---|")
     for task in active:
         lines.append(
-            "| {id} | {task} | {area} | {priority} | {status} | {deps} | {dod} | {notes} |".format(
-                id=task.id,
-                task=_cell(task.task),
-                area=_cell(task.area),
-                priority=task.priority.value,
-                status=task.status.value,
-                deps=_cell(_depends_cell(task)),
-                dod=_cell(task.definition_of_done),
-                notes=_cell(task.notes),
-            )
+            f"| {task.id} | {_cell(task.task)} | {_cell(task.area)} | {task.priority.value} | {task.status.value} | {_cell(_depends_cell(task))} | {_cell(task.definition_of_done)} | {_cell(task.notes)} |"
         )
     lines.append("")
 
@@ -223,9 +209,7 @@ def render_todo_section(doc: TodoDocument) -> str:
     lines.append("|---|---|---|---|")
     if done:
         for task in done:
-            lines.append(
-                f"| {task.id} | {_cell(task.task)} | — | {_cell(task.notes)} |"
-            )
+            lines.append(f"| {task.id} | {_cell(task.task)} | — | {_cell(task.notes)} |")
     else:
         lines.append("| — | — | — | No TODO items marked done yet |")
     lines.append("")
@@ -249,19 +233,8 @@ def render_wishlist_section(doc: WishlistDocument) -> str:
     for item in doc.items:
         priority = item.priority.value if item.priority else "—"
         lines.append(
-            "| {item} | {cat} | {prob} | {pri} | {status} | {dup} | {cost} | "
-            "{friction} | {impact} | {notes} |".format(
-                item=_cell(item.item),
-                cat=_cell(item.category),
-                prob=_cell(item.problem_capability),
-                pri=priority,
-                status=item.status.value,
-                dup=_cell(item.duplication),
-                cost=_cell(item.cost),
-                friction=_cell(item.friction),
-                impact=_cell(item.likely_music_impact),
-                notes=_cell(item.notes),
-            )
+            f"| {_cell(item.item)} | {_cell(item.category)} | {_cell(item.problem_capability)} | {priority} | {item.status.value} | {_cell(item.duplication)} | {_cell(item.cost)} | "
+            f"{_cell(item.friction)} | {_cell(item.likely_music_impact)} | {_cell(item.notes)} |"
         )
     lines.append("")
 
@@ -311,11 +284,7 @@ def render_questions_section(doc: OpenQuestionsDocument) -> str:
     _table(deferred, "Deferred")
     _table(resolved, "Resolved")
 
-    answered = [
-        q
-        for q in doc.questions
-        if q.answer.strip() or q.notes.strip()
-    ]
+    answered = [q for q in doc.questions if q.answer.strip() or q.notes.strip()]
     if answered:
         lines.append("## Answers and notes")
         lines.append("")
@@ -349,9 +318,7 @@ def render_questions_section(doc: OpenQuestionsDocument) -> str:
 
 def _replace_region(text: str, start: str, end: str, body: str) -> str:
     if start not in text or end not in text:
-        raise StoreError(
-            f"Missing generation markers {start!r} / {end!r} in Markdown file"
-        )
+        raise StoreError(f"Missing generation markers {start!r} / {end!r} in Markdown file")
     before, rest = text.split(start, 1)
     _, after = rest.split(end, 1)
     # Ensure body ends with single newline before end marker
@@ -364,33 +331,23 @@ def apply_todo_render(markdown: str, doc: TodoDocument) -> str:
 
 
 def apply_wishlist_render(markdown: str, doc: WishlistDocument) -> str:
-    return _replace_region(
-        markdown, WISH_START, WISH_END, render_wishlist_section(doc)
-    )
+    return _replace_region(markdown, WISH_START, WISH_END, render_wishlist_section(doc))
 
 
 def apply_questions_render(markdown: str, doc: OpenQuestionsDocument) -> str:
-    return _replace_region(
-        markdown, QUESTIONS_START, QUESTIONS_END, render_questions_section(doc)
-    )
+    return _replace_region(markdown, QUESTIONS_START, QUESTIONS_END, render_questions_section(doc))
 
 
 def apply_patchbays_render(markdown: str, data: dict) -> str:
-    return _replace_region(
-        markdown, PATCHBAYS_START, PATCHBAYS_END, render_patchbays_section(data)
-    )
+    return _replace_region(markdown, PATCHBAYS_START, PATCHBAYS_END, render_patchbays_section(data))
 
 
 def apply_tascam_render(markdown: str, data: dict) -> str:
-    return _replace_region(
-        markdown, TASCAM_START, TASCAM_END, render_tascam_section(data)
-    )
+    return _replace_region(markdown, TASCAM_START, TASCAM_END, render_tascam_section(data))
 
 
 def apply_alesis_render(markdown: str, data: dict) -> str:
-    return _replace_region(
-        markdown, ALESIS_START, ALESIS_END, render_alesis_section(data)
-    )
+    return _replace_region(markdown, ALESIS_START, ALESIS_END, render_alesis_section(data))
 
 
 def apply_routing_render(markdown: str, data: dict) -> str:
@@ -406,9 +363,7 @@ def apply_pedal_chains_render(markdown: str, data: dict) -> str:
 
 
 def apply_inventory_render(markdown: str, doc) -> str:
-    return _replace_region(
-        markdown, INVENTORY_START, INVENTORY_END, render_inventory_section(doc)
-    )
+    return _replace_region(markdown, INVENTORY_START, INVENTORY_END, render_inventory_section(doc))
 
 
 def apply_midi_topology_render(markdown: str, doc) -> str:
@@ -433,9 +388,7 @@ def apply_controllers_render(markdown: str, doc) -> str:
 
 
 def apply_ableton_render(markdown: str, doc) -> str:
-    return _replace_region(
-        markdown, ABLETON_START, ABLETON_END, render_ableton_section(doc)
-    )
+    return _replace_region(markdown, ABLETON_START, ABLETON_END, render_ableton_section(doc))
 
 
 def _write_if_changed(
@@ -498,29 +451,17 @@ def render_docs(
     using_custom_wish = wishlist_path is not None and wishlist_path != WISHLIST_PATH
     using_custom_q = questions_path is not None and questions_path != QUESTIONS_PATH
     using_custom_pb = patchbays_path is not None and patchbays_path != PATCHBAYS_PATH
-    using_custom_ch = (
-        channel_map_path is not None and channel_map_path != CHANNEL_MAP_PATH
-    )
+    using_custom_ch = channel_map_path is not None and channel_map_path != CHANNEL_MAP_PATH
     using_custom_rt = routing_path is not None and routing_path != ROUTING_PATH
-    using_custom_inv = (
-        inventory_path is not None and inventory_path != INVENTORY_PATH
-    )
+    using_custom_inv = inventory_path is not None and inventory_path != INVENTORY_PATH
     using_custom_midi = midi_path is not None and midi_path != MIDI_PATH
-    using_custom_controllers = (
-        controllers_path is not None and controllers_path != CONTROLLERS_PATH
-    )
+    using_custom_controllers = controllers_path is not None and controllers_path != CONTROLLERS_PATH
     using_custom_ableton = ableton_path is not None and ableton_path != ABLETON_PATH
-    using_custom_performance = (
-        performance_path is not None and performance_path != PERFORMANCE_PATH
-    )
-    using_custom_surfaces = (
-        surfaces_path is not None and surfaces_path != CONTROL_SURFACES_PATH
-    )
+    using_custom_performance = performance_path is not None and performance_path != PERFORMANCE_PATH
+    using_custom_surfaces = surfaces_path is not None and surfaces_path != CONTROL_SURFACES_PATH
     using_custom_backups = backups_path is not None and backups_path != BACKUPS_PATH
     if using_custom_todo and docs_todo is None:
-        raise StoreError(
-            "docs_todo path is required when rendering with a custom todo_path"
-        )
+        raise StoreError("docs_todo path is required when rendering with a custom todo_path")
     if using_custom_wish and docs_wishlist is None:
         raise StoreError(
             "docs_wishlist path is required when rendering with a custom wishlist_path"
@@ -543,13 +484,9 @@ def render_docs(
             "with a custom routing_path"
         )
     if using_custom_inv and docs_inventory is None:
-        raise StoreError(
-            "docs_inventory is required when rendering with a custom inventory_path"
-        )
+        raise StoreError("docs_inventory is required when rendering with a custom inventory_path")
     if using_custom_midi and (
-        docs_midi_topology is None
-        or docs_midi_clock is None
-        or diagram_midi_topology is None
+        docs_midi_topology is None or docs_midi_clock is None or diagram_midi_topology is None
     ):
         raise StoreError(
             "docs_midi_topology, docs_midi_clock, and diagram_midi_topology are "
@@ -560,9 +497,7 @@ def render_docs(
             "docs_controllers is required when rendering with a custom controllers_path"
         )
     if using_custom_ableton and docs_ableton is None:
-        raise StoreError(
-            "docs_ableton is required when rendering with a custom ableton_path"
-        )
+        raise StoreError("docs_ableton is required when rendering with a custom ableton_path")
     if (using_custom_performance or using_custom_surfaces) and (
         docs_performance is None or docs_live_recovery is None
     ):
@@ -571,9 +506,7 @@ def render_docs(
             "performance/surface paths"
         )
     if using_custom_backups and docs_backups is None:
-        raise StoreError(
-            "docs_backups is required when rendering with a custom backups_path"
-        )
+        raise StoreError("docs_backups is required when rendering with a custom backups_path")
 
     todo = load_todo(todo_path)
     wishlist = load_wishlist(wishlist_path)
@@ -587,7 +520,11 @@ def render_docs(
     changed = False
 
     pairs = [
-        (todo_md_path, apply_todo_render(todo_md_path.read_text(encoding="utf-8"), todo), "docs/todo.md"),
+        (
+            todo_md_path,
+            apply_todo_render(todo_md_path.read_text(encoding="utf-8"), todo),
+            "docs/todo.md",
+        ),
         (
             wish_md_path,
             apply_wishlist_render(wish_md_path.read_text(encoding="utf-8"), wishlist),
@@ -600,9 +537,7 @@ def render_docs(
         ),
     ]
     for path, new_text, display in pairs:
-        if _write_if_changed(
-            path, new_text, display_name=display, write=write, messages=messages
-        ):
+        if _write_if_changed(path, new_text, display_name=display, write=write, messages=messages):
             changed = True
 
     # Skip CURRENT projections when only planning fixtures are in play.
@@ -660,16 +595,12 @@ def render_docs(
         midi_pairs = [
             (
                 midi_topology_path,
-                apply_midi_topology_render(
-                    midi_topology_path.read_text(encoding="utf-8"), midi
-                ),
+                apply_midi_topology_render(midi_topology_path.read_text(encoding="utf-8"), midi),
                 "docs/midi-topology.md",
             ),
             (
                 midi_clock_path,
-                apply_midi_clock_render(
-                    midi_clock_path.read_text(encoding="utf-8"), midi
-                ),
+                apply_midi_clock_render(midi_clock_path.read_text(encoding="utf-8"), midi),
                 "docs/midi-clock.md",
             ),
             (
@@ -708,9 +639,7 @@ def render_docs(
     if not custom_inputs or ableton_path is not None or docs_ableton is not None:
         ableton = ableton_state.load_document(ableton_path)
         ableton_md_path = docs_ableton or DOCS_ABLETON_PATH
-        new_text = apply_ableton_render(
-            ableton_md_path.read_text(encoding="utf-8"), ableton
-        )
+        new_text = apply_ableton_render(ableton_md_path.read_text(encoding="utf-8"), ableton)
         if _write_if_changed(
             ableton_md_path,
             new_text,
@@ -734,9 +663,7 @@ def render_docs(
             inventory_path=inventory_path,
             midi_path=midi_path,
         )
-        surfaces = control_surface_state.load_document(
-            surfaces_path, inventory_path=inventory_path
-        )
+        surfaces = control_surface_state.load_document(surfaces_path, inventory_path=inventory_path)
         readiness = performance_state.evaluate_readiness(
             performance,
             controllers_path=controllers_path,
@@ -840,9 +767,7 @@ def render_docs(
         ),
     ]
     for path, new_text, display in current_pairs:
-        if _write_if_changed(
-            path, new_text, display_name=display, write=write, messages=messages
-        ):
+        if _write_if_changed(path, new_text, display_name=display, write=write, messages=messages):
             changed = True
 
     if not using_custom_pb or diagram_patchbays is not None:

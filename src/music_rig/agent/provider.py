@@ -58,8 +58,7 @@ class TurnProvider(Protocol):
         *,
         packet: dict[str, Any],
         context: list[dict[str, Any]] | None = None,
-    ) -> tuple[AgentTurn, dict[str, Any]]:
-        ...
+    ) -> tuple[AgentTurn, dict[str, Any]]: ...
 
 
 def load_agent_local_config(*, root: Path | None = None) -> AgentLocalConfig:
@@ -129,9 +128,7 @@ class CommandProvider:
                     check=False,
                 )
             except subprocess.TimeoutExpired as exc:
-                diagnostics["stderr_preview"] = preview_bytes(
-                    exc.stderr, self.max_stderr_bytes
-                )
+                diagnostics["stderr_preview"] = preview_bytes(exc.stderr, self.max_stderr_bytes)
                 raise ProviderTimeoutError(
                     f"provider timed out after {self.timeout_seconds}s"
                 ) from exc
@@ -148,23 +145,17 @@ class CommandProvider:
                 f"provider stdout exceeded {self.max_stdout_bytes} bytes"
             )
         if completed.returncode != 0:
-            raise ProviderInvalidResponseError(
-                f"provider exited {completed.returncode}"
-            )
+            raise ProviderInvalidResponseError(f"provider exited {completed.returncode}")
         try:
             raw = json.loads(stdout.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise ProviderInvalidResponseError(
-                f"provider returned non-JSON stdout: {exc}"
-            ) from exc
+            raise ProviderInvalidResponseError(f"provider returned non-JSON stdout: {exc}") from exc
         if not isinstance(raw, dict):
             raise ProviderInvalidResponseError("provider JSON must be an object")
         try:
             turn = AgentTurn.from_dict(raw)
         except Exception as exc:
-            raise ProviderInvalidResponseError(
-                f"provider turn schema invalid: {exc}"
-            ) from exc
+            raise ProviderInvalidResponseError(f"provider turn schema invalid: {exc}") from exc
         return turn, diagnostics
 
     def handshake(self) -> tuple[AgentTurn, dict[str, Any]]:
@@ -191,8 +182,7 @@ def resolve_provider(
     name = (provider or agent.provider or "").strip().lower() or None
     if not name:
         raise ProviderNotConfiguredError(
-            "No reconciliation provider configured.\n"
-            "Run: uv run rig agent provider setup"
+            "No reconciliation provider configured.\nRun: uv run rig agent provider setup"
         )
 
     def _build(which: str) -> TurnProvider:
@@ -311,8 +301,7 @@ def provider_status(*, root: Path | None = None) -> dict[str, Any]:
         "fallback": agent.fallback,
         "detected": detected,
         # legacy fields
-        "executable": detail.get("executable")
-        or (agent.argv[0] if agent.argv else None),
+        "executable": detail.get("executable") or (agent.argv[0] if agent.argv else None),
         "argv": list(agent.argv),
     }
 

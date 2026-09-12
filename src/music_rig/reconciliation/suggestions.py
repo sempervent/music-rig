@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from music_rig.actor import ActorKind
 from music_rig.reconciliation.operations import RigOperation
 
 
-class SuggestionKind(str, Enum):
+class SuggestionKind(StrEnum):
     """Machine-oriented suggestion category."""
 
     OPERATION = "operation"
@@ -200,10 +200,7 @@ def suggest_verify_record(
 ) -> ActionSuggestion:
     return ActionSuggestion(
         kind=SuggestionKind.VERIFY,
-        intent=(
-            f"verify record {question_id} --outcome {outcome} "
-            f"--value {value} --yes --json"
-        ),
+        intent=(f"verify record {question_id} --outcome {outcome} --value {value} --yes --json"),
         description=f"Record human observation for {question_id}",
         code="verify_record",
         params={"question_id": question_id, "outcome": outcome, "value": value},

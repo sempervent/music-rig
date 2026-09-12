@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -9,7 +9,6 @@ import yaml
 from music_rig import change_service, question_service, session_service
 from music_rig.models import (
     ChangeCategory,
-    ChangeStatus,
     NowKind,
     QuestionStatus,
     TodoDocument,
@@ -32,7 +31,6 @@ from music_rig.store import (
     load_questions,
     load_todo,
     save_todo,
-    write_documents,
 )
 
 
@@ -188,7 +186,7 @@ def decision(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         "docs_todo": docs_todo,
         "docs_wish": docs_wish,
         "docs_q": docs_q,
-        "clock": FakeClock(datetime(2026, 9, 10, 22, 0, 0, tzinfo=timezone.utc)),
+        "clock": FakeClock(datetime(2026, 9, 10, 22, 0, 0, tzinfo=UTC)),
     }
 
 
@@ -339,9 +337,7 @@ def test_failed_link_does_not_partial_write(decision, monkeypatch):
 
 def test_now_hierarchy(decision):
     # Next Session wins over higher-priority READY outside queue
-    rec = recommend_now(
-        todo_path=decision["todo"], sessions_dir=decision["sessions"]
-    )
+    rec = recommend_now(todo_path=decision["todo"], sessions_dir=decision["sessions"])
     assert rec.kind == NowKind.NEXT_SESSION
     assert rec.primary_reference == "RIG-010"
     assert "Next Session" in rec.reason
@@ -355,9 +351,7 @@ def test_now_hierarchy(decision):
         render=False,
         todo_path=decision["todo"],
     )
-    rec2 = recommend_now(
-        todo_path=decision["todo"], sessions_dir=decision["sessions"]
-    )
+    rec2 = recommend_now(todo_path=decision["todo"], sessions_dir=decision["sessions"])
     assert rec2.kind == NowKind.IN_PROGRESS
     assert rec2.primary_reference == "RIG-001"
 
@@ -390,9 +384,7 @@ def test_now_ready_fallback_and_skips(decision):
             data["status"] = TodoStatus.READY
         new_tasks.append(TodoTask.model_validate(data))
     save_todo(TodoDocument(next_session=[], tasks=new_tasks), decision["todo"])
-    rec = recommend_now(
-        todo_path=decision["todo"], sessions_dir=decision["sessions"]
-    )
+    rec = recommend_now(todo_path=decision["todo"], sessions_dir=decision["sessions"])
     assert rec.kind == NowKind.READY
     assert rec.primary_reference == "RIG-020"  # P0, first in YAML among P0 READY
     assert "BLOCKED" in " ".join(rec.skipped_summary)
@@ -422,9 +414,7 @@ def test_now_no_action_play(decision):
         ),
         decision["todo"],
     )
-    rec = recommend_now(
-        todo_path=decision["todo"], sessions_dir=decision["sessions"]
-    )
+    rec = recommend_now(todo_path=decision["todo"], sessions_dir=decision["sessions"])
     assert rec.kind == NowKind.PLAY
 
 
@@ -450,14 +440,10 @@ def test_reconcile(decision):
     )
     assert "docs/pedal-chains.md" in detail
     assert "NOT been automatically modified" in detail
-    qdetail = format_reconcile_question(
-        "Q-001", questions_path=decision["questions"]
-    )
+    qdetail = format_reconcile_question("Q-001", questions_path=decision["questions"])
     assert "PB-B" in qdetail
     assert "rig question resolve" in qdetail
-    assert "data/patchbays.yaml" in "\n".join(
-        likely_files_for_category(ChangeCategory.PATCHBAY)
-    )
+    assert "data/patchbays.yaml" in "\n".join(likely_files_for_category(ChangeCategory.PATCHBAY))
     assert ChangeCategory.OTHER in ChangeCategory
 
     # resolved question + open change advisory

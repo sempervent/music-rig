@@ -137,9 +137,7 @@ class AnswerScreen(SingleShotMixin, Screen[AnswerResult]):
             )
             yield TextArea(id="answer-input")
             with Horizontal(id="modal-buttons"):
-                yield Button(
-                    "Answer & Resolve", variant="primary", id="btn-resolve"
-                )
+                yield Button("Answer & Resolve", variant="primary", id="btn-resolve")
                 yield Button("Save Draft", id="btn-draft")
                 yield Button("Cancel", id="btn-cancel")
         yield Footer()
@@ -151,9 +149,7 @@ class AnswerScreen(SingleShotMixin, Screen[AnswerResult]):
             self.notify(format_error(exc), severity="error")
             self.complete(AnswerResult(SaveOutcome.FAILED, None))
             return
-        self.query_one("#answer-context", Static).update(
-            _answer_context_markdown(self._q)
-        )
+        self.query_one("#answer-context", Static).update(_answer_context_markdown(self._q))
         area = self.query_one("#answer-input", TextArea)
         area.load_text(self._q.answer or "")
         area.focus()
@@ -216,9 +212,7 @@ class AnswerScreen(SingleShotMixin, Screen[AnswerResult]):
             if not ok:
                 return
             try:
-                updated = question_service.resolve_question(
-                    self.question_id, answer, render=True
-                )
+                updated = question_service.resolve_question(self.question_id, answer, render=True)
             except StoreError as exc:
                 self.notify(format_error(exc, prefix="FAILED: "), severity="error")
                 return
@@ -237,11 +231,7 @@ class AnswerScreen(SingleShotMixin, Screen[AnswerResult]):
 
             def _recon(choice: bool | None) -> None:
                 # True = Reconcile Now → parent opens reconcile after dismiss.
-                next_action = (
-                    AnswerNextAction.RECONCILE
-                    if choice
-                    else AnswerNextAction.NONE
-                )
+                next_action = AnswerNextAction.RECONCILE if choice else AnswerNextAction.NONE
                 self.complete(
                     AnswerResult(
                         SaveOutcome.SUCCESS,
@@ -286,12 +276,8 @@ class AnswerScreen(SingleShotMixin, Screen[AnswerResult]):
             self.notify("Draft answer cannot be empty", severity="warning")
             return
         try:
-            result = question_service.draft_question(
-                self.question_id, answer, render=True
-            )
-            updated = result.get("question") or question_service.get_question(
-                self.question_id
-            )
+            result = question_service.draft_question(self.question_id, answer, render=True)
+            updated = result.get("question") or question_service.get_question(self.question_id)
         except StoreError as exc:
             self.notify(format_error(exc, prefix="FAILED: "), severity="error")
             return

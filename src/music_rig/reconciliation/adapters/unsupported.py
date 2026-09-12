@@ -70,30 +70,19 @@ class UnsupportedAdapter(ReconciliationAdapter):
         else:
             state = ReconciliationState.NEEDS_AGENT_ACTION
 
-        domain = (
-            question.target.domain
-            if question.target and question.target.domain
-            else "(none)"
-        )
+        domain = question.target.domain if question.target and question.target.domain else "(none)"
         kind = question.verification.kind if question.verification else ""
         families = list(
-            _COMMAND_FAMILIES_BY_KIND.get(
-                kind, ["rig inspect", "rig current", "rig path show"]
-            )
+            _COMMAND_FAMILIES_BY_KIND.get(kind, ["rig inspect", "rig current", "rig path show"])
         )
         # Prefer CURRENT mutation families for agent-interpreted recon
         if "rig current" not in " ".join(families):
             families = ["rig current path", "rig current channels", *families]
-        classification = MANUAL_CLASSIFICATION.get(
-            question.id, "GENUINELY_AGENT_INTERPRETED"
-        )
+        classification = MANUAL_CLASSIFICATION.get(question.id, "GENUINELY_AGENT_INTERPRETED")
         missing = None
         if classification in {"NEEDS_SMALL_SERVICE", "GENUINELY_DESCRIPTIVE"}:
             if domain == "(none)" and classification == "NEEDS_SMALL_SERVICE":
-                missing = (
-                    f"no CURRENT entrypoint for {question.id} / "
-                    f"{kind or 'unknown kind'}"
-                )
+                missing = f"no CURRENT entrypoint for {question.id} / {kind or 'unknown kind'}"
         elif classification == "STRUCTURABLE_NOW" and kind == "INVENTORY_LOCATION":
             families = [
                 "rig current gear set-location",
@@ -133,9 +122,7 @@ class UnsupportedAdapter(ReconciliationAdapter):
             blockers: list[Any] = [
                 {
                     "code": "draft_answer",
-                    "message": (
-                        "OPEN with draft answer — resolve before reconcile"
-                    ),
+                    "message": ("OPEN with draft answer — resolve before reconcile"),
                 }
             ]
         elif state == ReconciliationState.NEEDS_AGENT_ACTION:
@@ -146,17 +133,12 @@ class UnsupportedAdapter(ReconciliationAdapter):
 
             suggestions = [
                 suggest_plan(question.id),
-                suggest_finalize(
-                    question.id, confirm_current_reconciled=True, note="…"
-                ),
+                suggest_finalize(question.id, confirm_current_reconciled=True, note="…"),
             ]
             blockers = [
                 {
                     "code": "needs_agent_action",
-                    "message": (
-                        f"Needs agent reconciliation (manual interpretation): "
-                        f"{domain}"
-                    ),
+                    "message": (f"Needs agent reconciliation (manual interpretation): {domain}"),
                     "classification": classification,
                 }
             ]

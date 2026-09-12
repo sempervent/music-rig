@@ -55,8 +55,8 @@ adapters as the source of truth.
 Prefer:
 
 ```python
-ctx = ReconciliationContext.default()       # production
-ctx = ReconciliationContext.for_root(tmp)   # fixtures
+ctx = ReconciliationContext.default()  # production
+ctx = ReconciliationContext.for_root(tmp)  # fixtures
 ctx = ReconciliationContext.from_overrides({...})  # legacy *_path kwargs
 ```
 

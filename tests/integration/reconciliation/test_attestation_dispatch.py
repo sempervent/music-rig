@@ -2,21 +2,20 @@
 
 from __future__ import annotations
 
+from datetime import UTC
+
 import pytest
-from typer.testing import CliRunner
-from music_rig.actor import ActorKind, get_actor, reset_actor, set_actor
-from music_rig.cli import app
+
+from music_rig.actor import reset_actor
 from music_rig.models import AnswerActor, ReconciliationState
 from music_rig.reconciliation.dispatch import DispatchMode, classify_reconciliation_dispatch
 from music_rig.reconciliation.types import Capability, Plan
 from music_rig.verification_policy import (
     VerificationPolicy,
-    evidence_basis_for,
     has_evidence_authority,
     has_human_attestation,
-    policy_matrix,
-    verification_policy_for,
 )
+
 
 @pytest.fixture(autouse=True)
 def _reset_actor():
@@ -24,19 +23,20 @@ def _reset_actor():
     yield
     reset_actor()
 
-def _clock_plan(*, actor: AnswerActor | None, observation: bool = False) -> Plan:
-    from music_rig.models import OpenQuestion, QuestionStatus, QuestionVerification
-    from datetime import datetime, timezone
-    from music_rig.reconciliation.adapters.midi_clock import MidiClockAdapter
 
-    q = OpenQuestion(
+def _clock_plan(*, actor: AnswerActor | None, observation: bool = False) -> Plan:
+    from datetime import datetime
+
+    from music_rig.models import OpenQuestion, QuestionStatus, QuestionVerification
+
+    _q = OpenQuestion(
         id="Q-914",
         question="Which device is actually the MIDI clock master?",
         area="MIDI",
         status=QuestionStatus.RESOLVED,
         answer="Ableton is definitely the master clock; nothing else is master currently",
         answer_actor=actor,
-        resolved_at=datetime.now(timezone.utc),
+        resolved_at=datetime.now(UTC),
         target={"domain": "midi.clock_master"},
         verification=QuestionVerification(
             kind="MIDI_CLOCK",
@@ -47,13 +47,14 @@ def _clock_plan(*, actor: AnswerActor | None, observation: bool = False) -> Plan
         verification_result=(
             {
                 "outcome": "CONFIRMED",
-                "observed_at": datetime.now(timezone.utc),
+                "observed_at": datetime.now(UTC),
                 "observed_value": "ableton",
             }
             if observation
             else None
         ),
     )
+    assert _q.id == "Q-914"
     # Fake CURRENT via adapter.read is live — use monkeypatched plan details instead
     return Plan(
         artifact_type="question",
@@ -72,16 +73,19 @@ def _clock_plan(*, actor: AnswerActor | None, observation: bool = False) -> Plan
         },
     )
 
+
 def test_q014_shaped_human_attestation_is_deterministic(monkeypatch, tmp_path):
+    from datetime import datetime
+
+    import yaml
+
     from music_rig.models import (
         OpenQuestion,
         QuestionStatus,
         QuestionTarget,
         QuestionVerification,
     )
-    from datetime import datetime, timezone
     from music_rig.reconciliation.adapters.midi_clock import MidiClockAdapter
-    import yaml
 
     midi = {
         "endpoints": [{"id": "ableton", "kind": "software", "name": "Ableton"}],
@@ -102,7 +106,7 @@ def test_q014_shaped_human_attestation_is_deterministic(monkeypatch, tmp_path):
         status=QuestionStatus.RESOLVED,
         answer="Ableton is definitely the master clock; nothing else is master currently",
         answer_actor=AnswerActor.HUMAN,
-        resolved_at=datetime.now(timezone.utc),
+        resolved_at=datetime.now(UTC),
         target=QuestionTarget(domain="midi.clock_master"),
         verification=QuestionVerification(
             kind="MIDI_CLOCK",
@@ -116,23 +120,25 @@ def test_q014_shaped_human_attestation_is_deterministic(monkeypatch, tmp_path):
     plan = MidiClockAdapter().plan(q, paths={"midi": midi_path})
     assert plan.state is ReconciliationState.READY_TO_APPLY
     assert not any(
-        isinstance(b, dict) and b.get("code") == "needs_human_observation"
-        for b in plan.blockers
+        isinstance(b, dict) and b.get("code") == "needs_human_observation" for b in plan.blockers
     )
     d = classify_reconciliation_dispatch(plan)
     assert d.mode is DispatchMode.DETERMINISTIC
     assert d.provider_eligible is False
 
+
 def test_q014_shaped_bot_answer_not_authority(monkeypatch, tmp_path):
+    from datetime import datetime
+
+    import yaml
+
     from music_rig.models import (
         OpenQuestion,
         QuestionStatus,
         QuestionTarget,
         QuestionVerification,
     )
-    from datetime import datetime, timezone
     from music_rig.reconciliation.adapters.midi_clock import MidiClockAdapter
-    import yaml
 
     midi = {
         "endpoints": [{"id": "ableton", "kind": "software", "name": "Ableton"}],
@@ -153,7 +159,7 @@ def test_q014_shaped_bot_answer_not_authority(monkeypatch, tmp_path):
         status=QuestionStatus.RESOLVED,
         answer="Ableton is definitely the master clock; nothing else is master currently",
         answer_actor=AnswerActor.BOT,
-        resolved_at=datetime.now(timezone.utc),
+        resolved_at=datetime.now(UTC),
         target=QuestionTarget(domain="midi.clock_master"),
         verification=QuestionVerification(
             kind="MIDI_CLOCK",
@@ -169,10 +175,12 @@ def test_q014_shaped_bot_answer_not_authority(monkeypatch, tmp_path):
     d = classify_reconciliation_dispatch(plan)
     assert d.mode is DispatchMode.HUMAN_ANSWER
 
+
 def test_open_clarification_creates_child(tmp_path, monkeypatch):
+    import yaml
+
     from music_rig import question_service
     from music_rig.models import OpenQuestion, OpenQuestionsDocument, QuestionStatus
-    import yaml
 
     qpath = tmp_path / "open-questions.yaml"
     doc = OpenQuestionsDocument(
@@ -205,4 +213,3 @@ def test_open_clarification_creates_child(tmp_path, monkeypatch):
     assert child.clarifies_question == "Q-910"
     assert child.status is QuestionStatus.OPEN
     assert child.answer == ""
-

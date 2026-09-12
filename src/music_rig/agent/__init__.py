@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import asdict, dataclass, field
-from enum import Enum
+from dataclasses import dataclass, field
+from enum import StrEnum
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -21,12 +21,13 @@ from music_rig.reconciliation.operation_registry import (
     get_spec,
     validate_operation_shape,
 )
-from music_rig.reconciliation.operation_renderer import operation_json_view, render_cli
+from music_rig.reconciliation.operation_renderer import operation_json_view
+from music_rig.reconciliation.operation_renderer import render_cli as render_cli
 from music_rig.reconciliation.operations import RigOperation
 from music_rig.store import StoreError, load_todo
 
 
-class ProposalStatus(str, Enum):
+class ProposalStatus(StrEnum):
     READY = "READY"
     NEEDS_MORE_CONTEXT = "NEEDS_MORE_CONTEXT"
     NEEDS_HUMAN_CLARIFICATION = "NEEDS_HUMAN_CLARIFICATION"
@@ -71,8 +72,7 @@ class AgentReconciliationProposal:
 
 
 class AgentProvider(Protocol):
-    def propose(self, packet: dict[str, Any]) -> AgentReconciliationProposal:
-        ...
+    def propose(self, packet: dict[str, Any]) -> AgentReconciliationProposal: ...
 
 
 TRUTH_BOUNDARIES = [
@@ -155,9 +155,7 @@ def resolve_context(question: OpenQuestion, ctx: ReconciliationContext) -> dict[
             routing = load_routing(ctx.paths.routing)
             out["routing_path_ids"] = sorted(p.id for p in routing.paths)
             ch = channel_state.load_raw(ctx.paths.channels)
-            out["channel_devices"] = sorted(
-                k for k in ch.keys() if isinstance(ch.get(k), dict)
-            )
+            out["channel_devices"] = sorted(k for k in ch.keys() if isinstance(ch.get(k), dict))
         except Exception:
             pass
     # Linked TODO summaries (bounded)
@@ -183,8 +181,8 @@ def build_agent_packet(
     """Build a self-contained agent work packet — no LLM required."""
     ctx = ctx or ReconciliationContext.default()
     q = question_service.get_question(question_id, questions_path=ctx.paths.questions)
-    from music_rig.reconciliation.service import question_state
     from music_rig.reconciliation.adapters import get_adapter
+    from music_rig.reconciliation.service import question_state
     from music_rig.verification_policy import evidence_basis_for, verification_policy_for
 
     paths = ctx.path_dict()
@@ -225,9 +223,9 @@ def build_agent_packet(
         "question": q.question,
         "final_human_answer": q.answer,
         "answer_actor": (
-            q.answer_actor.value if q.answer_actor is not None else (
-                "LEGACY_UNKNOWN" if q.answer.strip() else None
-            )
+            q.answer_actor.value
+            if q.answer_actor is not None
+            else ("LEGACY_UNKNOWN" if q.answer.strip() else None)
         ),
         "answer_state": question_service.derive_answer_state(q).value,
         "question_status": q.status.value,
@@ -243,9 +241,7 @@ def build_agent_packet(
             else None
         ),
         "typed_target": (
-            {k: v for k, v in q.target.model_dump().items() if v is not None}
-            if q.target
-            else None
+            {k: v for k, v in q.target.model_dump().items() if v is not None} if q.target else None
         ),
         "reconciliation_state": state.value,
         "capability": plan.capability.value,
@@ -389,9 +385,7 @@ def validate_proposal(
 
     # Evidence escalation: any op claiming VERIFIED
     blob = json.dumps(proposal.to_dict(), default=str).casefold()
-    if "evidence" in blob and "verified" in blob and "verification_result" not in (
-        packet or {}
-    ):
+    if "evidence" in blob and "verified" in blob and "verification_result" not in (packet or {}):
         if q is None or q.verification_result is None:
             errors.append("evidence VERIFIED escalation forbidden without verification_result")
 
@@ -464,9 +458,7 @@ def apply_proposal(
 
     ops = [o for o in proposal.operations if o.kind != "question.finalize_manual"]
     finalize_op = None
-    if proposal.finalize or any(
-        o.kind == "question.finalize_manual" for o in proposal.operations
-    ):
+    if proposal.finalize or any(o.kind == "question.finalize_manual" for o in proposal.operations):
         existing = next(
             (o for o in proposal.operations if o.kind == "question.finalize_manual"),
             None,

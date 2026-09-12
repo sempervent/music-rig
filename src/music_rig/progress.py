@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import sys
 import time
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Iterator, Protocol
+from enum import StrEnum
+from typing import Any, Protocol
 
 
-class ProgressPhase(str, Enum):
+class ProgressPhase(StrEnum):
     INSPECTING = "INSPECTING"
     BUILDING_PACKET = "BUILDING_PACKET"
     CLASSIFYING = "CLASSIFYING"
@@ -126,9 +127,7 @@ class RichCliProgress:
     def _label(self, event: ProgressEvent) -> str:
         bits = []
         if event.provider or event.model:
-            bits.append(
-                " / ".join(x for x in (event.provider, event.model) if x)
-            )
+            bits.append(" / ".join(x for x in (event.provider, event.model) if x))
         bits.append(event.message)
         elapsed = format_elapsed(event.elapsed_s)
         timeout = ""

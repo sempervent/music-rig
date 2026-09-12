@@ -3,44 +3,23 @@
 from __future__ import annotations
 
 import json
-import shutil
-import subprocess
 import sys
 from pathlib import Path
+
 import pytest
-import yaml
-from typer.testing import CliRunner
-from music_rig import channel_state, patchbay_state, question_service
-from music_rig import store as store_mod
+
+from fixtures.repo_fixtures import _provider
 from music_rig.agent import (
-    AgentReconciliationProposal,
-    ProposalStatus,
-    apply_proposal,
     build_agent_packet,
-    capabilities,
-    validate_proposal,
 )
-from music_rig.agent import transaction as transaction_mod
 from music_rig.agent.errors import (
-    ConcurrentModificationError,
-    PlanConflictError,
     ProviderInvalidResponseError,
     ProviderTimeoutError,
 )
-from music_rig.agent.inspection import InspectionRequest, execute_inspection
-from music_rig.agent.orchestrate import AutonomyLevel, autonomous_reconcile, run_provider_loop
+from music_rig.agent.orchestrate import run_provider_loop
 from music_rig.agent.provider import CommandProvider
-from music_rig.agent.transaction import (
-    commit_transaction,
-    evaluate_postconditions,
-    prepare_transaction,
-)
-from music_rig.cli import app
-from music_rig.reconciliation.context import ReconciliationContext
-from music_rig.reconciliation.operation_registry import allowlisted_kinds, get_spec
-from music_rig.reconciliation.operations import RigOperation
-from music_rig.store import StoreError, ROOT, load_questions
-from fixtures.repo_fixtures import _provider
+from music_rig.store import ROOT
+
 
 def test_provider_ready_turn(fx21, monkeypatch):
     monkeypatch.setenv("FAKE_PROVIDER_MODE", "READY")
@@ -54,6 +33,7 @@ def test_provider_ready_turn(fx21, monkeypatch):
     assert loop["proposal"] is not None
     assert any(o.kind == "patchbay.set_model" for o in loop["proposal"].operations)
 
+
 def test_provider_more_context_loop(fx21, monkeypatch):
     monkeypatch.setenv("FAKE_PROVIDER_MODE", "MORE_CONTEXT")
     state = fx21["tmp"] / "more_state"
@@ -66,6 +46,7 @@ def test_provider_more_context_loop(fx21, monkeypatch):
     assert loop["context"]
     assert loop["context"][0]["request"]["kind"] == "routing.path"
 
+
 def test_provider_repeated_request_terminates(fx21, monkeypatch):
     monkeypatch.setenv("FAKE_PROVIDER_MODE", "REPEAT")
     state = fx21["tmp"] / "rep_state"
@@ -75,6 +56,7 @@ def test_provider_repeated_request_terminates(fx21, monkeypatch):
     loop = run_provider_loop(packet, ctx=fx21["ctx"], provider=prov, max_rounds=5)
     assert loop["ok"] is False
     assert loop["reason"] == "duplicate_context_request"
+
 
 def test_provider_round_limit(fx21, monkeypatch):
     monkeypatch.setenv("FAKE_PROVIDER_MODE", "MORE_CONTEXT")
@@ -86,6 +68,7 @@ def test_provider_round_limit(fx21, monkeypatch):
     assert loop["ok"] is False
     assert loop["reason"] == "context_round_limit"
 
+
 def test_provider_malformed_json_no_write(fx21, monkeypatch):
     monkeypatch.setenv("FAKE_PROVIDER_MODE", "MALFORMED")
     before = fx21["patchbays"].read_bytes()
@@ -94,6 +77,7 @@ def test_provider_malformed_json_no_write(fx21, monkeypatch):
     with pytest.raises(ProviderInvalidResponseError):
         run_provider_loop(packet, ctx=fx21["ctx"], provider=prov, max_rounds=2)
     assert fx21["patchbays"].read_bytes() == before
+
 
 def test_provider_timeout_no_write(fx21, monkeypatch):
     monkeypatch.setenv("FAKE_PROVIDER_MODE", "TIMEOUT")
@@ -104,6 +88,7 @@ def test_provider_timeout_no_write(fx21, monkeypatch):
         run_provider_loop(packet, ctx=fx21["ctx"], provider=prov, max_rounds=1)
     assert fx21["patchbays"].read_bytes() == before
 
+
 def test_provider_nonzero_exit_no_write(fx21, monkeypatch):
     monkeypatch.setenv("FAKE_PROVIDER_MODE", "NONZERO")
     before = fx21["patchbays"].read_bytes()
@@ -113,6 +98,7 @@ def test_provider_nonzero_exit_no_write(fx21, monkeypatch):
         run_provider_loop(packet, ctx=fx21["ctx"], provider=prov, max_rounds=1)
     assert fx21["patchbays"].read_bytes() == before
 
+
 def test_provider_oversized_output_no_write(fx21, monkeypatch):
     monkeypatch.setenv("FAKE_PROVIDER_MODE", "OVERSIZE")
     before = fx21["patchbays"].read_bytes()
@@ -121,6 +107,7 @@ def test_provider_oversized_output_no_write(fx21, monkeypatch):
     with pytest.raises(ProviderInvalidResponseError, match="exceeded"):
         run_provider_loop(packet, ctx=fx21["ctx"], provider=prov, max_rounds=1)
     assert fx21["patchbays"].read_bytes() == before
+
 
 def test_provider_cwd_isolated(fx21, monkeypatch):
     monkeypatch.setenv("FAKE_PROVIDER_MODE", "READY")
@@ -136,6 +123,7 @@ def test_provider_cwd_isolated(fx21, monkeypatch):
     assert probe.exists()
     cwd = Path(probe.read_text(encoding="utf-8").strip()).resolve()
     assert cwd != Path(ROOT).resolve()
+
 
 def test_provider_no_shell_true(fx21, monkeypatch):
     seen: dict = {}
@@ -166,4 +154,3 @@ def test_provider_no_shell_true(fx21, monkeypatch):
     prov = CommandProvider(argv=[sys.executable, "-c", "pass"], timeout_seconds=2)
     prov.run_turn(packet={"artifact": {"id": "Q-200"}}, context=[])
     assert seen.get("shell") is False
-

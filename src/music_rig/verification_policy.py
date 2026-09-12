@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from music_rig.actor import EvidenceBasis
@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from music_rig.models import OpenQuestion
 
 
-class VerificationPolicy(str, Enum):
+class VerificationPolicy(StrEnum):
     """Per verification-kind policy (not inferred from free prose each time)."""
 
     ANSWER_ATTESTATION_SUFFICIENT = "ANSWER_ATTESTATION_SUFFICIENT"
@@ -83,9 +83,8 @@ def evidence_basis_for(question: OpenQuestion) -> EvidenceBasis:
     if has_positive_observation(question):
         return EvidenceBasis.HUMAN_OBSERVATION
     policy = verification_policy_for(question)
-    if (
-        policy is VerificationPolicy.ANSWER_ATTESTATION_SUFFICIENT
-        and has_human_attestation(question)
+    if policy is VerificationPolicy.ANSWER_ATTESTATION_SUFFICIENT and has_human_attestation(
+        question
     ):
         return EvidenceBasis.HUMAN_ANSWER
     # FAILED_TEST / UNKNOWN observations do not grant positive basis

@@ -32,9 +32,7 @@ class ConfirmModal(SingleShotMixin, ModalScreen[bool]):
         Binding("n", "cancel", "No", show=False),
     ]
 
-    def __init__(
-        self, title: str, body: str = "", *, confirm_label: str = "Confirm"
-    ) -> None:
+    def __init__(self, title: str, body: str = "", *, confirm_label: str = "Confirm") -> None:
         super().__init__()
         self._title = title
         self._body = body
@@ -158,8 +156,7 @@ class SelectModeModal(SingleShotMixin, ModalScreen[str | None]):
         with Vertical(id="modal"):
             yield Label(f"Set mode for {self._pair_label}", id="modal-title")
             yield Static(
-                f"Current: {self._current}\n"
-                "Enter confirms focused button · 1–4 pick · Esc cancel",
+                f"Current: {self._current}\nEnter confirms focused button · 1–4 pick · Esc cancel",
                 id="modal-body",
             )
             with Vertical(id="mode-choices"):
@@ -169,13 +166,9 @@ class SelectModeModal(SingleShotMixin, ModalScreen[str | None]):
                     id="mode-normal",
                     action="screen.pick_normal",
                 )
-                yield Button(
-                    "2 half-normal", id="mode-half-normal", action="screen.pick_half"
-                )
+                yield Button("2 half-normal", id="mode-half-normal", action="screen.pick_half")
                 yield Button("3 thru", id="mode-thru", action="screen.pick_thru")
-                yield Button(
-                    "4 unknown", id="mode-unknown", action="screen.pick_unknown"
-                )
+                yield Button("4 unknown", id="mode-unknown", action="screen.pick_unknown")
                 yield Button("Cancel", id="cancel", action="screen.cancel")
 
     def on_mount(self) -> None:
@@ -265,9 +258,7 @@ class ApplyPatchbayModal(SingleShotMixin, ModalScreen[tuple[bool, bool] | None])
                 id="snap-check",
             )
             with Horizontal(id="modal-buttons"):
-                yield Button(
-                    "Apply", variant="primary", id="confirm", action="screen.confirm"
-                )
+                yield Button("Apply", variant="primary", id="confirm", action="screen.confirm")
                 yield Button("Cancel", id="cancel", action="screen.cancel")
 
     def on_mount(self) -> None:

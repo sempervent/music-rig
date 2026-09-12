@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Callable
+from collections.abc import Callable
+from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
 from music_rig.models import (
@@ -31,7 +31,7 @@ def default_clock() -> datetime:
     try:
         return datetime.now(ZoneInfo("America/New_York"))
     except Exception:
-        return datetime.now(timezone.utc)
+        return datetime.now(UTC)
 
 
 def capture_text(

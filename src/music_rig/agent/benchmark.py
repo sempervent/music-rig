@@ -20,9 +20,7 @@ def benchmark_fixture_packet() -> dict[str, Any]:
         "schema": "music_rig.agent_packet.v1",
         "artifact": {"type": "question", "id": "Q-BENCH"},
         "question": "Which patchbay models are installed for PB-A through PB-D?",
-        "final_human_answer": (
-            "PB-A and PB-B are ART P48; PB-C and PB-D are Behringer PX3000"
-        ),
+        "final_human_answer": ("PB-A and PB-B are ART P48; PB-C and PB-D are Behringer PX3000"),
         "answer_state": "FINAL",
         "question_status": "RESOLVED",
         "verification_result": None,
@@ -84,9 +82,7 @@ def run_ollama_benchmark(
     prompt_with_schema = build_planner_prompt(
         packet=packet, include_schema=True, compact_packet=True
     )
-    prompt_ollama = build_planner_prompt(
-        packet=packet, include_schema=False, compact_packet=True
-    )
+    prompt_ollama = build_planner_prompt(packet=packet, include_schema=False, compact_packet=True)
     rows: list[dict[str, Any]] = []
     for model in selected:
         if model not in available and ":" not in model:
@@ -107,7 +103,9 @@ def run_ollama_benchmark(
     fastest = None
     valid_rows = [r for r in rows if r.get("schema_valid") and r.get("ok")]
     if valid_rows:
-        fastest = min(valid_rows, key=lambda r: r.get("warm_total_s") or r.get("cold_total_s") or 1e9)
+        fastest = min(
+            valid_rows, key=lambda r: r.get("warm_total_s") or r.get("cold_total_s") or 1e9
+        )
     return {
         "ok": True,
         "base_url": base_url,
@@ -208,15 +206,11 @@ def format_benchmark_table(report: dict[str, Any]) -> str:
             f"{(ot if ot is not None else '—'):>11} {valid:>6}"
         )
     lines.append("")
-    lines.append(
-        f"Prompt chars (Ollama, no schema dup): {report.get('prompt_chars_ollama')}"
-    )
+    lines.append(f"Prompt chars (Ollama, no schema dup): {report.get('prompt_chars_ollama')}")
     lines.append(
         f"Prompt chars (with schema, Cursor-style): {report.get('prompt_chars_with_schema')}"
     )
     if report.get("fastest_valid"):
-        lines.append(
-            f"Fastest valid response in this run: {report['fastest_valid']}"
-        )
+        lines.append(f"Fastest valid response in this run: {report['fastest_valid']}")
     lines.append(report.get("note") or "")
     return "\n".join(lines)

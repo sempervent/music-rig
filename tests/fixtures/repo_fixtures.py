@@ -4,14 +4,13 @@ from __future__ import annotations
 
 import shutil
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 import yaml
 
-from music_rig import patchbay_state
-from music_rig import store
+from music_rig import patchbay_state, store
 from music_rig import store as store_mod
 from music_rig.agent.provider import CommandProvider
 from music_rig.reconciliation.context import ReconciliationContext
@@ -20,7 +19,8 @@ FIXTURE_PROVIDER = Path(__file__).resolve().parent / "fake_agent_provider.py"
 
 
 def _clock():
-    return datetime(2026, 9, 11, 21, 0, 0, tzinfo=timezone.utc)
+    return datetime(2026, 9, 11, 21, 0, 0, tzinfo=UTC)
+
 
 def _write_docs(tmp: Path) -> dict[str, Path]:
     paths = {}
@@ -129,6 +129,7 @@ def iso(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(store, "INBOX_PATH", inbox)
     monkeypatch.setattr(store, "PATCHBAYS_PATH", pb)
     return {"questions": questions, "inventory": inv, "patchbays": pb, "tmp": tmp_path}
+
 
 @pytest.fixture
 def fx15(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -382,7 +383,8 @@ def fx15(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(store, "DOCS_INVENTORY_PATH", docs["inventory.md"])
     monkeypatch.setattr(patchbay_state, "PATCHBAYS_PATH", patchbays)
     # render.py / midi_state import path constants by value — keep fixtures consistent
-    from music_rig import midi_state, render as render_mod
+    from music_rig import midi_state
+    from music_rig import render as render_mod
 
     monkeypatch.setattr(midi_state, "MIDI_PATH", midi)
     monkeypatch.setattr(render_mod, "MIDI_PATH", midi)
@@ -406,6 +408,7 @@ def fx15(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         "inventory": inventory,
         "tmp": tmp_path,
     }
+
 
 @pytest.fixture
 def fx17(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -472,9 +475,7 @@ def fx17(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         ),
         encoding="utf-8",
     )
-    patchbays.write_text(
-        yaml.safe_dump({"schema_notes": {}, "patchbays": {}}), encoding="utf-8"
-    )
+    patchbays.write_text(yaml.safe_dump({"schema_notes": {}, "patchbays": {}}), encoding="utf-8")
     routing.write_text(
         yaml.safe_dump(
             {
@@ -727,17 +728,26 @@ def fx17(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
     from music_rig import (
         ableton_state as ableton_mod,
+    )
+    from music_rig import (
         control_state as control_mod,
+    )
+    from music_rig import (
         current_service as current_mod,
+    )
+    from music_rig import (
         midi_state as midi_mod,
-        routing_state as routing_mod,
     )
     from music_rig import render as render_mod
+    from music_rig import (
+        routing_state as routing_mod,
+    )
 
     monkeypatch.setattr(midi_mod, "MIDI_PATH", midi)
     monkeypatch.setattr(control_mod, "CONTROLLERS_PATH", controllers)
-    monkeypatch.setattr(control_mod, "MIDI_PATH", midi)
-    monkeypatch.setattr(control_mod, "ABLETON_PATH", ableton)
+    # control_state no longer imports these paths; keep setattr soft for fixtures.
+    monkeypatch.setattr(control_mod, "MIDI_PATH", midi, raising=False)
+    monkeypatch.setattr(control_mod, "ABLETON_PATH", ableton, raising=False)
     monkeypatch.setattr(ableton_mod, "ABLETON_PATH", ableton)
     monkeypatch.setattr(routing_mod, "ROUTING_PATH", routing)
     monkeypatch.setattr(current_mod, "MIDI_PATH", midi)
@@ -784,6 +794,7 @@ def fx17(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         "routing": routing,
         "changes": changes,
     }
+
 
 @pytest.fixture
 def fx19(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -910,11 +921,7 @@ def fx19(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
                         "summary": "A/B/Y other",
                         "status": "CURRENT",
                         "branches": {
-                            "a": {
-                                "nodes": [
-                                    {"id": "n1", "label": "A", "gear_ref": "fx-gear"}
-                                ]
-                            }
+                            "a": {"nodes": [{"id": "n1", "label": "A", "gear_ref": "fx-gear"}]}
                         },
                     }
                 }
@@ -937,8 +944,8 @@ def fx19(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr("music_rig.routing_state.ROUTING_PATH", routing)
 
     # Never write production docs from fixture mutations
-    from music_rig import render as render_mod
     from music_rig import question_service as qs_mod
+    from music_rig import render as render_mod
     from music_rig import todo_service as ts_mod
 
     def _noop_render(**kwargs):
@@ -959,6 +966,7 @@ def fx19(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         "routing": routing,
         "tmp": tmp_path,
     }
+
 
 @pytest.fixture
 def fx20(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -1128,6 +1136,7 @@ def fx20(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     ctx = ReconciliationContext.for_root(tmp_path)
     return {"tmp": tmp_path, "ctx": ctx, "questions": questions, "patchbays": patchbays}
 
+
 def _minimal_routing() -> dict:
     return {
         "routes": {},
@@ -1150,11 +1159,13 @@ def _minimal_routing() -> dict:
         },
     }
 
+
 def _install_fake_provider(tmp: Path) -> Path:
     dest = tmp / "fake_agent_provider.py"
     shutil.copy(FIXTURE_PROVIDER, dest)
     dest.chmod(0o755)
     return dest
+
 
 def _provider(
     script: Path,
@@ -1176,6 +1187,7 @@ def _provider(
         env_forward=forward,
         max_stdout_bytes=max_stdout_bytes,
     )
+
 
 @pytest.fixture
 def fx21(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -1260,9 +1272,7 @@ def fx21(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
                         "status": "RESOLVED",
                         "related_todos": ["RIG-200"],
                         "related_changes": [],
-                        "answer": (
-                            "PB-A & PB-B are ART P48, PB-C & PB-D are Behringer PX3000"
-                        ),
+                        "answer": ("PB-A & PB-B are ART P48, PB-C & PB-D are Behringer PX3000"),
                         "notes": "",
                         "resolved_at": "2026-09-12T12:00:00+00:00",
                         "reconciled_at": None,
@@ -1300,9 +1310,7 @@ def fx21(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
                         "status": "RESOLVED",
                         "related_todos": ["RIG-200"],
                         "related_changes": [],
-                        "answer": (
-                            "PB-A & PB-B are ART P48, PB-C & PB-D are Behringer PX3000"
-                        ),
+                        "answer": ("PB-A & PB-B are ART P48, PB-C & PB-D are Behringer PX3000"),
                         "notes": "",
                         "resolved_at": "2026-09-12T12:00:00+00:00",
                         "reconciled_at": None,
@@ -1321,9 +1329,7 @@ def fx21(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
                         "status": "RESOLVED",
                         "related_todos": ["RIG-200"],
                         "related_changes": [],
-                        "answer": (
-                            "Alesis 2=Acoustic; PB-A is ART P48 for the return path"
-                        ),
+                        "answer": ("Alesis 2=Acoustic; PB-A is ART P48 for the return path"),
                         "notes": "",
                         "resolved_at": "2026-09-12T12:00:00+00:00",
                         "reconciled_at": None,
@@ -1420,4 +1426,3 @@ def fx21(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         "routing": routing,
         "script": script,
     }
-

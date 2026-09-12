@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Callable
 
+from music_rig import todo_service
 from music_rig.inbox_service import default_clock
 from music_rig.models import (
     AnswerState,
@@ -25,7 +26,6 @@ from music_rig.store import (
     load_todo,
     write_documents,
 )
-from music_rig import todo_service
 
 Clock = Callable[[], datetime]
 
@@ -77,19 +77,13 @@ def question_json_fields(question: OpenQuestion) -> dict:
         "clarifies_question": question.clarifies_question,
         "verification_policy": verification_policy_for(question).value,
         "evidence_basis": evidence_basis_for(question).value,
-        "resolved_at": (
-            question.resolved_at.isoformat() if question.resolved_at else None
-        ),
-        "reconciled_at": (
-            question.reconciled_at.isoformat() if question.reconciled_at else None
-        ),
+        "resolved_at": (question.resolved_at.isoformat() if question.resolved_at else None),
+        "reconciled_at": (question.reconciled_at.isoformat() if question.reconciled_at else None),
         "lifecycle_label": lifecycle_label(question),
     }
 
 
-def get_question(
-    question_id: str, *, questions_path: Path | None = None
-) -> OpenQuestion:
+def get_question(question_id: str, *, questions_path: Path | None = None) -> OpenQuestion:
     doc = load_questions(questions_path)
     key = question_id.strip().upper()
     item = doc.question_map().get(key)
@@ -121,9 +115,7 @@ def list_questions(
         items = [q for q in items if q.status == QuestionStatus.OPEN]
     elif unreconciled_only:
         items = [
-            q
-            for q in items
-            if q.status == QuestionStatus.RESOLVED and q.reconciled_at is None
+            q for q in items if q.status == QuestionStatus.RESOLVED and q.reconciled_at is None
         ]
     else:
         # ACTIVE
@@ -218,9 +210,7 @@ def open_clarification_question(
             and q.question.strip() == text
             and not q.answer.strip()
         ):
-            raise StoreError(
-                f"Open clarification already exists as {q.id} for {parent.id}"
-            )
+            raise StoreError(f"Open clarification already exists as {q.id} for {parent.id}")
     area_clean = (area or parent.area).strip() or parent.area
     if dry_run:
         return {
@@ -261,10 +251,7 @@ def open_clarification_question(
         "parent_id": parent.id,
         "question_id": child.id,
         "question": child,
-        "message": (
-            f"Opened clarification {child.id} for {parent.id}. "
-            "No CURRENT changes."
-        ),
+        "message": (f"Opened clarification {child.id} for {parent.id}. No CURRENT changes."),
     }
 
 
@@ -289,7 +276,7 @@ def resolve_question(
     ``answer_actor`` defaults from CLI actor context (HUMAN vs BOT).
     BOT cannot supply final human authority for attestation/observation policies.
     """
-    from music_rig.actor import AnswerActor, ActorKind, get_actor, require_human
+    from music_rig.actor import ActorKind, AnswerActor, get_actor
     from music_rig.verification_policy import VerificationPolicy, verification_policy_for
 
     qdoc = load_questions(questions_path)
@@ -306,11 +293,7 @@ def resolve_question(
 
     actor = answer_actor
     if actor is None:
-        actor = (
-            AnswerActor.BOT
-            if get_actor() is ActorKind.BOT
-            else AnswerActor.HUMAN
-        )
+        actor = AnswerActor.BOT if get_actor() is ActorKind.BOT else AnswerActor.HUMAN
     if isinstance(actor, str):
         actor = AnswerActor(actor)
 
@@ -341,9 +324,7 @@ def resolve_question(
                 if key not in qrefs:
                     qrefs.append(key)
                 updated_changes.append(
-                    ChangeRecord(
-                        **{**item.model_dump(), "related_questions": qrefs}
-                    )
+                    ChangeRecord(**{**item.model_dump(), "related_questions": qrefs})
                 )
             else:
                 updated_changes.append(item)
@@ -401,7 +382,7 @@ def draft_question(
     Does not invent verification_result. Does not reconcile.
     BOT drafts remain answer_actor=BOT and do not clear NEEDS_HUMAN_ANSWER.
     """
-    from music_rig.actor import AnswerActor, ActorKind, get_actor
+    from music_rig.actor import ActorKind, AnswerActor, get_actor
 
     _ = clock  # reserved for future audit timestamps
     cleaned = answer.strip()
@@ -409,9 +390,7 @@ def draft_question(
         raise StoreError("Draft answer cannot be empty.")
     current = get_question(question_id, questions_path=questions_path)
     before = question_json_fields(current)
-    actor = (
-        AnswerActor.BOT if get_actor() is ActorKind.BOT else AnswerActor.HUMAN
-    )
+    actor = AnswerActor.BOT if get_actor() is ActorKind.BOT else AnswerActor.HUMAN
     if dry_run:
         return {
             "dry_run": True,
@@ -430,12 +409,9 @@ def draft_question(
             "question_status": QuestionStatus.OPEN.value,
             "resolved_at": None,
             "reconciled_at": None,
-            "suggested_next_command": (
-                f"uv run rig question resolve {current.id}"
-            ),
+            "suggested_next_command": (f"uv run rig question resolve {current.id}"),
             "message": (
-                "Draft answer recorded. Question remains OPEN. "
-                "Resolve when the answer is final."
+                "Draft answer recorded. Question remains OPEN. Resolve when the answer is final."
             ),
         }
     qdoc = load_questions(questions_path)
@@ -477,8 +453,7 @@ def draft_question(
         "reconciled_at": None,
         "suggested_next_command": f"uv run rig question resolve {updated.id}",
         "message": (
-            "Draft answer recorded. Question remains OPEN. "
-            "Resolve when the answer is final."
+            "Draft answer recorded. Question remains OPEN. Resolve when the answer is final."
         ),
     }
 
@@ -697,9 +672,7 @@ def link_change(
     new_qdoc = OpenQuestionsDocument(
         questions=[updated_q if q.id == key else q for q in qdoc.questions]
     )
-    new_cdoc = ChangesDocument(
-        items=[updated_c if c.id == chg else c for c in cdoc.items]
-    )
+    new_cdoc = ChangesDocument(items=[updated_c if c.id == chg else c for c in cdoc.items])
     write_documents(
         questions=new_qdoc,
         changes=new_cdoc,
@@ -845,9 +818,7 @@ def mark_reconciled(
         raise StoreError(f"{key} RESOLVED requires a non-empty answer.")
     note_clean = note.strip()
     if no_current_change and not note_clean:
-        raise StoreError(
-            f"{key}: --no-current-change requires a non-empty --note."
-        )
+        raise StoreError(f"{key}: --no-current-change requires a non-empty --note.")
     if current.reconciled_at is not None:
         raise StoreError(f"{key} is already reconciled.")
     updated = OpenQuestion(
@@ -874,9 +845,7 @@ def mark_reconciled(
 
 def open_question_count(*, questions_path: Path | None = None) -> int:
     return sum(
-        1
-        for q in load_questions(questions_path).questions
-        if q.status == QuestionStatus.OPEN
+        1 for q in load_questions(questions_path).questions if q.status == QuestionStatus.OPEN
     )
 
 
@@ -911,9 +880,7 @@ def answer_question(
     current = get_question(question_id, questions_path=questions_path)
     before = question_json_fields(current)
     after_note = (
-        verification_note.strip()
-        if verification_note is not None
-        else current.verification_note
+        verification_note.strip() if verification_note is not None else current.verification_note
     )
     suggested = f"uv run rig reconcile plan question {current.id} --json"
     if dry_run:
@@ -962,9 +929,7 @@ def answer_question(
         "question_status": fields["question_status"],
         "resolved_at": fields["resolved_at"],
         "reconciled_at": None,
-        "suggested_next_command": (
-            f"uv run rig reconcile plan question {updated.id} --json"
-        ),
+        "suggested_next_command": (f"uv run rig reconcile plan question {updated.id} --json"),
         "next_command": f"uv run rig reconcile plan question {updated.id} --json",
         "message": "Answer recorded. CURRENT reconciliation still required.",
     }
@@ -984,9 +949,7 @@ _TARGET_FIELDS = (
 )
 
 
-def show_target(
-    question_id: str, *, questions_path: Path | None = None
-) -> dict:
+def show_target(question_id: str, *, questions_path: Path | None = None) -> dict:
     q = get_question(question_id, questions_path=questions_path)
     return {
         "question_id": q.id,
@@ -1005,9 +968,7 @@ def validate_target_refs(
     from music_rig import inventory_state, patchbay_state, routing_state
     from music_rig.models import QuestionTarget
 
-    qt = QuestionTarget.model_validate(
-        {k: v for k, v in target.items() if v not in (None, "", [])}
-    )
+    qt = QuestionTarget.model_validate({k: v for k, v in target.items() if v not in (None, "", [])})
     if qt.bay:
         data = patchbay_state.load_raw(patchbays_path)
         bay_id = qt.bay.strip().upper()
@@ -1097,9 +1058,7 @@ def set_target(
         inventory_path=inventory_path,
     )
     after = {
-        k: v
-        for k, v in QuestionTarget.model_validate(merged).model_dump().items()
-        if v is not None
+        k: v for k, v in QuestionTarget.model_validate(merged).model_dump().items() if v is not None
     }
     if dry_run:
         return {

@@ -2,22 +2,22 @@
 
 from __future__ import annotations
 
-from fixtures.repo_fixtures import _clock
 import json
-from datetime import datetime, timezone
-from pathlib import Path
+
 import pytest
 import yaml
 from typer.testing import CliRunner
-from music_rig import inspect_service, patchbay_state, question_service, store
+
+from fixtures.repo_fixtures import _clock
+from music_rig import question_service
 from music_rig.cli import app
 from music_rig.models import QuestionStatus, ReconciliationState, TodoStatus
-from music_rig.presentation import format_domains_table, format_reconcile_queue_table
 from music_rig.reconciliation import service as reconcile_service
 from music_rig.reconciliation.types import Capability, VerificationStatus
 from music_rig.store import StoreError, load_changes, load_questions, load_todo
 
 runner = CliRunner()
+
 
 def test_question_answer_dry_run_and_apply(fx15):
     runner = CliRunner()
@@ -60,6 +60,7 @@ def test_question_answer_dry_run_and_apply(fx15):
     assert q.status == QuestionStatus.RESOLVED
     assert q.answer == "half-normal"
     assert q.reconciled_at is None
+
 
 def test_question_target_set_validate(fx15):
     runner = CliRunner()
@@ -120,19 +121,17 @@ def test_question_target_set_validate(fx15):
     assert show.exit_code == 0
     assert json.loads(show.stdout)["result"]["target"]["pair"] == "1/25"
 
+
 def test_incomplete_target_e2e_fixture_not_prod_pair(fx15):
     """Q with patchbay.mode + bay + pair null → target set → apply → finalize.
 
     Uses fixture pair 1/25 only — does not claim production Q-008 pair.
     """
-    question_service.answer_question(
-        "Q-080", "half-normal", clock=_clock, render=False
-    )
+    question_service.answer_question("Q-080", "half-normal", clock=_clock, render=False)
     plan1 = reconcile_service.plan_question("Q-080")
     assert plan1.state == ReconciliationState.NEEDS_AGENT_ACTION
     assert any(
-        isinstance(b, dict) and b.get("code") == "missing_target_field"
-        for b in plan1.blockers
+        isinstance(b, dict) and b.get("code") == "missing_target_field" for b in plan1.blockers
     )
     blocker = next(b for b in plan1.blockers if isinstance(b, dict))
     assert blocker["field"] == "pair"
@@ -161,6 +160,7 @@ def test_incomplete_target_e2e_fixture_not_prod_pair(fx15):
     assert raw["patchbays"]["PB-B"]["jacks"][1]["mode"] == "half-normal"
     assert load_todo().task_map()["RIG-080"].status == TodoStatus.DONE
     assert load_changes().item_map()["CHG-080"].status.value == "APPLIED"
+
 
 def test_adapter_verify_only_guards(fx15):
     from music_rig.reconciliation.adapters import get_adapter
@@ -202,14 +202,12 @@ def test_adapter_verify_only_guards(fx15):
     assert plan_map.capability == Capability.MANUAL
     assert plan_map.state == ReconciliationState.NEEDS_AGENT_ACTION
     assert any(
-        isinstance(b, dict) and "gear_ref" in str(b.get("message", ""))
-        for b in plan_map.blockers
+        isinstance(b, dict) and "gear_ref" in str(b.get("message", "")) for b in plan_map.blockers
     )
 
+
 def test_question_list_active_flags(fx15):
-    question_service.answer_question(
-        "Q-081", "ableton", clock=_clock, render=False
-    )
+    question_service.answer_question("Q-081", "ableton", clock=_clock, render=False)
     active = question_service.list_questions()
     ids = {q.id for q in active}
     assert "Q-080" in ids
@@ -217,9 +215,8 @@ def test_question_list_active_flags(fx15):
     open_only = question_service.list_questions(open_only=True)
     assert all(q.status == QuestionStatus.OPEN for q in open_only)
     unrec = question_service.list_questions(unreconciled_only=True)
-    assert all(
-        q.status == QuestionStatus.RESOLVED and q.reconciled_at is None for q in unrec
-    )
+    assert all(q.status == QuestionStatus.RESOLVED and q.reconciled_at is None for q in unrec)
+
 
 def test_target_gear_path_validation(fx15):
     with pytest.raises(StoreError):
@@ -237,7 +234,4 @@ def test_target_gear_path_validation(fx15):
     )
     assert ok["after"]["path"] == "space"
     with pytest.raises(StoreError):
-        question_service.set_target(
-            "Q-080", gear="no-such-gear", dry_run=True
-        )
-
+        question_service.set_target("Q-080", gear="no-such-gear", dry_run=True)

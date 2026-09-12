@@ -70,7 +70,6 @@ def format_channels(
                 and int(keys[i + 1]) == int(key) + 1
             ):
                 meta2 = tascam[keys[i + 1]]
-                src2 = meta2.get("source")
                 name2 = meta2.get("name", "")
                 # Pair if both L/R-ish or same type stereo bus
                 pairable = (
@@ -129,9 +128,7 @@ def format_channels_compat(*, channel_map_path: Path | None = None) -> str:
         status = meta.get("status", "")
         status_suffix = f" ({status})" if status else ""
         source = "—" if meta.get("source") is None else meta.get("source")
-        lines.append(
-            f"  {channel}: {meta['name']} <- {source} [{meta['type']}]{status_suffix}"
-        )
+        lines.append(f"  {channel}: {meta['name']} <- {source} [{meta['type']}]{status_suffix}")
     lines.append("")
     lines.append("Alesis")
     for channel, meta in (data.get("alesis") or {}).items():
@@ -274,9 +271,7 @@ def path_tree_for(name: str, *, routing_path: Path | None = None) -> tuple[str, 
     return header, tree
 
 
-def patchbay_unknown_mode_stats(
-    *, patchbays_path: Path | None = None
-) -> list[tuple[str, int]]:
+def patchbay_unknown_mode_stats(*, patchbays_path: Path | None = None) -> list[tuple[str, int]]:
     data = load_patchbays(patchbays_path)
     stats: list[tuple[str, int]] = []
     for name, bay in (data.get("patchbays") or {}).items():

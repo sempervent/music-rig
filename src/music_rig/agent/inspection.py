@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any
 
 from music_rig.reconciliation.context import ReconciliationContext
 from music_rig.store import StoreError
@@ -249,7 +250,7 @@ def _inspect_performance(req: InspectionRequest, ctx: ReconciliationContext) -> 
 def _inspect_refs(req: InspectionRequest, ctx: ReconciliationContext) -> dict[str, Any]:
     """Bounded cross-ref: related todos/changes for a question id."""
     from music_rig import question_service
-    from music_rig.store import load_todo, load_changes
+    from music_rig.store import load_changes, load_todo
 
     qid = req.id
     if not qid:
