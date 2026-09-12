@@ -104,7 +104,7 @@ The model-to-letter mapping is UNKNOWN until the physical units are inspected
 | novation-launch-control-3 | Novation Launch Control 3 | Novation | Launch Control 3 | 1 | OWNED | UNKNOWN | — |
 | korg-padkontrol | Korg padKONTROL | Korg | padKONTROL | 1 | OWNED | UNKNOWN | — |
 | behringer-fcb1010 | Behringer FCB1010 | Behringer | FCB1010 | 1 | OWNED | UNKNOWN | — |
-| novation-remote-zero-sl | Novation ReMOTE ZeRO SL | Novation | ReMOTE ZeRO SL | 1 | OWNED | ISSUE | Encoder |
+| novation-remote-zero-sl | Novation ReMOTE ZeRO SL | Novation | ReMOTE ZeRO SL | 1 | OWNED | ISSUE | Encoder #6 broken |
 | elgato-stream-deck-plus | Elgato Stream Deck+ | Elgato | Stream Deck+ | 1 | OWNED | UNKNOWN | — |
 | mosky-dual-switch | MOSKY Dual Switch | MOSKY | — | 1 | OWNED | UNKNOWN | — |
 | boss-ev-30 | BOSS EV-30 | BOSS | EV-30 | 1 | OWNED | UNKNOWN | — |

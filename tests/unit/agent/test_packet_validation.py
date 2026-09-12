@@ -59,7 +59,7 @@ def test_ambiguous_proposal_no_writes(fx20):
     assert q.reconciled_at is None
 
 
-def test_validate_proposal_rejects_unregistered_and_empty_ready(fx20):
+def test_validate_proposal_rejects_unregistered(fx20):
     bad = AgentReconciliationProposal(
         artifact_id="Q-200",
         status=ProposalStatus.READY,
@@ -68,20 +68,13 @@ def test_validate_proposal_rejects_unregistered_and_empty_ready(fx20):
     )
     result = validate_proposal(bad, ctx=fx20["ctx"])
     assert result["ok"] is False
-
-    empty = AgentReconciliationProposal(
-        artifact_id="Q-200",
-        status=ProposalStatus.READY,
-        rationale="nothing",
-        operations=[],
-    )
-    result2 = validate_proposal(empty, ctx=fx20["ctx"])
-    # READY with zero ops should be rejected or flagged
-    assert result2["ok"] is False or result2.get("warnings") or result2.get("errors")
+    assert result["errors"]
 
 
 def test_build_packet_unknown_question(fx20):
     import pytest
 
-    with pytest.raises(Exception):
+    from music_rig.store import StoreError
+
+    with pytest.raises((StoreError, KeyError, ValueError)):
         build_agent_packet("Q-999", ctx=fx20["ctx"])

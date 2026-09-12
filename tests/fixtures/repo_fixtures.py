@@ -745,8 +745,9 @@ def fx17(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
     monkeypatch.setattr(midi_mod, "MIDI_PATH", midi)
     monkeypatch.setattr(control_mod, "CONTROLLERS_PATH", controllers)
-    monkeypatch.setattr(control_mod, "MIDI_PATH", midi)
-    monkeypatch.setattr(control_mod, "ABLETON_PATH", ableton)
+    # control_state no longer imports these paths; keep setattr soft for fixtures.
+    monkeypatch.setattr(control_mod, "MIDI_PATH", midi, raising=False)
+    monkeypatch.setattr(control_mod, "ABLETON_PATH", ableton, raising=False)
     monkeypatch.setattr(ableton_mod, "ABLETON_PATH", ableton)
     monkeypatch.setattr(routing_mod, "ROUTING_PATH", routing)
     monkeypatch.setattr(current_mod, "MIDI_PATH", midi)
