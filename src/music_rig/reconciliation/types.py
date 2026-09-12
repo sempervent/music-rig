@@ -11,9 +11,44 @@ from music_rig.models import ReconciliationState
 
 class Capability(str, Enum):
     APPLY_AND_VERIFY = "APPLY_AND_VERIFY"
+    # Human must observe; after verification_result, adapter may apply evidence/value.
+    # Historical name VERIFY_ONLY kept for CLI/compat; behavior is human-verify-then-apply.
     VERIFY_ONLY = "VERIFY_ONLY"
+    HUMAN_VERIFY_THEN_APPLY = "HUMAN_VERIFY_THEN_APPLY"
     MANUAL = "MANUAL"
     UNSUPPORTED = "UNSUPPORTED"
+
+
+class PlanOperationKind(str, Enum):
+    SET_CURRENT_VALUE = "SET_CURRENT_VALUE"
+    SET_EVIDENCE_VERIFIED = "SET_EVIDENCE_VERIFIED"
+    SET_EVIDENCE_UNKNOWN = "SET_EVIDENCE_UNKNOWN"
+    RECORD_FAILED_VERIFICATION = "RECORD_FAILED_VERIFICATION"
+    NO_CURRENT_CHANGE = "NO_CURRENT_CHANGE"
+
+
+def op(
+    kind: PlanOperationKind | str,
+    *,
+    target: str = "",
+    before: Any = None,
+    after: Any = None,
+    note: str = "",
+    **extra: Any,
+) -> dict[str, Any]:
+    """Typed plan operation dict for reconcile plan JSON."""
+    kind_val = kind.value if isinstance(kind, PlanOperationKind) else str(kind)
+    payload: dict[str, Any] = {"op": kind_val}
+    if target:
+        payload["target"] = target
+    if before is not None:
+        payload["before"] = before
+    if after is not None:
+        payload["after"] = after
+    if note:
+        payload["note"] = note
+    payload.update(extra)
+    return payload
 
 
 class VerificationStatus(str, Enum):

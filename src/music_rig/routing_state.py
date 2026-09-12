@@ -9,6 +9,7 @@ from typing import Any
 
 from music_rig.models import (
     CurrentPreview,
+    MidiEvidenceStatus,
     NamedPath,
     PathTreeNode,
     RoutingBranch,
@@ -726,4 +727,50 @@ def propose_batch(
             affected_files=[],
             message=f"Path {pid}: no routing changes proposed.",
         )
+    return preview, raw
+
+
+def propose_set_path_evidence(
+    path_id: str,
+    evidence: MidiEvidenceStatus | str,
+    *,
+    routing_path: Path | None = None,
+    data: dict[str, Any] | None = None,
+) -> tuple[CurrentPreview, dict[str, Any]]:
+    """Set NamedPath.evidence only — does not invent topology."""
+    status = (
+        evidence
+        if isinstance(evidence, MidiEvidenceStatus)
+        else MidiEvidenceStatus(str(evidence).strip().upper())
+    )
+    raw = copy.deepcopy(data if data is not None else load_raw(routing_path))
+    pid, named = get_named_path(raw, path_id)
+    before = {
+        "path": pid,
+        "status": named.status,
+        "evidence": named.evidence.value if named.evidence else None,
+    }
+    updated = NamedPath(
+        label=named.label,
+        status=named.status,
+        route_ref=named.route_ref,
+        notes=named.notes,
+        evidence=status,
+        branches=named.branches,
+    )
+    _set_path(raw, pid, updated)
+    after = {
+        "path": pid,
+        "status": updated.status,
+        "evidence": status.value,
+    }
+    preview = CurrentPreview(
+        domain="routing.path_evidence",
+        target=pid,
+        before=before,
+        after=after,
+        changed=before != after,
+        affected_files=["data/routing.yaml", "docs/current-routing.md"],
+        message=f"Path {pid} evidence → {status.value}",
+    )
     return preview, raw

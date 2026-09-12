@@ -507,12 +507,13 @@ def test_verify_run_enum_answer_only(fx16):
     result = runner.invoke(
         app,
         ["verify", "run", "Q-090", "--answer-only"],
-        input="2\n\nn\n",  # half-normal (2nd choice), empty note, no reconcile N/A
+        # choice 2=half-normal, note empty, record observation? n → answer only
+        input="2\n\nn\n",
     )
-    # With answer-only, no reconcile confirm
-    assert result.exit_code == 0
+    assert result.exit_code == 0, result.stdout
     q = question_service.get_question("Q-090")
     assert q.answer == "half-normal"
+    assert q.verification_result is None
     assert q.reconciled_at is None
     data = patchbay_state.load_raw()
     jack = data["patchbays"]["PB-B"]["jacks"].get(1) or data["patchbays"]["PB-B"]["jacks"].get("1")
@@ -525,16 +526,29 @@ def test_verify_run_unknown_and_cancel(fx16):
     assert cancel.exit_code == 0
     assert "Cancelled" in cancel.stdout or question_service.get_question("Q-090").status == QuestionStatus.OPEN
 
-    unk = runner.invoke(
+    # UNKNOWN as observation → no resolve (Stage 17)
+    unk_obs = runner.invoke(
         app,
         ["verify", "run", "Q-090", "--answer-only"],
-        input="4\n\n",  # UNKNOWN
+        input="4\n\ny\n",  # UNKNOWN, note, yes observation
     )
-    assert unk.exit_code == 0
+    assert unk_obs.exit_code == 0, unk_obs.stdout
     q = question_service.get_question("Q-090")
-    assert q.answer == "UNKNOWN"
-    assert q.status == QuestionStatus.RESOLVED
+    assert q.status == QuestionStatus.OPEN
+    assert q.verification_result is not None
+    assert q.verification_result.outcome.value == "UNKNOWN"
 
+    # Decline observation → classic answer path resolves UNKNOWN
+    unk_ans = runner.invoke(
+        app,
+        ["verify", "run", "Q-091", "--answer-only"],
+        input="3\n\nn\n",  # UNKNOWN (3rd BOOL), note, no observation
+    )
+    assert unk_ans.exit_code == 0, unk_ans.stdout
+    q2 = question_service.get_question("Q-091")
+    assert q2.answer == "UNKNOWN"
+    assert q2.status == QuestionStatus.RESOLVED
+    assert q2.verification_result is None
 
 # --- e2e patchbay HALF-NORMAL → reconcile MATCH finalize ---
 

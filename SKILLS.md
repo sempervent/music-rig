@@ -104,20 +104,58 @@ Structured NEEDS_AGENT_ACTION blockers look like:
 Candidates come from canonical data only. **Do not invent** production pairs
 (e.g. production Q-008 pair stays null until inspected).
 
-## VERIFY_ONLY domains
+## VERIFY_ONLY / human-verify-then-apply domains
 
-These adapters never promote INTENDED→VERIFIED via `reconcile apply`:
+These adapters never invent VERIFIED from metadata alone. After an explicit
+human `verification_result` (CONFIRMED/CORRECTED), `reconcile apply` may set
+scoped CURRENT evidence/value via shared services:
 
-| Domain | Capability | Notes |
+| Domain | Capability | After observation |
 |---|---|---|
-| `routing.verify` | VERIFY_ONLY | Inspect paths; finalize with `--no-current-change` |
-| `midi.verify` | VERIFY_ONLY | Topology evidence; no auto-match freeform |
-| `controls.verify` | VERIFY_ONLY | Controller evidence |
-| `ableton.template` | VERIFY_ONLY | Live-set match is offline/manual |
-| `midi.clock_master` | VERIFY_ONLY | Q-014 is physical practice (“in practice”); use `set-clock-master` then finalize — apply does not auto-write |
-| `inventory.patchbay_mapping` | MANUAL | hardware_model only; no `gear_ref` / `set-gear` yet |
+| `routing.verify` | VERIFY_ONLY | YES+CONFIRMED → NamedPath.evidence VERIFIED |
+| `midi.verify` | VERIFY_ONLY | link-scoped only; never whole topology |
+| `controls.verify` | VERIFY_ONLY | context-scoped evidence; not whole controller |
+| `ableton.template` | VERIFY_ONLY | template evidence VERIFIED |
+| `midi.clock_master` | VERIFY_ONLY | set master if needed + status VERIFIED |
+| `inventory.patchbay_mapping` | MANUAL | set-model then finalize |
 
 `patchbay.mode` is `APPLY_AND_VERIFY` when bay + pair + normalizable mode are known.
+
+## Observation vs answer (Stage 17)
+
+```text
+ANSWER          recorded fact on the Question
+OBSERVATION     verification_result — human performed the check
+CURRENT         canonical documented configuration
+EVIDENCE        VERIFIED | INTENDED | UNKNOWN on CURRENT entities
+```
+
+Complete YAML ≠ VERIFIED. Only explicit human observation may promote evidence.
+
+```bash
+# Answer without claiming physical verification (evidence stays INTENDED)
+uv run rig verify answer Q-014 --value ableton --yes --json
+
+# Explicit human observation (sets verification_result)
+uv run rig verify record Q-014 --outcome confirmed --value ableton --yes --json
+uv run rig verify record Q-014 --outcome corrected --value kaoss --yes --json
+uv run rig verify record Q-016 --outcome failed_test --note "…" --create-change --yes --json
+uv run rig verify record Q-014 --outcome unknown --yes --json
+
+# Then reconcile evidence/value
+uv run rig reconcile plan question Q-014 --json
+uv run rig reconcile apply question Q-014 --dry-run --json
+uv run rig reconcile apply question Q-014 --yes --json
+```
+
+**CONFIRMED flow:** observation matches documented → SET_EVIDENCE_VERIFIED (no value change if already correct) → verify MATCH → finalize.
+
+**FAILED_TEST flow:** record observation; do **not** mark VERIFIED; optional Change; Question stays active; sweep must not finalize as success.
+
+Never invent `verification_result` from inference or manuals. Agents may only call
+`verify record` after the human explicitly reports performing the check.
+
+Aliases: `rig verify confirm|correct|fail`.
 
 ## Artifact lifecycle
 
@@ -178,7 +216,8 @@ valid**. Manuals describe capabilities — they do not invent CURRENT state.
 uv run rig verify queue [--area] [--json]
 uv run rig verify next [--json]
 uv run rig verify show Q-008 [--json]
-uv run rig verify run Q-008 [--answer-only]     # interactive
+uv run rig verify run Q-008 [--answer-only]     # interactive (+ observation prompt)
+uv run rig verify record Q-014 --outcome confirmed --value ableton [--dry-run] [--yes] [--json]
 uv run rig verify answer Q-008 --value half-normal [--dry-run] [--yes] [--json] [--note]
 uv run rig verify session [--area] [--todo RIG-002]
 uv run rig verify summary [--json]
@@ -188,13 +227,13 @@ uv run rig tui verify
 
 Workflow:
 
-1. `verify queue` / `verify show` — see CURRENT hint + how to check
+1. `verify queue` / `verify show` — see CURRENT, evidence, last observation, how to check
 2. Ask the human / inspect the rig (do not invent from manuals)
-3. `verify answer` or `verify run` — records via `question answer` only
-4. `reconcile plan` → apply / verify / finalize as capability allows
+3. `verify record` (preferred when human performed the check) or `verify answer`
+4. `reconcile plan` → apply evidence/value / verify / finalize as capability allows
 
-Never invent answers to production OPEN questions during tests. Enriching
-verification metadata (kind, prompt, answer schema, unambiguous targets) is OK.
+Never invent answers or observations for production OPEN questions during tests.
+Enriching verification metadata (kind, prompt, answer schema, unambiguous targets) is OK.
 
 ## Question list flags
 

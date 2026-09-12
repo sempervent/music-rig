@@ -15,11 +15,14 @@ from typing import Any, Callable
 from music_rig import question_service
 from music_rig.inbox_service import default_clock
 from music_rig.models import (
+    ChangeCategory,
     OpenQuestion,
     QuestionStatus,
     QuestionVerification,
     TodoPriority,
     TodoStatus,
+    VerificationOutcome,
+    VerificationResult,
 )
 from music_rig.reconciliation import service as reconcile_service
 from music_rig.reconciliation.adapters import get_adapter
@@ -328,6 +331,7 @@ def build_card(
     capability = None
     blockers: list[Any] = []
     state = None
+    operations: list[Any] = []
     try:
         plan = reconcile_service.plan_question(
             q.id, questions_path=questions_path
@@ -336,6 +340,7 @@ def build_card(
         capability = plan.capability.value
         blockers = plan.blockers
         state = plan.state.value
+        operations = plan.operations
     except StoreError:
         capability = (
             _capability_for(q).value if _capability_for(q) else None
@@ -358,6 +363,11 @@ def build_card(
         else:
             related_work.append({"id": tid, "missing": True})
 
+    evidence = None
+    if isinstance(current, dict):
+        evidence = current.get("evidence") or current.get("status")
+
+    vr = q.verification_result
     return {
         "question_id": q.id,
         "question": q.question,
@@ -373,24 +383,316 @@ def build_card(
         ),
         "verification": v.model_dump() if v else None,
         "verification_note": q.verification_note,
+        "verification_result": vr.model_dump(mode="json") if vr else None,
         "prompt": (v.prompt if v else "") or "",
         "accepted": accepted_answers(q, inventory_path=inventory_path),
         "current": current,
+        "evidence": evidence,
         "reconciliation": {
             "capability": capability,
             "state": state,
             "blockers": blockers,
+            "operations": operations,
             "after_answer_bucket": _after_answer_bucket(
                 Capability(capability) if capability else None
             ),
+            "after_observation_bucket": _after_observation_bucket(q, capability),
         },
         "related_work": related_work,
         "suggested_commands": [
             f"uv run rig verify run {q.id}",
+            f"uv run rig verify record {q.id} --outcome confirmed --yes --json",
             f"uv run rig verify answer {q.id} --value \"…\" --json",
             f"uv run rig reconcile plan question {q.id} --json",
         ],
     }
+
+
+def _after_observation_bucket(q: OpenQuestion, capability: str | None) -> str:
+    """Capability projection once an explicit observation exists (or would)."""
+    vr = q.verification_result
+    if vr and vr.outcome == VerificationOutcome.FAILED_TEST:
+        return "failed-test"
+    if vr and vr.outcome == VerificationOutcome.UNKNOWN:
+        return "unknown-observation"
+    cap = Capability(capability) if capability else _capability_for(q)
+    if cap == Capability.APPLY_AND_VERIFY:
+        return "fully-reconcilable"
+    if cap in {Capability.VERIFY_ONLY, Capability.HUMAN_VERIFY_THEN_APPLY}:
+        return "fully-reconcilable"
+    if cap == Capability.MANUAL:
+        return "agent-action"
+    if cap == Capability.UNSUPPORTED or cap is None:
+        return "descriptive-or-agent"
+    return "agent-action"
+
+
+def _infer_outcome_vs_current(
+    q: OpenQuestion,
+    value: str,
+    *,
+    questions_path: Path | None = None,
+) -> VerificationOutcome:
+    """CONFIRMED if value matches CURRENT documented value; else CORRECTED."""
+    normalized = value.strip()
+    if normalized.casefold() == "unknown":
+        return VerificationOutcome.UNKNOWN
+    try:
+        plan = reconcile_service.plan_question(q.id, questions_path=questions_path)
+        current = plan.current
+    except StoreError:
+        current = None
+    if isinstance(current, dict):
+        candidates = [
+            current.get("master"),
+            current.get("mode"),
+            current.get("evidence"),
+            current.get("status"),
+        ]
+        for c in candidates:
+            if c is not None and str(c).strip().casefold() == normalized.casefold():
+                return VerificationOutcome.CONFIRMED
+    if q.answer.strip() and q.answer.strip().casefold() == normalized.casefold():
+        return VerificationOutcome.CONFIRMED
+    return VerificationOutcome.CORRECTED
+
+
+def record_observation(
+    question_id: str,
+    outcome: VerificationOutcome | str,
+    *,
+    value: str | None = None,
+    note: str | None = None,
+    dry_run: bool = False,
+    yes: bool = False,
+    create_change: bool = False,
+    clock: Clock = default_clock,
+    render: bool = True,
+    questions_path: Path | None = None,
+    inventory_path: Path | None = None,
+    changes_path: Path | None = None,
+) -> dict[str, Any]:
+    """Record explicit human verification_result; optionally update answer.
+
+    Observation ≠ answer. FAILED_TEST / UNKNOWN do not invent VERIFIED evidence.
+    Value-bearing CONFIRMED/CORRECTED may resolve/update the Question answer.
+    """
+    _ = yes  # CLI confirm gate
+    q = question_service.get_question(question_id, questions_path=questions_path)
+    if isinstance(outcome, str):
+        key = outcome.strip().upper().replace("-", "_")
+        aliases = {
+            "CONFIRMED": VerificationOutcome.CONFIRMED,
+            "CONFIRM": VerificationOutcome.CONFIRMED,
+            "CORRECTED": VerificationOutcome.CORRECTED,
+            "CORRECT": VerificationOutcome.CORRECTED,
+            "UNKNOWN": VerificationOutcome.UNKNOWN,
+            "FAILED_TEST": VerificationOutcome.FAILED_TEST,
+            "FAILED": VerificationOutcome.FAILED_TEST,
+            "FAIL": VerificationOutcome.FAILED_TEST,
+        }
+        if key not in aliases:
+            raise StoreError(
+                f"Invalid outcome {outcome!r}; expected "
+                "confirmed|corrected|unknown|failed_test"
+            )
+        outcome_e = aliases[key]
+    else:
+        outcome_e = outcome
+
+    observed_value = (value or "").strip()
+    if outcome_e in {
+        VerificationOutcome.CONFIRMED,
+        VerificationOutcome.CORRECTED,
+    } and observed_value:
+        observed_value = normalize_answer(
+            q, observed_value, inventory_path=inventory_path
+        )
+    elif outcome_e == VerificationOutcome.UNKNOWN and not observed_value:
+        observed_value = "UNKNOWN"
+    elif outcome_e == VerificationOutcome.UNKNOWN and observed_value:
+        observed_value = normalize_answer(
+            q, observed_value, inventory_path=inventory_path
+        )
+
+    if outcome_e == VerificationOutcome.CORRECTED and not observed_value:
+        raise StoreError("CORRECTED requires --value")
+    if outcome_e == VerificationOutcome.CONFIRMED and not observed_value:
+        # Allow confirm of existing answer / CURRENT without re-stating value
+        if q.answer.strip():
+            observed_value = q.answer.strip()
+        else:
+            raise StoreError("CONFIRMED requires --value when Question has no answer")
+
+    result = VerificationResult(
+        outcome=outcome_e,
+        observed_at=clock(),
+        observed_value=observed_value,
+        note=(note or "").strip(),
+        source="HUMAN",
+    )
+
+    resolve_answer = False
+    answer_value = q.answer
+    if outcome_e in {
+        VerificationOutcome.CONFIRMED,
+        VerificationOutcome.CORRECTED,
+    } and observed_value and observed_value.casefold() != "unknown":
+        resolve_answer = True
+        answer_value = observed_value
+    elif outcome_e == VerificationOutcome.UNKNOWN:
+        # Do not resolve unless explicitly answering UNKNOWN as the fact
+        resolve_answer = False
+
+    # Evidence plan (no write)
+    evidence_plan = None
+    try:
+        # Preview plan as if observation were already on the question
+        preview_q = OpenQuestion.model_validate(
+            {
+                **q.model_dump(mode="json"),
+                "verification_result": result.model_dump(mode="json"),
+                **(
+                    {
+                        "status": QuestionStatus.RESOLVED.value,
+                        "answer": answer_value,
+                        "resolved_at": (q.resolved_at or clock()).isoformat(),
+                    }
+                    if resolve_answer
+                    else {}
+                ),
+            }
+        )
+        # Temporarily plan via adapter with mutated in-memory question
+        from music_rig.reconciliation.adapters import get_adapter
+
+        adapter = get_adapter(preview_q.target.domain if preview_q.target else None)
+        paths = reconcile_service._paths(questions=questions_path)  # noqa: SLF001
+        plan = adapter.plan(preview_q, paths=paths)
+        evidence_plan = {
+            "state": plan.state.value,
+            "capability": plan.capability.value,
+            "operations": plan.operations,
+            "blockers": plan.blockers,
+            "details": plan.details,
+        }
+    except Exception as exc:  # noqa: BLE001 — dry-run preview best-effort
+        evidence_plan = {"error": str(exc)}
+
+    change_preview = None
+    if create_change and outcome_e == VerificationOutcome.FAILED_TEST:
+        change_preview = {
+            "category": ChangeCategory.OTHER.value,
+            "summary": f"FAILED_TEST {q.id}: expected vs observed",
+            "details": (
+                f"Question: {q.question}\n"
+                f"Expected/documented: {q.answer or '(none)'}\n"
+                f"Observed: {observed_value or '(failed)'}\n"
+                f"Note: {result.note or '(none)'}\n"
+                f"Target: {q.target.model_dump() if q.target else None}"
+            ),
+            "affected_areas": [q.area] if q.area else [],
+        }
+
+    payload: dict[str, Any] = {
+        "question_id": q.id,
+        "dry_run": dry_run,
+        "verification_result": result.model_dump(mode="json"),
+        "will_resolve_answer": resolve_answer,
+        "answer": answer_value if resolve_answer else q.answer,
+        "evidence_plan": evidence_plan,
+        "create_change": change_preview,
+        "message": (
+            f"Observation {outcome_e.value} recorded"
+            if not dry_run
+            else f"dry-run: would record {outcome_e.value}"
+        ),
+        "next_command": f"uv run rig reconcile plan question {q.id} --json",
+    }
+
+    if dry_run:
+        return payload
+
+    from music_rig.store import load_questions, write_documents
+    from music_rig.models import OpenQuestionsDocument
+
+    qdoc = load_questions(questions_path)
+    data = q.model_dump(mode="json")
+    data["verification_result"] = result.model_dump(mode="json")
+    if note is not None:
+        data["verification_note"] = note.strip()
+    if resolve_answer:
+        data["status"] = QuestionStatus.RESOLVED.value
+        data["answer"] = answer_value
+        data["resolved_at"] = (q.resolved_at or clock()).isoformat()
+        data["reconciled_at"] = None
+        data["reconciliation_note"] = ""
+    updated = OpenQuestion.model_validate(data)
+    new_qdoc = OpenQuestionsDocument(
+        questions=[updated if x.id == q.id else x for x in qdoc.questions]
+    )
+
+    created_change_id = None
+    if create_change and outcome_e == VerificationOutcome.FAILED_TEST and change_preview:
+        from music_rig import change_service
+
+        chg = change_service.create_change(
+            change_preview["summary"],
+            category=ChangeCategory.OTHER,
+            details=change_preview["details"],
+            affected_areas=change_preview["affected_areas"],
+            clock=clock,
+            changes_path=changes_path,
+            link_session=False,
+        )
+        created_change_id = chg.id
+        # link change on question
+        refs = list(updated.related_changes)
+        if chg.id not in refs:
+            refs.append(chg.id)
+        updated = OpenQuestion.model_validate(
+            {**updated.model_dump(mode="json"), "related_changes": refs}
+        )
+        new_qdoc = OpenQuestionsDocument(
+            questions=[updated if x.id == q.id else x for x in qdoc.questions]
+        )
+        # bidirectional link
+        from music_rig.store import load_changes
+        from music_rig.models import ChangeRecord, ChangesDocument
+
+        cdoc = load_changes(changes_path)
+        items = []
+        for item in cdoc.items:
+            if item.id == chg.id:
+                qrefs = list(item.related_questions)
+                if q.id not in qrefs:
+                    qrefs.append(q.id)
+                items.append(
+                    ChangeRecord(**{**item.model_dump(), "related_questions": qrefs})
+                )
+            else:
+                items.append(item)
+        write_documents(
+            questions=new_qdoc,
+            changes=ChangesDocument(items=items),
+            questions_path=questions_path,
+            changes_path=changes_path,
+        )
+    else:
+        write_documents(questions=new_qdoc, questions_path=questions_path)
+
+    if render:
+        from music_rig.render import render_docs
+
+        try:
+            render_docs(write=True)
+        except StoreError:
+            pass
+
+    payload["question"] = updated
+    payload["created_change_id"] = created_change_id
+    payload["status"] = updated.status.value
+    return payload
 
 
 def record_verified_answer(
@@ -456,6 +758,13 @@ def summary(
         "manual": 0,
     }
     by_kind: dict[str, int] = {}
+    after_obs: dict[str, int] = {
+        "fully-reconcilable": 0,
+        "agent-action": 0,
+        "descriptive-or-agent": 0,
+        "failed-test": 0,
+        "unknown-observation": 0,
+    }
     for item in queue:
         by_area[item.area] = by_area.get(item.area, 0) + 1
         by_kind[item.kind] = by_kind.get(item.kind, 0) + 1
@@ -465,11 +774,23 @@ def summary(
         if cap == Capability.UNSUPPORTED:
             bucket = "agent"
         by_bucket[bucket] = by_bucket.get(bucket, 0) + 1
+        # Project after explicit human observation (design-time estimate)
+        obs_bucket = "fully-reconcilable"
+        if cap == Capability.APPLY_AND_VERIFY:
+            obs_bucket = "fully-reconcilable"
+        elif cap in {Capability.VERIFY_ONLY, Capability.HUMAN_VERIFY_THEN_APPLY}:
+            obs_bucket = "fully-reconcilable"
+        elif cap == Capability.MANUAL:
+            obs_bucket = "agent-action"
+        else:
+            obs_bucket = "descriptive-or-agent"
+        after_obs[obs_bucket] = after_obs.get(obs_bucket, 0) + 1
     return {
         "total_open_guided": len(queue),
         "by_area": dict(sorted(by_area.items())),
         "by_kind": dict(sorted(by_kind.items())),
         "after_answer_capability": by_bucket,
+        "after_observation_capability": after_obs,
         "top": [i.question_id for i in queue[:5]],
     }
 
@@ -527,6 +848,7 @@ __all__ = [
     "normalize_answer",
     "accepted_answers",
     "record_verified_answer",
+    "record_observation",
     "summary",
     "production_readiness_matrix",
     "open_questions_for_todo",

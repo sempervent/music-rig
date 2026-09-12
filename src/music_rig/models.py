@@ -401,6 +401,31 @@ class QuestionVerification(BaseModel):
         return self
 
 
+class VerificationOutcome(str, Enum):
+    """Explicit human observation outcome (distinct from Question answer)."""
+
+    CONFIRMED = "CONFIRMED"
+    CORRECTED = "CORRECTED"
+    UNKNOWN = "UNKNOWN"
+    FAILED_TEST = "FAILED_TEST"
+
+
+class VerificationResult(BaseModel):
+    """Durable record that a human performed the requested check.
+
+    Observation ≠ answer. Complete YAML alone never implies VERIFIED evidence.
+    Never invent verification_result from inference.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    outcome: VerificationOutcome
+    observed_at: datetime
+    observed_value: str = ""
+    note: str = ""
+    source: str = "HUMAN"
+
+
 class OwnershipStatus(str, Enum):
     OWNED = "OWNED"
     RETIRED = "RETIRED"
@@ -511,6 +536,7 @@ class OpenQuestion(BaseModel):
     target: QuestionTarget | None = None
     verification: QuestionVerification | None = None
     verification_note: str = ""
+    verification_result: VerificationResult | None = None
 
     @field_validator("related_todos", "related_changes")
     @classmethod
@@ -1417,6 +1443,8 @@ class NamedPath(BaseModel):
     status: str = "CURRENT"
     route_ref: str | None = None
     notes: str | None = None
+    # Optional human-verification evidence (path.status remains lifecycle CURRENT/…)
+    evidence: MidiEvidenceStatus | None = None
     branches: dict[str, RoutingBranch] = Field(default_factory=dict)
 
     @model_validator(mode="after")

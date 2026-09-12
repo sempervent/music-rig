@@ -429,7 +429,20 @@ def apply_question(
         docs_questions=docs_questions,
     )
     adapter = _adapter_for(q)
-    if adapter.capability != Capability.APPLY_AND_VERIFY:
+    if adapter.capability == Capability.APPLY_AND_VERIFY:
+        pass
+    elif adapter.capability in {
+        Capability.VERIFY_ONLY,
+        Capability.HUMAN_VERIFY_THEN_APPLY,
+    }:
+        from music_rig.reconciliation.action_packet import has_positive_observation
+
+        if not has_positive_observation(q):
+            raise StoreError(
+                f"{q.id} capability is {adapter.capability.value}; "
+                "apply requires verification_result CONFIRMED or CORRECTED"
+            )
+    else:
         raise StoreError(
             f"{q.id} capability is {adapter.capability.value}; apply not supported"
         )
@@ -753,6 +766,17 @@ def sweep(
             counts["needs_answer"] += 1
             continue
         if q.status != QuestionStatus.RESOLVED:
+            continue
+        from music_rig.reconciliation.action_packet import observation_blocks_success
+
+        if observation_blocks_success(q):
+            skipped.append(
+                {
+                    "id": q.id,
+                    "reason": "FAILED_TEST — sweep must not finalize as success",
+                }
+            )
+            counts["needs_agent_action"] += 1
             continue
         st = question_state(q, paths=paths)
         adapter = _adapter_for(q)
