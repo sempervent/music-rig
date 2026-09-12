@@ -402,6 +402,42 @@ A **proposed** or **experiment** route does not mean it is currently wired.
 - Do not mark open questions as decided unless the repository has been updated to record the decision.
 - Do not call dual mono "stereo." The JOYO path is mono until BOSS CH-1 provides the post-chain stereo output, unless device-specific docs prove otherwise.
 
+## PLAY / CAPTURE / PRODUCE
+
+Three equally valid outcomes:
+
+| Outcome | Meaning |
+|---|---|
+| **PLAY** | Enjoyable music / discovery — recording not required |
+| **CAPTURE** | Optional Scratch or Multitrack — must not interrupt PLAY |
+| **PRODUCE** | Deliberate later workflow |
+
+A successful jam without a WAV file is still success. See [docs/jam-now.md](docs/jam-now.md)
+and [docs/capture-now.md](docs/capture-now.md).
+
+## Experiment vs CURRENT
+
+| Layer | Role |
+|---|---|
+| Session notes / discoveries / inbox captures | Incomplete, speculative, cheap — **not** CURRENT |
+| OPEN Changes (`rig change`) | Reality may have changed — **does not** edit CURRENT |
+| CURRENT (`rig current …` + reconcile) | Intentionally promoted canonical state |
+
+**Creative-session rule:** prefer recording an experiment or note over interrupting
+the HUMAN to reconcile CURRENT.
+
+Agents **may** freely create (with `--am-bot`): session notes, discoveries, inbox
+captures, planned Changes, TODOs, wishlist rows, draft recipes, draft docs — as
+long as they are **not** represented as HUMAN-confirmed CURRENT / VERIFIED physical
+facts.
+
+Agents still **must not** fabricate: HUMAN answers, HUMAN observations, HUMAN DoD
+acceptance, or verified physical CURRENT.
+
+Do **not** create HumanActionRequests merely to approve routine creative
+experimentation. Human authority is for provenance/safety — not a permission slip
+to make music.
+
 ## Change expectations
 
 - When rig changes are documented, update every affected representation of that change instead of only one file.

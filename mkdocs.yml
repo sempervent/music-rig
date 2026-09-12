@@ -36,6 +36,8 @@ nav:
   - Operational readiness: operational-readiness.md
   - Known-good ops: known-good-ops.md
   - Jam now: jam-now.md
+  - Capture now: capture-now.md
+  - Stage 28 capture: stage-28-capture.md
   - Human handoff: human-handoff.md
   - Stage 25 live validation: stage-25-live-validation.md
   - Interactive TUI: tui.md

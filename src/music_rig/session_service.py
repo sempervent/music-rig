@@ -57,6 +57,23 @@ def require_active(sessions_dir: Path | None = None) -> SessionLog:
     return active
 
 
+def ensure_active(
+    *,
+    focus: str = "",
+    clock: Clock = default_clock,
+    sessions_dir: Path | None = None,
+) -> tuple[SessionLog, bool]:
+    """Return the active session, starting a lightweight one if needed.
+
+    Notes / discoveries / captures should not require a prior ceremony.
+    Returns (session, started_now).
+    """
+    active = find_active(sessions_dir)
+    if active is not None:
+        return active, False
+    return start_session(focus=focus, clock=clock, sessions_dir=sessions_dir), True
+
+
 def start_session(
     focus: str = "",
     *,
@@ -124,7 +141,11 @@ def add_note(
     *,
     clock: Clock = default_clock,
     sessions_dir: Path | None = None,
+    auto_start: bool = True,
 ) -> SessionLog:
+    """Append a NOTE. By default auto-starts a session when none is active."""
+    if auto_start:
+        ensure_active(focus="ad-hoc note", clock=clock, sessions_dir=sessions_dir)
     return append_event(SessionEventType.NOTE, text, clock=clock, sessions_dir=sessions_dir)
 
 
@@ -133,7 +154,11 @@ def add_discovery(
     *,
     clock: Clock = default_clock,
     sessions_dir: Path | None = None,
+    auto_start: bool = True,
 ) -> SessionLog:
+    """Append a DISCOVERY. By default auto-starts a session when none is active."""
+    if auto_start:
+        ensure_active(focus="ad-hoc discovery", clock=clock, sessions_dir=sessions_dir)
     return append_event(SessionEventType.DISCOVERY, text, clock=clock, sessions_dir=sessions_dir)
 
 
@@ -192,7 +217,10 @@ def session_capture(
     clock: Clock = default_clock,
     sessions_dir: Path | None = None,
     inbox_path=None,
+    auto_start: bool = True,
 ) -> tuple[SessionLog, object]:
+    if auto_start:
+        ensure_active(focus="ad-hoc capture", clock=clock, sessions_dir=sessions_dir)
     item = inbox_service.capture_text(text, clock=clock, inbox_path=inbox_path, render=False)
     session = append_event(
         SessionEventType.CAPTURE,

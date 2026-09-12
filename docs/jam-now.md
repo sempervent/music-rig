@@ -5,6 +5,16 @@ You have ~30 minutes. Do not administer the studio — play.
 **Classification:** PLAYABLE (documented + clock/patchbay core settled).  
 Optional audits (cable archaeology, ZeRO template names, smoke re-runs) are deferred.
 
+## CAPTURE?
+
+| Choice | Meaning |
+|---|---|
+| **None** | Just play. Still a successful session. |
+| **Scratch** | Stream Deck OBS REC — one press start/stop. Details: [Capture now](capture-now.md). |
+| **Multitrack** | Ableton Arrangement Record on prepared PFL JAM tracks. Details: [Capture now](capture-now.md). |
+
+Decide later if you want — you can engage Scratch mid-jam if something gets interesting.
+
 ## START
 
 1. Power **TASCAM** → **Alesis** → pedals → **KAOSS** → Mac.  
@@ -31,10 +41,19 @@ Ready when you hear a dry source under Ableton transport.
 Bad loop / wet runaway → **RC-1 stop** or mute AUX send → Ableton stop.  
 See [Live Recovery](live-recovery.md) if needed.
 
+## After (optional, 30 seconds)
+
+```bash
+uv run rig session note "what felt good / weird / keep?"
+```
+
+No session start ceremony required. Do not reconcile CURRENT unless you want to keep a change.
+
 ## Ignore for now
 
 - Exact Thru5 THRU socket numbers (device-level fanout is enough)  
 - ZeRO template names (UNKNOWN is honest)  
 - Formal smoke re-checklist unless something is actually broken  
+- Recording as a requirement (it is not)
 
 If something fails while playing, tell the bot in plain language afterward.

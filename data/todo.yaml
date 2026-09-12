@@ -528,19 +528,21 @@ tasks:
   waiting_on: null
   next_session_why: null
 - id: RIG-046
-  task: Record one complete PFL reference jam through the documented rig
+  task: Play another PFL jam; optionally practice Scratch or Multitrack capture without breaking flow
   area: Integration
   priority: P0
   status: READY
   depends_on:
   - RIG-015
   depends_hint: helpful
-  definition_of_done: At least one instrument source; AUX SEND wet path; RC-1 used; JOYO branch
-    used; KAOSS available/used; Ableton records expected paths; OBS/camera if practical; recording
-    reviewed; discrepancies logged
-  notes: Proves the rig makes music
+  definition_of_done: Successful jam counts even with zero recording (Stage 27 precedent).
+    Optional stretch — Scratch (OBS REC) or Multitrack (Arrangement Record) start/stop
+    without leaving the musical state; note any remaining friction. Do not treat
+    uncaptured SUCCESS as failure.
+  notes: 'Stage 27 HUMAN jam SUCCESS without capture. Capture friction is Stage 28 —
+    PLAY first. See docs/capture-now.md.'
   waiting_on: null
-  next_session_why: Make music — reference jam is the point of the rig
+  next_session_why: Make music — practice optional capture only if it stays fun
 - id: RIG-047
   task: Audit pedal power supplies vs CURRENT pedal load
   area: Pedals / power
