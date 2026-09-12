@@ -32,10 +32,18 @@ def _reset_actor():
 def test_root_am_bot_sets_bot_actor():
     r = runner.invoke(app, ["--am-bot", "agent", "capabilities", "--json"])
     assert r.exit_code == 0, r.output
-    # callback runs in same process — last set actor should be BOT after invoke
-    # (CliRunner may reset; check help instead)
-    r2 = runner.invoke(app, ["--help"])
-    assert "--am-bot" in r2.output
+    assert get_actor() is ActorKind.BOT
+
+
+def test_root_help_documents_am_bot():
+    import re
+
+    r = runner.invoke(app, ["--help"])
+    assert r.exit_code == 0, r.output
+    # Rich may inject ANSI / wrap cells; strip SGR before substring checks.
+    plain = re.sub(r"\x1b\[[0-9;]*m", "", r.output)
+    assert "--am-bot" in plain
+
 
 
 def test_human_default_actor():

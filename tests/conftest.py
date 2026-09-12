@@ -2,10 +2,32 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
 import yaml
+
+# Fail fast if pytest was launched with Homebrew/system Python instead of uv.
+if sys.version_info < (3, 12):
+    raise RuntimeError(
+        f"music-rig tests require Python >= 3.12 (got {sys.version.split()[0]} "
+        f"from {sys.executable}).\n"
+        "Use: uv run pytest\n"
+        "Not: pytest / python -m pytest from Homebrew."
+    )
+try:
+    import pydantic
+except ImportError as exc:  # pragma: no cover
+    raise RuntimeError(
+        "pydantic is missing in this interpreter.\nUse: uv run pytest"
+    ) from exc
+if tuple(int(p) for p in pydantic.__version__.split(".")[:2]) < (2, 0):
+    raise RuntimeError(
+        f"music-rig requires pydantic v2 (got {pydantic.__version__} from "
+        f"{pydantic.__file__}).\n"
+        "Use: uv run pytest"
+    )
 
 from music_rig import store
 

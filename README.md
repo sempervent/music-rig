@@ -378,18 +378,20 @@ More detail: [docs/tui.md](docs/tui.md) and [SKILLS.md](SKILLS.md).
 
 ## Documentation CI/CD
 
-- CI runs pytest, `rig check`, `rig render --check`, channel-map print, and `mkdocs build --strict`.
+- CI runs pytest (with coverage, fail under 75%), `rig check`, `rig render --check`, channel-map print, and `mkdocs build --strict`.
 - Pushes to `main` also deploy the MkDocs site to GitHub Pages.
 - Local validation:
 
 ```bash
 uv sync --locked --extra dev --extra docs
-uv run pytest
+uv run pytest --cov-fail-under=75
 uv run rig check
 uv run rig render --check
 uv run python scripts/print_channel_map.py
 uv run mkdocs build --strict
 ```
+
+Coverage measures `music_rig` excluding thin `cli.py` wiring and the Textual `tui/` package (logic lives in services; TUI has dedicated pilot tests). CI fails under 75%.
 
 - Local preview:
 
