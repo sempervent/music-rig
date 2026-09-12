@@ -125,6 +125,12 @@ Which physical unit is PB-A / PB-B / PB-C / PB-D (ART P48 vs Behringer PX3000)?
 
 **Reconciliation note:** [agent-interpreted / manually reconciled] Updated CURRENT hardware_model from final Q-007 answer: PB-A/B=ART P48, PB-C/D=Behringer PX3000 (model-level; unique unit IDs still unknown)
 
+### Q-008 — OPEN
+
+What normalization mode (normal / half-normal / thru) is each populated PB-B pair set to?
+
+**Answer:** All represented PB-B pairs are normal (HUMAN Stage 25 live validation).
+
 ### Q-009 — OPEN
 
 What are the rear-panel assignments for PB-A, PB-C, and PB-D?

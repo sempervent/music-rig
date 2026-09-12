@@ -55,9 +55,9 @@ Bot documents the procedure; **PASS is HUMAN-only**.
 
 Result log (fill when performed):
 
-- Date:
-- Result: PASS / FAIL / PARTIAL / NOT RUN
-- Notes:
+- Date: 2026-09-12
+- Result: PASS (HUMAN Stage 25 live validation — “All passes”)
+- Notes: Physical smoke A–H reported PASS by HUMAN in session.
 
 ## Reference jam recipe (~5–10 minutes)
 
@@ -84,10 +84,10 @@ play, path is RC-1 → KAOSS | RC-600, or instrument → RC-600 via Alesis mixer
 
 Result log:
 
-- Date:
-- Result: PASS / FAIL / NOT RUN
-- BPM / meter used:
-- Notes:
+- Date: 2026-09-12
+- Result: PASS (HUMAN Stage 25 — “All passes”)
+- BPM / meter used: (not specified)
+- Notes: Reference jam reported PASS by HUMAN in the same validation session.
 
 ## Still open (blocks “fully known” but not necessarily “can play”)
 

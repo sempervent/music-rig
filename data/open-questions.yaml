@@ -164,7 +164,8 @@ questions:
   related_todos:
   - RIG-002
   related_changes: []
-  answer: ''
+  answer: All represented PB-B pairs are normal (HUMAN Stage 25 live validation).
+  answer_actor: BOT
   notes: ''
   reconciliation_note: ''
   target:
