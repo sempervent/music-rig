@@ -3,9 +3,12 @@
 `data/midi.yaml` is the canonical structured source for MIDI endpoints, devices,
 physical links, channels, clock, and Ableton port state.
 
-Physical MIDI topology is currently **UNKNOWN**. No cable, USB port, DIN port, or
-Ableton preference is implied by an intended design. A link appears below only
-when it is explicitly represented in `connections`.
+Two DIN links are **VERIFIED** (Q-015): FCB1010 → U6MIDI Pro IN 1, and
+U6MIDI Pro OUT 1 → Thru5 WC IN 1. Downstream Thru5 fan-out and remaining
+ports are still incompletely traced (RIG-037).
+
+A link appears in the generated table only when it is explicitly represented
+in `connections`.
 
 <!-- rig:midi-topology:start -->
 <!-- GENERATED FROM data/midi.yaml BY `uv run rig render`. DO NOT EDIT THIS SECTION DIRECTLY. -->
