@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from music_rig.actor import EvidenceBasis
 from music_rig.models import (
@@ -25,10 +25,7 @@ from music_rig.verification_policy import (
 
 
 def test_policy_for_none_and_unknown_kind():
-    assert (
-        verification_policy_for(None)
-        is VerificationPolicy.ANSWER_ATTESTATION_SUFFICIENT
-    )
+    assert verification_policy_for(None) is VerificationPolicy.ANSWER_ATTESTATION_SUFFICIENT
     q = OpenQuestion(
         id="Q-901",
         question="x?",
@@ -41,10 +38,7 @@ def test_policy_for_none_and_unknown_kind():
             choices=[],
         ),
     )
-    assert (
-        verification_policy_for(q)
-        is VerificationPolicy.ANSWER_ATTESTATION_SUFFICIENT
-    )
+    assert verification_policy_for(q) is VerificationPolicy.ANSWER_ATTESTATION_SUFFICIENT
 
 
 def test_effective_actor_and_attestation_empty_answer():
@@ -65,7 +59,7 @@ def test_effective_actor_and_attestation_empty_answer():
         status=QuestionStatus.RESOLVED,
         answer="yes",
         answer_actor=AnswerActor.BOT,
-        resolved_at=datetime.now(timezone.utc),
+        resolved_at=datetime.now(UTC),
     )
     assert has_bot_answer(q2) is True
     assert has_human_attestation(q2) is False
@@ -79,7 +73,7 @@ def test_evidence_basis_failed_observation():
         status=QuestionStatus.RESOLVED,
         answer="ableton",
         answer_actor=AnswerActor.HUMAN,
-        resolved_at=datetime.now(timezone.utc),
+        resolved_at=datetime.now(UTC),
         verification=QuestionVerification(
             kind="MIDI_CLOCK",
             prompt="p",
@@ -88,7 +82,7 @@ def test_evidence_basis_failed_observation():
         ),
         verification_result=VerificationResult(
             outcome=VerificationOutcome.FAILED_TEST,
-            observed_at=datetime.now(timezone.utc),
+            observed_at=datetime.now(UTC),
             observed_value="nope",
         ),
     )

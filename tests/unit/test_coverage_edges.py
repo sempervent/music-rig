@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 import pytest
 import yaml
 
+from music_rig.actor import EvidenceBasis
 from music_rig.channel_state import apply_data, save_raw, validate_channel_map
 from music_rig.models import (
     AnswerActor,
@@ -20,7 +21,6 @@ from music_rig.models import (
 )
 from music_rig.reconciliation.operation_registry import prepare_operation
 from music_rig.reconciliation.operations import OperationMutability, RigOperation
-from music_rig.actor import EvidenceBasis
 from music_rig.store import StoreError, save_changes, save_inbox
 from music_rig.verification_policy import evidence_basis_for, has_human_attestation
 
